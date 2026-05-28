@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -6,13 +6,142 @@ import {
   Card, Button, Spinner, C, Badge,
 } from '../ui'
 import { useCUM } from '../../hooks/useCUM'
-import { OPT, CIUDADES } from '../../lib/constants'
+import { useMunicipios } from '../../hooks/useMunicipios'
+import { OPT } from '../../lib/constants'
 import { calcEdad, fmtDate, productMetrics } from '../../lib/utils'
 import {
   step1Schema, step2Schema, step3Schema, step4Schema,
   type Step1Data, type Step2Data, type Step3Data, type Step4Data,
 } from '../../lib/validators'
 import type { SurveyDraft, Medication } from '../../types'
+
+// ─── Municipio combobox ───────────────────────────────────────────────────────
+
+function toTitleCase(s: string): string {
+  const lower = ['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e']
+  return s
+    .toLowerCase()
+    .split(' ')
+    .map((w, i) => (i === 0 || !lower.includes(w)) ? w.charAt(0).toUpperCase() + w.slice(1) : w)
+    .join(' ')
+}
+
+interface MunicipioComboboxProps {
+  value: string
+  onChange: (v: string) => void
+}
+
+function MunicipioCombobox({ value, onChange }: MunicipioComboboxProps) {
+  const [text, setText] = useState(value)
+  const [open, setOpen] = useState(false)
+  const { results, loading, error, search, clear } = useMunicipios()
+  const skipSearch = useRef(false)
+
+  useEffect(() => {
+    if (skipSearch.current) { skipSearch.current = false; return }
+    setText(value)
+  }, [value])
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value
+    setText(v)
+    onChange(v)
+    setOpen(true)
+    search(v)
+  }
+
+  function handleSelect(municipio: string) {
+    const name = toTitleCase(municipio)
+    skipSearch.current = true
+    setText(name)
+    onChange(name)
+    setOpen(false)
+    clear()
+  }
+
+  function handleClear() {
+    setText('')
+    onChange('')
+    setOpen(false)
+    clear()
+  }
+
+  const showDropdown = open && (results.length > 0 || (error !== '' && text.trim().length >= 2) || loading)
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <input
+          value={text}
+          onChange={handleChange}
+          onFocus={() => { if (text.trim().length >= 2 && results.length > 0) setOpen(true) }}
+          onBlur={() => setTimeout(() => setOpen(false), 160)}
+          placeholder="Escriba para buscar municipio…"
+          autoComplete="off"
+        />
+        <div style={{
+          position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}>
+          {loading && <Spinner size={14} color={C.teal} />}
+          {text && !loading && (
+            <button
+              type="button"
+              onMouseDown={e => { e.preventDefault(); handleClear() }}
+              aria-label="Limpiar"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.hint, fontSize: 18, lineHeight: 1, padding: 0 }}
+            >×</button>
+          )}
+        </div>
+      </div>
+
+      {showDropdown && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 3px)', left: 0, right: 0, zIndex: 30,
+          background: C.surface, border: `0.5px solid ${C.border}`,
+          borderRadius: 8, boxShadow: '0 4px 14px rgba(0,0,0,0.10)',
+          maxHeight: 220, overflowY: 'auto',
+        }}>
+          {error && (
+            <div style={{ padding: '8px 12px', fontSize: 12, color: C.amber, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <i className="ti ti-wifi-off" style={{ fontSize: 14 }} aria-hidden />
+              {error} — el texto ingresado se guardará tal cual
+            </div>
+          )}
+          {results.map((r, i) => (
+            <button
+              key={i}
+              type="button"
+              onMouseDown={e => { e.preventDefault(); handleSelect(r.municipio) }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '9px 12px', border: 'none', cursor: 'pointer',
+                background: 'transparent',
+                borderBottom: i < results.length - 1 ? `0.5px solid ${C.border}` : 'none',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = C.bg)}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>
+                {toTitleCase(r.municipio)}
+              </div>
+              {r.departamento && (
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
+                  {toTitleCase(r.departamento)}
+                </div>
+              )}
+            </button>
+          ))}
+          {!loading && !error && results.length === 0 && text.trim().length >= 2 && (
+            <div style={{ padding: '10px 12px', fontSize: 12, color: C.muted }}>
+              Sin resultados — el texto ingresado se guardará tal cual
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Shared ───────────────────────────────────────────────────────────────────
 
@@ -127,10 +256,10 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
       </Field>
 
       <Field label="Ciudad / Municipio" error={errors.ciudad?.message}>
-        <select {...register('ciudad')} style={{ width: '100%', padding: 8, borderRadius: 4, border: `0.5px solid ${C.border}`, font: 'inherit' }}>
-          <option value="">Seleccione una ciudad…</option>
-          {CIUDADES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <Controller name="ciudad" control={control}
+          render={({ field }) => (
+            <MunicipioCombobox value={field.value ?? ''} onChange={field.onChange} />
+          )} />
       </Field>
 
       <Field label="Dirección de residencia" error={errors.dir?.message}>
