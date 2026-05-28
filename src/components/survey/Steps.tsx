@@ -7,14 +7,14 @@ import {
 } from '../ui'
 import { useCUM } from '../../hooks/useCUM'
 import { OPT, CIUDADES } from '../../lib/constants'
-import { calcEdad, fmtDate, dayDiff, productMetrics } from '../../lib/utils'
+import { calcEdad, fmtDate, productMetrics } from '../../lib/utils'
 import {
   step1Schema, step2Schema, step3Schema, step4Schema,
   type Step1Data, type Step2Data, type Step3Data, type Step4Data,
 } from '../../lib/validators'
 import type { SurveyDraft, Medication } from '../../types'
 
-// ─── Shared ───────────────────────────────────────────────────────────────
+// ─── Shared ───────────────────────────────────────────────────────────────────
 
 interface StepProps {
   draft: SurveyDraft
@@ -63,14 +63,14 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
     <form onSubmit={handleSubmit(data => onNext(data as any))} noValidate>
       <SectionHead icon="ti-id-badge" label="Datos de identificación" />
 
-      <Field label="Fecha de la entrevista (F_ETA)" required error={errors.fEta?.message}>
+      <Field label="Fecha de la entrevista" required error={errors.fEta?.message}>
         <input
           type="date" max={new Date().toISOString().split('T')[0]}
           {...register('fEta')}
         />
       </Field>
 
-      <Field label="ID Único del Encuestador (NUI_ETR)" required error={errors.nuiEtr?.message}>
+      <Field label="ID del encuestador" required error={errors.nuiEtr?.message}>
         <input
           type="number" inputMode="numeric" min={1} step={1}
           placeholder="Ej: 1012345678"
@@ -78,7 +78,7 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
         />
       </Field>
 
-      <Field label="N° de registro de la encuesta (NUI)" hint="Asignado automáticamente">
+      <Field label="Número de encuesta" hint="Asignado automáticamente">
         <input type="text" value={draft.nui} readOnly {...register('nui', { valueAsNumber: true })} />
       </Field>
 
@@ -112,8 +112,7 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
     <form onSubmit={handleSubmit(data => onNext(data as any))} noValidate>
       <SectionHead icon="ti-users" label="Datos sociodemográficos" />
 
-      {/* F_NAC + EDAD calculada */}
-      <Field label="Fecha de nacimiento (F_NAC)" required error={errors.fNac?.message}>
+      <Field label="Fecha de nacimiento" required error={errors.fNac?.message}>
         <input type="date" max={draft.fEta || undefined} {...register('fNac')} />
         {edad !== null && (
           <div style={{
@@ -122,26 +121,23 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
             fontSize: 13, color: C.teal, fontWeight: 500,
           }}>
             <i className="ti ti-calendar-check" style={{ marginRight: 6, fontSize: 13 }} aria-hidden />
-            EDAD calculada: {edad} años (F_ETA − F_NAC)
+            Edad calculada: {edad} años
           </div>
         )}
       </Field>
 
-      {/* CIUDAD */}
-      <Field label="Ciudad / Municipio (CIUDAD)" error={errors.ciudad?.message}>
+      <Field label="Ciudad / Municipio" error={errors.ciudad?.message}>
         <select {...register('ciudad')} style={{ width: '100%', padding: 8, borderRadius: 4, border: `0.5px solid ${C.border}`, font: 'inherit' }}>
           <option value="">Seleccione una ciudad…</option>
           {CIUDADES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </Field>
 
-      {/* DIR */}
-      <Field label="Dirección de residencia (DIR)" error={errors.dir?.message}>
+      <Field label="Dirección de residencia" error={errors.dir?.message}>
         <input placeholder="Calle, carrera, barrio…" {...register('dir')} />
       </Field>
 
-      {/* ESTRATO */}
-      <Field label="Estrato socioeconómico (ESTRATO)" error={errors.estrato?.message}>
+      <Field label="Estrato socioeconómico" error={errors.estrato?.message}>
         <Controller name="estrato" control={control}
           render={({ field }) => (
             <div role="radiogroup" style={{ display: 'flex', gap: 6 }}>
@@ -165,40 +161,35 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
           )} />
       </Field>
 
-      {/* ETNIA */}
-      <Field label="Pertenencia étnica (ETNIA)" required error={errors.etnia?.message}>
+      <Field label="Pertenencia étnica" required error={errors.etnia?.message}>
         <Controller name="etnia" control={control}
           render={({ field }) => (
             <ChipGroup options={OPT.etnia} value={field.value} onChange={field.onChange} />
           )} />
       </Field>
 
-      {/* AS_SALUD */}
-      <Field label="Régimen de afiliación a salud (AS_SALUD)" required error={errors.asSalud?.message}>
+      <Field label="Régimen de salud" required error={errors.asSalud?.message}>
         <Controller name="asSalud" control={control}
           render={({ field }) => (
             <ChipGroup options={OPT.asSalud} value={field.value} onChange={field.onChange} />
           )} />
       </Field>
 
-      {/* EST_LAB */}
-      <Field label="Ocupación actual (EST_LAB)" required error={errors.estLab?.message}>
+      <Field label="Ocupación actual" required error={errors.estLab?.message}>
         <Controller name="estLab" control={control}
           render={({ field }) => (
             <ChipGroup options={OPT.estLab} value={field.value} onChange={field.onChange} />
           )} />
       </Field>
 
-      {/* INGRESO */}
-      <Field label="Ingresos mensuales (INGRESO)" required error={errors.ingreso?.message}>
+      <Field label="Ingresos mensuales del hogar" required error={errors.ingreso?.message}>
         <Controller name="ingreso" control={control}
           render={({ field }) => (
             <ChipGroup options={OPT.ingreso} value={field.value} onChange={field.onChange} />
           )} />
       </Field>
 
-      {/* NV_ESTU */}
-      <Field label="Último nivel de estudios aprobado (NV_ESTU)" required error={errors.nvEstu?.message}>
+      <Field label="Nivel educativo" required error={errors.nvEstu?.message}>
         <Controller name="nvEstu" control={control}
           render={({ field }) => (
             <ChipGroup options={OPT.nvEstu} value={field.value} onChange={field.onChange} />
@@ -237,7 +228,6 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
   const fPrc     = watch('fPrc')
 
   function handleNext(data: Step3Data) {
-    // Deterministic sanitization per codebook field-logic
     const patch: Partial<SurveyDraft> = { ...data } as any
     if (data.estSalud !== 'Sí') {
       Object.assign(patch, { prbSalud: '', conMed: '', medPrc: '', fPrc: '', fDisp: '', indMed: '' })
@@ -255,8 +245,7 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
     <form onSubmit={handleSubmit(handleNext)} noValidate>
       <SectionHead icon="ti-heart-rate-monitor" label="Estado de salud" />
 
-      {/* PER_SALUD */}
-      <Field label="Percepción general de salud (PER_SALUD)" required error={errors.perSalud?.message}>
+      <Field label="Percepción general de salud" required error={errors.perSalud?.message}>
         <Controller name="perSalud" control={control}
           render={({ field }) => (
             <ChipGroup options={OPT.perSalud} value={field.value} onChange={field.onChange} />
@@ -265,9 +254,8 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
 
       <Divider />
 
-      {/* EST_SALUD */}
       <Field
-        label="¿En las últimas 4 semanas ha padecido alguna enfermedad o problema de salud? (EST_SALUD)"
+        label="¿En las últimas 4 semanas ha padecido alguna enfermedad o problema de salud?"
         required error={errors.estSalud?.message}
       >
         <Controller name="estSalud" control={control}
@@ -276,32 +264,28 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
 
       {estSalud === 'Sí' && (
         <div className="fade-in">
-          {/* PRB_SALUD */}
-          <Field label="¿Cuál es su principal problema de salud? (PRB_SALUD)">
+          <Field label="¿Cuál es su principal problema de salud?">
             <Controller name="prbSalud" control={control}
               render={({ field }) => (
                 <input placeholder="Describa brevemente…" {...field} />
               )} />
           </Field>
 
-          {/* CON_MED */}
-          <Field label="¿Consume medicamentos para este problema? (CON_MED)">
+          <Field label="¿Consume medicamentos para este problema?">
             <Controller name="conMed" control={control}
               render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
           </Field>
 
           {conMed === 'Sí' && (
             <div className="fade-in">
-              {/* MED_PRC */}
-              <Field label="¿Los medicamentos fueron ordenados por médico u odontólogo? (MED_PRC)">
+              <Field label="¿Los medicamentos fueron prescritos por un profesional de salud?">
                 <Controller name="medPrc" control={control}
                   render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
               </Field>
 
               {medPrc === 'Sí' && (
                 <div className="fade-in">
-                  {/* F_PRC */}
-                  <Field label="Fecha de prescripción médica (F_PRC)">
+                  <Field label="Fecha de prescripción médica">
                     <input
                       type="date"
                       min={draft.fNac || undefined}
@@ -309,12 +293,11 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
                       {...register('fPrc')}
                     />
                     <p style={{ fontSize: 11, color: C.hint, margin: '3px 0 0' }}>
-                      F_NAC ≤ F_PRC ≤ F_ETA
+                      Entre la fecha de nacimiento y la fecha de la entrevista
                     </p>
                   </Field>
 
-                  {/* F_DISP */}
-                  <Field label="Fecha de dispensación / entrega (F_DISP)">
+                  <Field label="Fecha de entrega en farmacia">
                     <input
                       type="date"
                       min={fPrc || draft.fNac || undefined}
@@ -322,12 +305,11 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
                       {...register('fDisp')}
                     />
                     <p style={{ fontSize: 11, color: C.hint, margin: '3px 0 0' }}>
-                      F_PRC ≤ F_DISP ≤ F_ETA
+                      Posterior a la prescripción y anterior a la fecha de entrevista
                     </p>
                   </Field>
 
-                  {/* IND_MED */}
-                  <Field label="¿Sigue las indicaciones del profesional de salud? (IND_MED)">
+                  <Field label="¿Sigue las indicaciones del profesional de salud?">
                     <Controller name="indMed" control={control}
                       render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
                   </Field>
@@ -366,7 +348,6 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
 
   function handleNext(data: Step4Data) {
     const patch: Partial<SurveyDraft> = { ...data } as any
-    // Sanitize: DISP_MED_VC=No → clear CTO_DISP_VC
     if (data.dispMedVc !== 'Sí') patch.ctoDispVc = ''
     onNext(patch)
   }
@@ -375,8 +356,7 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
     <form onSubmit={handleSubmit(handleNext)} noValidate>
       <SectionHead icon="ti-package" label="Medicamentos sin consumir y disposición" />
 
-      {/* MED_SOB */}
-      <Field label="¿Tiene medicamentos guardados sin consumir? (MED_SOB)" required error={errors.medSob?.message}>
+      <Field label="¿Tiene medicamentos guardados sin consumir?" required error={errors.medSob?.message}>
         <Controller name="medSob" control={control}
           render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
       </Field>
@@ -385,16 +365,14 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
         <div className="fade-in">
           <Divider label="Conocimiento del entrevistado" />
 
-          {/* DISP_MED_VC */}
-          <Field label="¿Sabe qué hacer con los medicamentos vencidos? (DISP_MED_VC)">
+          <Field label="¿Sabe qué hacer con los medicamentos vencidos?">
             <Controller name="dispMedVc" control={control}
               render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
           </Field>
 
-          {/* CTO_DISP_VC — solo si DISP_MED_VC = Sí */}
           {dispMedVc === 'Sí' && (
             <div className="fade-in">
-              <Field label="¿Qué hace con los medicamentos vencidos? (CTO_DISP_VC)">
+              <Field label="¿Qué hace con los medicamentos vencidos?">
                 <Controller name="ctoDispVc" control={control}
                   render={({ field }) => (
                     <textarea placeholder="Describa la práctica actual…" rows={3} {...field} />
@@ -405,21 +383,19 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
 
           <Divider label="Observación directa — encuestador" />
 
-          {/* VTO_MED_NC */}
-          <Field label="¿Hay unidades vencidas entre los almacenados? (VTO_MED_NC)">
+          <Field label="¿Hay unidades vencidas entre los almacenados?">
             <Controller name="vtoMedNc" control={control}
               render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
           </Field>
 
-          {/* CANT_MED / CANT_MED_VTO */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="Cant. total sin consumir (CANT_MED)" error={errors.cantMed?.message}>
+            <Field label="Cant. sin consumir" error={errors.cantMed?.message}>
               <input
                 type="number" inputMode="numeric" min={0} placeholder="0"
                 {...register('cantMed', { valueAsNumber: true })}
               />
             </Field>
-            <Field label="Cant. vencidos (CANT_MED_VTO)" error={errors.cantMedVto?.message}>
+            <Field label="Cant. vencidos" error={errors.cantMedVto?.message}>
               <input
                 type="number" inputMode="numeric" min={0}
                 max={cantMed ?? undefined} placeholder="0"
@@ -428,9 +404,8 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
             </Field>
           </div>
 
-          {/* PESO_MED_NC */}
           <Field
-            label="Peso total en balanza — gramos (PESO_MED_NC)"
+            label="Peso total en balanza (g)"
             hint="Medir en balanza. Solo el número."
             error={errors.pesoMedNc?.message}
           >
@@ -457,7 +432,6 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
   const [entry, setEntry]   = useState<Medication>({ ...EMPTY_MED })
   const [addErr, setAddErr] = useState('')
 
-  // CUM search
   const { results, loading, error: cumError, searched, search } = useCUM()
   const [query, setQuery]   = useState('')
   const [selIdx, setSelIdx] = useState<number | null>(null)
@@ -475,7 +449,7 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
 
   function addMedication() {
     if (!entry.nmMed.trim() && !entry.dci.trim()) {
-      setAddErr('Ingrese al menos el Nombre comercial (NM_MED) o la DCI.')
+      setAddErr('Ingrese al menos el nombre comercial o el principio activo.')
       return
     }
     setMeds(prev => [...prev, { ...entry }])
@@ -495,7 +469,7 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
 
   return (
     <form onSubmit={handleNext} noValidate>
-      <SectionHead icon="ti-pill" label="Medicamentos almacenados (1:N)" />
+      <SectionHead icon="ti-pill" label="Medicamentos almacenados" />
       <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
         Registre cada producto almacenado sin consumir. Busque en el CUM-INVIMA para evitar errores de tipeo.
       </p>
@@ -559,28 +533,28 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
 
       {/* Manual entry form */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <Field label="Nombre comercial (NM_MED)">
+        <Field label="Nombre comercial">
           <input
             value={entry.nmMed}
             onChange={e => setEntry(v => ({ ...v, nmMed: e.target.value }))}
             placeholder="Ej: Dolex, Novalgina…"
           />
         </Field>
-        <Field label="DCI / Principio activo (DCI)">
+        <Field label="Principio activo (DCI)">
           <input
             value={entry.dci}
             onChange={e => setEntry(v => ({ ...v, dci: e.target.value }))}
             placeholder="Ej: Acetaminofén…"
           />
         </Field>
-        <Field label="Concentración (CONC_MED)">
+        <Field label="Concentración">
           <input
             type="number" min={0} step="any" placeholder="500"
             value={entry.concMed ?? ''}
             onChange={e => setEntry(v => ({ ...v, concMed: e.target.value ? parseFloat(e.target.value) : null }))}
           />
         </Field>
-        <Field label="Unidad (UND_CONC)">
+        <Field label="Unidad">
           <ChipGroup
             options={OPT.undConc}
             value={entry.undConc}
@@ -588,7 +562,7 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
           />
         </Field>
       </div>
-      <Field label="Fecha de vencimiento (F_VTO)">
+      <Field label="Fecha de vencimiento">
         <input
           type="date"
           value={entry.fVto}
@@ -646,7 +620,7 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
                     {m.fVto && (
                       <span style={{ fontSize: 11, color: metrics.isExpired ? C.amber : C.muted }}>
                         <i className="ti ti-calendar-x" style={{ marginRight: 3, fontSize: 11 }} aria-hidden />
-                        F_VTO: {fmtDate(m.fVto)}
+                        Vence: {fmtDate(m.fVto)}
                         {metrics.isExpired && metrics.tVto !== null && (
                           <strong style={{ marginLeft: 4 }}>({metrics.tVto} d vencido)</strong>
                         )}
@@ -654,12 +628,12 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
                     )}
                     {metrics.tDisp !== null && (
                       <span style={{ fontSize: 11, color: C.muted }}>
-                        T_DISP: {metrics.tDisp} d
+                        En bodega: {metrics.tDisp} d
                       </span>
                     )}
                     {metrics.vUtil !== null && (
                       <span style={{ fontSize: 11, color: C.muted }}>
-                        V_UTIL: {metrics.vUtil} d
+                        Vida útil: {metrics.vUtil} d
                       </span>
                     )}
                   </div>
@@ -710,40 +684,40 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
       {/* Identificación */}
       <Card style={{ marginBottom: 10 }}>
         <GroupLabel>Identificación</GroupLabel>
-        <Row label="F_ETA (Fecha encuesta)"  value={fmtDate(draft.fEta)} />
-        <Row label="NUI (N° encuesta)"       value={draft.nui} />
-        <Row label="NUI_ETR (Encuestador)"   value={draft.nuiEtr} />
+        <Row label="Fecha de la entrevista"   value={fmtDate(draft.fEta)} />
+        <Row label="N° de encuesta"           value={draft.nui} />
+        <Row label="ID del encuestador"       value={draft.nuiEtr} />
       </Card>
 
       {/* Demografía */}
       <Card style={{ marginBottom: 10 }}>
         <GroupLabel>Demografía</GroupLabel>
-        <Row label="F_NAC (Nacimiento)"      value={fmtDate(draft.fNac)} />
-        {edad !== null && <Row label="EDAD (calculada)"   value={`${edad} años`} />}
-        <Row label="CIUDAD"                  value={draft.ciudad} />
-        {draft.dir && <Row label="DIR"       value={draft.dir} />}
-        {draft.estrato && <Row label="ESTRATO" value={draft.estrato} />}
-        <Row label="ETNIA"                   value={draft.etnia} />
-        <Row label="AS_SALUD"                value={draft.asSalud} />
-        <Row label="EST_LAB"                 value={draft.estLab} />
-        <Row label="INGRESO"                 value={draft.ingreso} />
-        <Row label="NV_ESTU"                 value={draft.nvEstu} />
+        <Row label="Fecha de nacimiento"      value={fmtDate(draft.fNac)} />
+        {edad !== null && <Row label="Edad"   value={`${edad} años`} />}
+        <Row label="Ciudad"                   value={draft.ciudad} />
+        {draft.dir && <Row label="Dirección"  value={draft.dir} />}
+        {draft.estrato && <Row label="Estrato" value={draft.estrato} />}
+        <Row label="Pertenencia étnica"       value={draft.etnia} />
+        <Row label="Régimen de salud"         value={draft.asSalud} />
+        <Row label="Ocupación"                value={draft.estLab} />
+        <Row label="Ingresos mensuales"       value={draft.ingreso} />
+        <Row label="Nivel educativo"          value={draft.nvEstu} />
       </Card>
 
       {/* Salud */}
       <Card style={{ marginBottom: 10 }}>
         <GroupLabel>Salud</GroupLabel>
-        <Row label="PER_SALUD"               value={draft.perSalud} />
-        <Row label="EST_SALUD"               value={draft.estSalud} />
+        <Row label="Percepción de salud"      value={draft.perSalud} />
+        <Row label="Enfermedad reciente"      value={draft.estSalud} />
         {draft.estSalud === 'Sí' && <>
-          {draft.prbSalud && <Row label="PRB_SALUD"  value={draft.prbSalud} />}
-          <Row label="CON_MED"               value={draft.conMed} />
+          {draft.prbSalud && <Row label="Problema de salud"  value={draft.prbSalud} />}
+          <Row label="Consume medicamentos"   value={draft.conMed} />
           {draft.conMed === 'Sí' && <>
-            <Row label="MED_PRC"             value={draft.medPrc} />
+            <Row label="Con prescripción"     value={draft.medPrc} />
             {draft.medPrc === 'Sí' && <>
-              {draft.fPrc  && <Row label="F_PRC"  value={fmtDate(draft.fPrc)} />}
-              {draft.fDisp && <Row label="F_DISP" value={fmtDate(draft.fDisp)} />}
-              <Row label="IND_MED"           value={draft.indMed} />
+              {draft.fPrc  && <Row label="Fecha de prescripción"  value={fmtDate(draft.fPrc)} />}
+              {draft.fDisp && <Row label="Fecha de dispensación"  value={fmtDate(draft.fDisp)} />}
+              <Row label="Sigue indicaciones" value={draft.indMed} />
             </>}
           </>}
         </>}
@@ -752,16 +726,16 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
       {/* Almacenamiento */}
       <Card style={{ marginBottom: 10 }}>
         <GroupLabel>Almacenamiento y disposición</GroupLabel>
-        <Row label="MED_SOB"                 value={draft.medSob} />
+        <Row label="Med. sin consumir"        value={draft.medSob} />
         {draft.medSob === 'Sí' && <>
-          <Row label="DISP_MED_VC"           value={draft.dispMedVc} />
+          <Row label="Sabe qué hacer con vencidos"  value={draft.dispMedVc} />
           {draft.dispMedVc === 'Sí' && draft.ctoDispVc &&
-            <Row label="CTO_DISP_VC"         value={draft.ctoDispVc} />
+            <Row label="Práctica de disposición"    value={draft.ctoDispVc} />
           }
-          <Row label="VTO_MED_NC"            value={draft.vtoMedNc} />
-          <Row label="CANT_MED"              value={draft.cantMed} />
-          <Row label="CANT_MED_VTO"          value={draft.cantMedVto} />
-          {draft.pesoMedNc != null && <Row label="PESO_MED_NC (g)" value={draft.pesoMedNc} />}
+          <Row label="Vencidos observados"    value={draft.vtoMedNc} />
+          <Row label="Cantidad sin consumir"  value={draft.cantMed} />
+          <Row label="Cantidad vencidos"      value={draft.cantMedVto} />
+          {draft.pesoMedNc != null && <Row label="Peso (g)" value={draft.pesoMedNc} />}
         </>}
       </Card>
 
@@ -783,7 +757,7 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
                   )}
                   {m.fVto && (
                     <Badge
-                      label={`VTO: ${fmtDate(m.fVto)}`}
+                      label={`Vence: ${fmtDate(m.fVto)}`}
                       variant={mx.isExpired ? 'amber' : 'teal'}
                     />
                   )}
@@ -791,17 +765,17 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   {mx.tVto !== null && (
                     <span style={{ fontSize: 11, color: mx.isExpired ? C.amber : C.muted }}>
-                      T_VTO: <strong>{mx.tVto} d</strong>
+                      Días vencido: <strong>{mx.tVto} d</strong>
                     </span>
                   )}
                   {mx.tDisp !== null && (
                     <span style={{ fontSize: 11, color: C.muted }}>
-                      T_DISP: <strong>{mx.tDisp} d</strong>
+                      En bodega: <strong>{mx.tDisp} d</strong>
                     </span>
                   )}
                   {mx.vUtil !== null && (
                     <span style={{ fontSize: 11, color: C.muted }}>
-                      V_UTIL: <strong>{mx.vUtil} d</strong>
+                      Vida útil: <strong>{mx.vUtil} d</strong>
                     </span>
                   )}
                 </div>
@@ -812,7 +786,7 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
       )}
 
       {/* OBS */}
-      <Field label="Observaciones del encuestador (OBS) — opcional">
+      <Field label="Observaciones — opcional">
         <Controller name="obs" control={control}
           render={({ field }) => (
             <textarea
