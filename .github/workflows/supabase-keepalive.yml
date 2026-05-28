@@ -1,0 +1,24 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Lunes a las 08:00 UTC (cada 7 días — el proyecto pausa tras 7 días sin actividad)
+    - cron: '0 8 * * 1'
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub Actions
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase DB
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/surveys?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "Supabase response status: $STATUS"
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "406" ]; then
+            echo "Error: Supabase responded with $STATUS"
+            exit 1
+          fi
+          echo "Keepalive OK"
