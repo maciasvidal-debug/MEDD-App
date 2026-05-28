@@ -68,9 +68,13 @@ export interface Survey {
   medications: Medication[]
 
   obs: string // OBS: Observaciones (opcional)
+
+  syncStatus?: SyncStatus
 }
 
-export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt'>
+export type SyncStatus = 'local' | 'synced' | 'syncing' | 'error'
+
+export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>
 
 // ─── CUM-INVIMA ────────────────────────────────────────────────────────────
 export interface CUMRecord {
@@ -81,6 +85,9 @@ export interface CUMRecord {
   formafarmaceutica: string
   viaadministracion?: string
 }
+
+// ─── Auth ──────────────────────────────────────────────────────────────────
+export type AuthView = 'login' | 'register'
 
 // ─── UI state ──────────────────────────────────────────────────────────────
 export type AppView = 'dashboard' | 'encuestas' | 'wizard' | 'buscar' | 'exportar' | 'ajustes'

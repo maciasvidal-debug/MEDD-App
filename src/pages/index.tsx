@@ -635,9 +635,11 @@ export function ExportarPage() {
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────
 
 export function AjustesPage() {
-  const { settings, persistSettings, surveys } = useStore()
+  const { settings, persistSettings, surveys, user, signOut, syncing, triggerSync } = useStore()
   const [form, setForm] = useState(settings)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const pendingCount = surveys.filter(s => s.syncStatus !== 'synced').length
 
   return (
     <div>
@@ -674,12 +676,40 @@ export function AjustesPage() {
           Guardar ajustes
         </Button>
 
+        <Divider label="cuenta" />
+
+        <Card style={{ background: C.bg }}>
+          <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
+            <InfoRow label="Sesión activa" value={user?.email ?? '—'} />
+            <InfoRow
+              label="Encuestas pendientes de sync"
+              value={pendingCount > 0 ? `${pendingCount} local(es)` : 'Al día'}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <Button
+              onClick={() => triggerSync()}
+              icon={syncing ? 'ti-loader-2' : 'ti-cloud-upload'}
+              style={{ flex: 1 }}
+            >
+              {syncing ? 'Sincronizando…' : 'Sincronizar ahora'}
+            </Button>
+            <Button
+              onClick={() => signOut()}
+              icon="ti-logout"
+              style={{ flex: 1, background: '#FEE2E2', color: '#B91C1C' }}
+            >
+              Cerrar sesión
+            </Button>
+          </div>
+        </Card>
+
         <Divider label="información" />
 
         <Card style={{ background: C.bg }}>
           <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
             <InfoRow label="Encuestas almacenadas" value={surveys.length} />
-            <InfoRow label="Almacenamiento" value="IndexedDB (local)" />
+            <InfoRow label="Almacenamiento" value="IndexedDB + Supabase" />
             <InfoRow label="Versión esquema" value="2.0 (codebook-aligned)" />
           </div>
         </Card>
