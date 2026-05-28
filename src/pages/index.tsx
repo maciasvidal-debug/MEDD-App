@@ -6,29 +6,45 @@ import {
 import { TopBar, StepBar } from '../components/layout'
 import {
   StatCard, Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, C, Chip, ChipGroup,
+  Field, SectionHead, C, ChipGroup,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
-import { freqTable, pct, calcEdad, fmtDate, fmtTimestamp, toCSV, downloadBlob, dateTag } from '../lib/utils'
+import {
+  freqTable, groupSum, pct, calcEdad, fmtDate, fmtTimestamp,
+  toCSV, downloadBlob, dateTag, productMetrics,
+} from '../lib/utils'
 import { OPT, TOTAL_STEPS } from '../lib/constants'
-import type { SurveyDraft } from '../types'
+import type { SurveyDraft, Survey } from '../types'
 
-// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+// ─── DASHBOARD ────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
   const { surveys, openWizard } = useStore()
   const n = surveys.length
 
-  const nSob  = surveys.filter(s => s.medSob   === 'Sí').length
-  const nVenc = surveys.filter(s => s.hayVenc   === 'Sí').length
-  const nDisp = surveys.filter(s => s.dispVenc  === 'Sí').length
-  const peso  = surveys.reduce((a, s) => a + (s.pesoMed ?? 0), 0)
+  const nSob    = surveys.filter(s => s.medSob    === 'Sí').length
+  const nVenc   = surveys.filter(s => s.vtoMedNc  === 'Sí').length
+  const nDisp   = surveys.filter(s => s.dispMedVc === 'Sí').length
+  const pesoTotal = surveys.reduce((a, s) => a + (s.pesoMedNc ?? 0), 0)
+  const unidTotal = surveys.reduce((a, s) => a + (s.cantMed   ?? 0), 0)
+  const vencTotal = surveys.reduce((a, s) => a + (s.cantMedVto ?? 0), 0)
+  const totalMeds = surveys.reduce((a, s) => a + (s.medications?.length ?? 0), 0)
 
-  const barEps  = freqTable(surveys, 'eps',   OPT.eps).filter(d => d.n > 0)
-  const barEduc = freqTable(surveys, 'educ',  OPT.educ).filter(d => d.n > 0)
-  const barEtnia= freqTable(surveys, 'etnia', OPT.etnia).filter(d => d.n > 0)
+  const barAsSalud = freqTable(surveys, 'asSalud', OPT.asSalud).filter(d => d.n > 0)
+  const barNvEstu  = freqTable(surveys, 'nvEstu',  OPT.nvEstu).filter(d => d.n > 0)
+  const barEtnia   = freqTable(surveys, 'etnia',   OPT.etnia).filter(d => d.n > 0)
+
+  // ESTRATO distribution (new)
+  const barEstrato = OPT.estrato
+    .map(e => ({ name: `Estrato ${e}`, n: surveys.filter(s => s.estrato === e).length }))
+    .filter(d => d.n > 0)
+
+  // CIUDAD: top cities by expired units (CANT_MED_VTO)
+  const ciudadVenc = groupSum(surveys, 'ciudad', 'cantMedVto')
+    .filter(d => d.name && d.name !== 'Sin dato')
+    .slice(0, 8)
 
   const tipStyle = {
     background: C.surface, border: `0.5px solid ${C.border}`,
@@ -39,9 +55,7 @@ export function DashboardPage() {
       ? <div style={tipStyle}><strong>{payload[0].payload.name}</strong>: {payload[0].value}</div>
       : null
 
-  const MiniDonut = ({
-    val, outOf, label, color,
-  }: { val: number; outOf: number; label: string; color: string }) => {
+  const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; label: string; color: string }) => {
     const data = [{ v: val }, { v: Math.max(0, outOf - val) }]
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
@@ -87,18 +101,18 @@ export function DashboardPage() {
         <p style={{ fontSize: 11, color: C.hint, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
           Indicadores clave · {n} encuesta{n !== 1 ? 's' : ''}
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-          <StatCard icon="ti-users"           label="Total encuestados"      value={n}                           color={C.navy} />
-          <StatCard icon="ti-pill"            label="Med. sin consumir"       value={nSob}  sub={`${pct(nSob,n)}%`}  color={C.teal} />
-          <StatCard icon="ti-alert-triangle"  label="Vencidos confirmados"    value={nVenc} sub={`${pct(nVenc,n)}%`} color={C.amber} />
-          <StatCard icon="ti-scale"           label="Peso total (g)"          value={peso.toFixed(1)}             color={C.gray} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+          <StatCard icon="ti-users"          label="Total encuestados"    value={n}                                  color={C.navy} />
+          <StatCard icon="ti-pill"           label="Productos registrados" value={totalMeds}                          color={C.teal} />
+          <StatCard icon="ti-package"        label="Unidades sin consumir" value={unidTotal}                          color={C.teal} />
+          <StatCard icon="ti-alert-triangle" label="Unidades vencidas"    value={vencTotal}  sub={`${pct(vencTotal,unidTotal)}%`} color={C.amber} />
+          <StatCard icon="ti-scale"          label="Peso total (g)"       value={pesoTotal.toFixed(1)}               color={C.gray} />
+          <StatCard icon="ti-map-pin"        label="Con vencidos conf."   value={nVenc}      sub={`${pct(nVenc,n)}%`}             color={C.red} />
         </div>
 
         {/* Donuts */}
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
-            Variables clave de resultado
-          </div>
+        <Card style={{ marginBottom: 14 }}>
+          <SectionLabel>Variables clave de resultado</SectionLabel>
           <div style={{ display: 'flex', justifyContent: 'space-around' }}>
             <MiniDonut val={nDisp} outOf={n} label="Conoce disposición" color={C.teal} />
             <MiniDonut val={nSob}  outOf={n} label="Med. sin consumir"  color={C.navy} />
@@ -106,15 +120,47 @@ export function DashboardPage() {
           </div>
         </Card>
 
-        {/* EPS chart */}
-        {barEps.length > 0 && (
-          <Card style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-              Distribución por régimen EPS
-            </div>
-            <div style={{ height: 130 }}>
+        {/* Hotspots geográficos: CIUDAD x CANT_MED_VTO */}
+        {ciudadVenc.length > 0 && (
+          <Card style={{ marginBottom: 14 }}>
+            <SectionLabel>Hotspots geográficos — Unidades vencidas por ciudad</SectionLabel>
+            <div style={{ height: Math.max(80, ciudadVenc.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barEps} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                <BarChart data={ciudadVenc} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={85} />
+                  <Tooltip content={<CustomTip />} />
+                  <Bar dataKey="value" fill={C.amber} radius={[0, 3, 3, 0]} name="Unidades vencidas" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        )}
+
+        {/* ESTRATO distribution */}
+        {barEstrato.length > 0 && (
+          <Card style={{ marginBottom: 14 }}>
+            <SectionLabel>Distribución por estrato socioeconómico</SectionLabel>
+            <div style={{ height: Math.max(80, barEstrato.length * 28) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barEstrato} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
+                  <Tooltip content={<CustomTip />} />
+                  <Bar dataKey="n" fill={C.navy} radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        )}
+
+        {/* AS_SALUD */}
+        {barAsSalud.length > 0 && (
+          <Card style={{ marginBottom: 14 }}>
+            <SectionLabel>Distribución por régimen de salud (AS_SALUD)</SectionLabel>
+            <div style={{ height: Math.max(80, barAsSalud.length * 30) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barAsSalud} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
                   <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
                   <Tooltip content={<CustomTip />} />
@@ -125,38 +171,34 @@ export function DashboardPage() {
           </Card>
         )}
 
-        {/* Educación chart */}
-        {barEduc.length > 0 && (
-          <Card style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-              Distribución por nivel de estudios
-            </div>
-            <div style={{ height: 155 }}>
+        {/* NV_ESTU */}
+        {barNvEstu.length > 0 && (
+          <Card style={{ marginBottom: 14 }}>
+            <SectionLabel>Distribución por nivel de estudios (NV_ESTU)</SectionLabel>
+            <div style={{ height: Math.max(80, barNvEstu.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barEduc} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                <BarChart data={barNvEstu} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
                   <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={105} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
                   <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.navy} radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="n" fill="#7030A0" radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
         )}
 
-        {/* Etnia chart */}
+        {/* Etnia */}
         {barEtnia.length > 0 && (
-          <Card style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-              Distribución por etnia
-            </div>
-            <div style={{ height: 110 }}>
+          <Card style={{ marginBottom: 14 }}>
+            <SectionLabel>Distribución por pertenencia étnica (ETNIA)</SectionLabel>
+            <div style={{ height: Math.max(80, barEtnia.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barEtnia} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
                   <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
                   <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill="#7030A0" radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="n" fill={C.gray} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -167,12 +209,19 @@ export function DashboardPage() {
   )
 }
 
-// ─── WIZARD PAGE ──────────────────────────────────────────────────────────────
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+      {children}
+    </div>
+  )
+}
+
+// ─── WIZARD PAGE ──────────────────────────────────────────────────────────
 
 export function WizardPage() {
   const { wizard, setWizardStep, updateDraft, closeWizard, addSurvey, updateSurvey } = useStore()
   if (!wizard) return null
-
   const { step, draft, editingId } = wizard
 
   function handleNext(patch: Partial<SurveyDraft>) {
@@ -190,13 +239,7 @@ export function WizardPage() {
     else closeWizard()
   }
 
-  const stepProps = {
-    draft,
-    onNext: handleNext,
-    onBack: handleBack,
-    isFirst: step === 1,
-    isLast: step === TOTAL_STEPS,
-  }
+  const stepProps = { draft, onNext: handleNext, onBack: handleBack, isFirst: step === 1, isLast: step === TOTAL_STEPS }
 
   return (
     <div>
@@ -225,21 +268,24 @@ export function WizardPage() {
   )
 }
 
-// ─── ENCUESTAS PAGE ───────────────────────────────────────────────────────────
+// ─── ENCUESTAS PAGE ───────────────────────────────────────────────────────
 
 export function EncuestasPage() {
   const { surveys, removeSurvey, openEditWizard, openWizard } = useStore()
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter]     = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [detail, setDetail]     = useState<Survey | null>(null)
 
   const filtered = useMemo(() => {
     if (!filter.trim()) return surveys
     const q = filter.toLowerCase()
     return surveys.filter(s =>
-      s.nui.includes(q) ||
-      s.nmMed?.toLowerCase().includes(q) ||
-      s.dci?.toLowerCase().includes(q) ||
-      s.eps?.toLowerCase().includes(q)
+      String(s.nui).includes(q) ||
+      s.ciudad?.toLowerCase().includes(q) ||
+      s.asSalud?.toLowerCase().includes(q) ||
+      s.medications?.some(m =>
+        m.nmMed?.toLowerCase().includes(q) || m.dci?.toLowerCase().includes(q)
+      )
     )
   }, [surveys, filter])
 
@@ -252,7 +298,7 @@ export function EncuestasPage() {
             <input
               value={filter}
               onChange={e => setFilter(e.target.value)}
-              placeholder="Buscar por N°, medicamento, DCI, EPS…"
+              placeholder="Buscar por N°, ciudad, medicamento, DCI…"
             />
           </div>
         )}
@@ -262,11 +308,7 @@ export function EncuestasPage() {
             icon="ti-clipboard-list"
             title="Sin registros"
             description="Cuando registres encuestas aparecerán aquí."
-            action={
-              <Button onClick={() => openWizard(0)} icon="ti-plus">
-                Primera encuesta
-              </Button>
-            }
+            action={<Button onClick={() => openWizard(0)} icon="ti-plus">Primera encuesta</Button>}
           />
         ) : filtered.length === 0 ? (
           <p style={{ color: C.muted, fontSize: 13, textAlign: 'center', padding: '32px 0' }}>
@@ -274,45 +316,58 @@ export function EncuestasPage() {
           </p>
         ) : (
           filtered.map(sv => {
-            const edad = calcEdad(sv.fechaNac)
+            const edad = calcEdad(sv.fEta, sv.fNac)
+            const expiredMeds = sv.medications?.filter(m => {
+              const mx = productMetrics(sv.fEta, sv.fDisp, m)
+              return mx.isExpired
+            }).length ?? 0
+
             return (
               <Card key={sv.id} style={{ marginBottom: 10 }}>
-                {/* Header row */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>#{sv.nui}</span>
-                    <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>{fmtDate(sv.fechaEncuesta)}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>#{String(sv.nui).padStart(3, '0')}</span>
+                    <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>{fmtDate(sv.fEta)}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {sv.medSob  === 'Sí' && <Badge label="Med. almac." variant="teal" />}
-                    {sv.hayVenc === 'Sí' && <Badge label="Vencidos"    variant="amber" />}
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {sv.ciudad && <Badge label={sv.ciudad} variant="gray" />}
+                    {sv.medSob   === 'Sí' && <Badge label="Med. almac."  variant="teal" />}
+                    {sv.vtoMedNc === 'Sí' && <Badge label="Vencidos"     variant="amber" />}
                   </div>
                 </div>
 
-                {/* Data grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px', fontSize: 12, marginBottom: 8 }}>
                   {edad !== null && <span style={{ color: C.muted }}>Edad: <strong>{edad} años</strong></span>}
-                  {sv.eps     && <span style={{ color: C.muted }}>EPS: <strong>{sv.eps}</strong></span>}
-                  {sv.medSob === 'Sí' && (
-                    <>
-                      <span style={{ color: C.muted }}>Cant: <strong>{sv.cantMed ?? '—'}</strong></span>
-                      {sv.pesoMed != null && <span style={{ color: C.muted }}>Peso: <strong>{sv.pesoMed}g</strong></span>}
-                    </>
+                  {sv.estrato   && <span style={{ color: C.muted }}>Estrato: <strong>{sv.estrato}</strong></span>}
+                  {sv.asSalud   && <span style={{ color: C.muted }}>Salud: <strong>{sv.asSalud}</strong></span>}
+                  {sv.cantMed != null && sv.medSob === 'Sí' && (
+                    <span style={{ color: C.muted }}>Sin consumir: <strong>{sv.cantMed}</strong></span>
+                  )}
+                  {sv.cantMedVto != null && sv.cantMedVto > 0 && (
+                    <span style={{ color: C.amber }}>Vencidos: <strong>{sv.cantMedVto}</strong></span>
+                  )}
+                  {sv.pesoMedNc != null && (
+                    <span style={{ color: C.muted }}>Peso: <strong>{sv.pesoMedNc}g</strong></span>
                   )}
                 </div>
 
-                {/* Medication pill */}
-                {(sv.nmMed || sv.dci) && (
+                {sv.medications?.length > 0 && (
                   <div style={{ padding: '6px 8px', background: C.bg, borderRadius: 6, fontSize: 12, marginBottom: 10 }}>
                     <i className="ti ti-pill" style={{ fontSize: 12, marginRight: 5, color: C.teal }} aria-hidden />
-                    {sv.nmMed && <strong>{sv.nmMed}</strong>}
-                    {sv.nmMed && sv.dci && ' · '}
-                    {sv.dci && <span style={{ color: C.muted }}>{sv.dci}</span>}
-                    {sv.concMed != null && sv.undConc && <span style={{ color: C.hint }}> · {sv.concMed} {sv.undConc}</span>}
+                    <strong>{sv.medications.length}</strong> producto(s) registrado(s)
+                    {expiredMeds > 0 && (
+                      <span style={{ marginLeft: 8, color: C.amber }}>· {expiredMeds} vencido(s)</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDetail(sv)}
+                      style={{ marginLeft: 10, background: 'none', border: 'none', color: C.teal, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Ver detalle
+                    </button>
                   </div>
                 )}
 
-                {/* Actions */}
                 {confirmId === sv.id ? (
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
@@ -328,9 +383,11 @@ export function EncuestasPage() {
                     <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => openEditWizard(sv)}>
                       Editar
                     </Button>
-                    <Button size="sm" variant="ghost" icon="ti-trash"
+                    <Button
+                      size="sm" variant="ghost" icon="ti-trash"
                       style={{ color: C.red, borderColor: `${C.red}50` }}
-                      onClick={() => setConfirmId(sv.id)}>
+                      onClick={() => setConfirmId(sv.id)}
+                    >
                       Eliminar
                     </Button>
                   </div>
@@ -340,11 +397,94 @@ export function EncuestasPage() {
           })
         )}
       </div>
+
+      {/* Medication detail modal */}
+      {detail && (
+        <MedDetailModal survey={detail} onClose={() => setDetail(null)} />
+      )}
     </div>
   )
 }
 
-// ─── BUSCAR PAGE ──────────────────────────────────────────────────────────────
+function MedDetailModal({ survey, onClose }: { survey: Survey; onClose: () => void }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+        zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: C.surface, borderRadius: '12px 12px 0 0',
+          padding: '20px 16px', width: '100%', maxWidth: 520,
+          maxHeight: '80vh', overflowY: 'auto',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontSize: 15, fontWeight: 500 }}>
+            Encuesta #{String(survey.nui).padStart(3, '0')} — Medicamentos
+          </span>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 22, lineHeight: 1 }}
+          >×</button>
+        </div>
+
+        {survey.medications.length === 0 ? (
+          <p style={{ color: C.hint, fontSize: 13 }}>Sin productos registrados.</p>
+        ) : (
+          survey.medications.map((m, i) => {
+            const mx = productMetrics(survey.fEta, survey.fDisp, m)
+            return (
+              <Card key={i} style={{ marginBottom: 10, background: mx.isExpired ? '#FEF3C7' : C.bg }}>
+                <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>
+                  {m.nmMed || '—'}
+                </div>
+                {m.dci && <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>DCI: {m.dci}</div>}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {m.concMed != null && m.undConc && (
+                    <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
+                  )}
+                  {m.fVto && (
+                    <Badge label={`VTO: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
+                  )}
+                </div>
+                {/* Time metrics (Excel logic) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
+                  <MetricCell label="T_VTO" value={mx.tVto} unit="d" highlight={mx.isExpired} />
+                  <MetricCell label="T_DISP" value={mx.tDisp} unit="d" />
+                  <MetricCell label="V_UTIL" value={mx.vUtil} unit="d" />
+                </div>
+              </Card>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MetricCell({ label, value, unit, highlight }: {
+  label: string; value: number | null; unit: string; highlight?: boolean
+}) {
+  return (
+    <div style={{
+      textAlign: 'center', padding: '6px 4px', borderRadius: 6,
+      background: highlight ? C.amberLight : C.surface,
+      border: `0.5px solid ${C.border}`,
+    }}>
+      <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 15, fontWeight: 500, color: highlight ? C.amber : C.text }}>
+        {value != null ? `${value} ${unit}` : '—'}
+      </div>
+    </div>
+  )
+}
+
+// ─── BUSCAR PAGE ──────────────────────────────────────────────────────────
 
 export function BuscarPage() {
   const [query, setQuery] = useState('')
@@ -403,10 +543,10 @@ export function BuscarPage() {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {[
-                { key: `${i}-nm`,   val: r.producto,         label: 'Copiar nombre → col Y' },
-                { key: `${i}-dci`,  val: r.principioactivo,  label: 'Copiar DCI → col Z' },
-                { key: `${i}-conc`, val: r.concentracion,    label: 'Copiar conc. → col AA' },
-                { key: `${i}-unit`, val: r.unidadmedida,     label: 'Copiar unidad → col AB' },
+                { key: `${i}-nm`,   val: r.producto,        label: 'Copiar NM_MED' },
+                { key: `${i}-dci`,  val: r.principioactivo, label: 'Copiar DCI' },
+                { key: `${i}-conc`, val: r.concentracion,   label: 'Copiar CONC' },
+                { key: `${i}-unit`, val: r.unidadmedida,    label: 'Copiar UND' },
               ].map(({ key, val, label }) => (
                 <button
                   key={key}
@@ -432,7 +572,7 @@ export function BuscarPage() {
   )
 }
 
-// ─── EXPORT PAGE ──────────────────────────────────────────────────────────────
+// ─── EXPORT PAGE ──────────────────────────────────────────────────────────
 
 export function ExportarPage() {
   const { surveys } = useStore()
@@ -455,7 +595,7 @@ export function ExportarPage() {
             </div>
             <div>
               <div style={{ fontWeight: 500, fontSize: 14 }}>Exportar CSV</div>
-              <div style={{ fontSize: 12, color: C.muted }}>Compatible con Excel, SPSS, R, Stata · UTF-8 BOM</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Columnas del codebook · Compatible con Excel, SPSS, R, Stata · UTF-8 BOM</div>
             </div>
           </div>
           <Button
@@ -475,7 +615,7 @@ export function ExportarPage() {
             </div>
             <div>
               <div style={{ fontWeight: 500, fontSize: 14 }}>Exportar JSON</div>
-              <div style={{ fontSize: 12, color: C.muted }}>Estructura completa · Para procesamiento programático</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Estructura completa con array de medicamentos · Para procesamiento programático</div>
             </div>
           </div>
           <Button
@@ -492,7 +632,7 @@ export function ExportarPage() {
   )
 }
 
-// ─── SETTINGS PAGE ────────────────────────────────────────────────────────────
+// ─── SETTINGS PAGE ────────────────────────────────────────────────────────
 
 export function AjustesPage() {
   const { settings, persistSettings, surveys } = useStore()
@@ -521,11 +661,12 @@ export function AjustesPage() {
           />
         </Field>
 
-        <Field label="N° de identificación del encuestador (predeterminado)">
+        <Field label="ID del encuestador (NUI_ETR predeterminado)" hint="Se prellena en cada nueva encuesta">
           <input
+            type="number" min={1}
             value={form.nuiEncuestador}
             onChange={e => set('nuiEncuestador')(e.target.value)}
-            placeholder="Se prellena en cada nueva encuesta"
+            placeholder="Ej: 1012345678"
           />
         </Field>
 
@@ -537,21 +678,21 @@ export function AjustesPage() {
 
         <Card style={{ background: C.bg }}>
           <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: C.muted }}>Encuestas almacenadas</span>
-              <strong>{surveys.length}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: C.muted }}>Almacenamiento</span>
-              <span>IndexedDB (local)</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: C.muted }}>Versión</span>
-              <span>1.0.0</span>
-            </div>
+            <InfoRow label="Encuestas almacenadas" value={surveys.length} />
+            <InfoRow label="Almacenamiento" value="IndexedDB (local)" />
+            <InfoRow label="Versión esquema" value="2.0 (codebook-aligned)" />
           </div>
         </Card>
       </div>
+    </div>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+      <span style={{ color: C.muted }}>{label}</span>
+      <strong>{value}</strong>
     </div>
   )
 }

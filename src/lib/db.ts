@@ -2,17 +2,16 @@ import { openDB, type IDBPDatabase } from 'idb'
 import type { Survey, Settings } from '../types'
 import { DEFAULT_SETTINGS } from './constants'
 
-// ─── DB schema ────────────────────────────────────────────────────────────────
-
-const DB_NAME = 'medd_db'
-const DB_VERSION = 1
+const DB_NAME    = 'medd_db'
+const DB_VERSION = 2   // Bumped: new codebook-aligned fields + 1:N medications
 
 interface MEDDSchema {
   surveys: {
-    key: string         // Survey.id
+    key: string
     value: Survey
     indexes: {
-      'by-fecha': string
+      'by-fEta':   string
+      'by-ciudad': string
       'by-medSob': string
     }
   }
@@ -22,21 +21,22 @@ interface MEDDSchema {
   }
 }
 
-// ─── DB singleton ─────────────────────────────────────────────────────────────
-
 let _db: IDBPDatabase<MEDDSchema> | null = null
 
 async function getDB(): Promise<IDBPDatabase<MEDDSchema>> {
   if (_db) return _db
   _db = await openDB<MEDDSchema>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // Surveys store
-      if (!db.objectStoreNames.contains('surveys')) {
-        const store = db.createObjectStore('surveys', { keyPath: 'id' })
-        store.createIndex('by-fecha', 'fechaEncuesta')
-        store.createIndex('by-medSob', 'medSob')
+    upgrade(db, oldVersion, _newVersion, tx) {
+      // Version 1 → 2: recreate surveys store with new indexes.
+      // Field schema changed completely; old records are incompatible.
+      if (db.objectStoreNames.contains('surveys')) {
+        db.deleteObjectStore('surveys')
       }
-      // Settings store
+      const store = db.createObjectStore('surveys', { keyPath: 'id' })
+      store.createIndex('by-fEta',   'fEta')
+      store.createIndex('by-ciudad', 'ciudad')
+      store.createIndex('by-medSob', 'medSob')
+
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'id' })
       }
@@ -45,10 +45,10 @@ async function getDB(): Promise<IDBPDatabase<MEDDSchema>> {
   return _db
 }
 
-// ─── Survey CRUD ──────────────────────────────────────────────────────────────
+// ─── Survey CRUD ──────────────────────────────────────────────────────────
 
 export async function getAllSurveys(): Promise<Survey[]> {
-  const db = await getDB()
+  const db  = await getDB()
   const all = await db.getAll('surveys')
   return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
@@ -73,12 +73,12 @@ export async function clearAllSurveys(): Promise<void> {
   await db.clear('surveys')
 }
 
-// ─── Settings ─────────────────────────────────────────────────────────────────
+// ─── Settings ─────────────────────────────────────────────────────────────
 
 const SETTINGS_KEY = 'app_settings'
 
 export async function getSettings(): Promise<Settings> {
-  const db = await getDB()
+  const db     = await getDB()
   const record = await db.get('settings', SETTINGS_KEY)
   return record ?? DEFAULT_SETTINGS
 }

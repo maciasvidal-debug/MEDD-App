@@ -7,23 +7,17 @@ import {
 import { uuid, todayISO } from '../lib/utils'
 import { EMPTY_DRAFT, DEFAULT_SETTINGS } from '../lib/constants'
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
+// ─── Toast ────────────────────────────────────────────────────────────────
 
 export type ToastLevel = 'success' | 'error' | 'info'
-export interface Toast {
-  id: string
-  message: string
-  level: ToastLevel
-}
+export interface Toast { id: string; message: string; level: ToastLevel }
 
-// ─── Store interface ──────────────────────────────────────────────────────────
+// ─── Store interface ──────────────────────────────────────────────────────
 
 interface AppStore {
-  // Navigation
   view: AppView
   setView: (v: AppView) => void
 
-  // Surveys
   surveys: Survey[]
   surveysLoaded: boolean
   loadSurveys: () => Promise<void>
@@ -31,7 +25,6 @@ interface AppStore {
   updateSurvey: (id: string, draft: SurveyDraft) => Promise<void>
   removeSurvey: (id: string) => Promise<void>
 
-  // Wizard
   wizard: WizardState | null
   openWizard: (surveyCount: number) => void
   openEditWizard: (survey: Survey) => void
@@ -39,26 +32,22 @@ interface AppStore {
   setWizardStep: (step: number) => void
   updateDraft: (patch: Partial<SurveyDraft>) => void
 
-  // Settings
   settings: Settings
   settingsLoaded: boolean
   loadSettings: () => Promise<void>
   persistSettings: (s: Settings) => Promise<void>
 
-  // Toasts
   toasts: Toast[]
   pushToast: (message: string, level?: ToastLevel) => void
   removeToast: (id: string) => void
 }
 
-// ─── Store implementation ─────────────────────────────────────────────────────
+// ─── Store implementation ─────────────────────────────────────────────────
 
 export const useStore = create<AppStore>((set, get) => ({
-  // Navigation
   view: 'dashboard',
   setView: (view) => set({ view }),
 
-  // Surveys
   surveys: [],
   surveysLoaded: false,
   async loadSurveys() {
@@ -66,13 +55,8 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ surveys, surveysLoaded: true })
   },
   async addSurvey(draft) {
-    const now = new Date().toISOString()
-    const survey: Survey = {
-      ...draft,
-      id: uuid(),
-      createdAt: now,
-      updatedAt: now,
-    }
+    const now    = new Date().toISOString()
+    const survey: Survey = { ...draft, id: uuid(), createdAt: now, updatedAt: now }
     await saveSurvey(survey)
     set(s => ({ surveys: [survey, ...s.surveys] }))
     get().pushToast('Encuesta guardada correctamente')
@@ -82,11 +66,8 @@ export const useStore = create<AppStore>((set, get) => ({
     const existing = get().surveys.find(s => s.id === id)
     if (!existing) return
     const updated: Survey = {
-      ...existing,
-      ...draft,
-      id,
-      createdAt: existing.createdAt,
-      updatedAt: new Date().toISOString(),
+      ...existing, ...draft,
+      id, createdAt: existing.createdAt, updatedAt: new Date().toISOString(),
     }
     await saveSurvey(updated)
     set(s => ({
@@ -102,15 +83,15 @@ export const useStore = create<AppStore>((set, get) => ({
     get().pushToast('Encuesta eliminada', 'info')
   },
 
-  // Wizard
   wizard: null,
   openWizard(surveyCount) {
     const { settings } = get()
+    const nuiEtr = settings.nuiEncuestador ? parseInt(settings.nuiEncuestador, 10) || null : null
     const draft: SurveyDraft = {
       ...EMPTY_DRAFT,
-      fechaEncuesta: todayISO(),
-      nuiEncuestador: settings.nuiEncuestador,
-      nui: String(surveyCount + 1).padStart(3, '0'),
+      fEta:   todayISO(),
+      nuiEtr,
+      nui:    surveyCount + 1,
     }
     set({ wizard: { step: 1, draft }, view: 'wizard' })
   },
@@ -118,12 +99,8 @@ export const useStore = create<AppStore>((set, get) => ({
     const { id, createdAt, updatedAt, ...draft } = survey
     set({ wizard: { step: 1, draft, editingId: id }, view: 'wizard' })
   },
-  closeWizard() {
-    set({ wizard: null, view: 'encuestas' })
-  },
-  setWizardStep(step) {
-    set(s => s.wizard ? { wizard: { ...s.wizard, step } } : {})
-  },
+  closeWizard() { set({ wizard: null, view: 'encuestas' }) },
+  setWizardStep(step) { set(s => s.wizard ? { wizard: { ...s.wizard, step } } : {}) },
   updateDraft(patch) {
     set(s =>
       s.wizard
@@ -132,7 +109,6 @@ export const useStore = create<AppStore>((set, get) => ({
     )
   },
 
-  // Settings
   settings: DEFAULT_SETTINGS,
   settingsLoaded: false,
   async loadSettings() {
@@ -145,7 +121,6 @@ export const useStore = create<AppStore>((set, get) => ({
     get().pushToast('Configuración guardada')
   },
 
-  // Toasts
   toasts: [],
   pushToast(message, level = 'success') {
     const id = uuid()
