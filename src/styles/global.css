@@ -1,0 +1,124 @@
+/* ─── Reset ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Brand */
+  --c-navy:       #1E3A5F;
+  --c-navy-mid:   #2B4C73;
+  --c-navy-light: #EFF6FF;
+  --c-teal:       #0F766E;
+  --c-teal-mid:   #14B8A6;
+  --c-teal-light: #CCFBF1;
+  --c-amber:      #B45309;
+  --c-amber-light:#FEF3C7;
+  --c-red:        #B91C1C;
+  --c-red-light:  #FEE2E2;
+  --c-green:      #166534;
+  --c-green-light:#DCFCE7;
+
+  /* Radius */
+  --r-sm:  6px;
+  --r-md:  8px;
+  --r-lg:  12px;
+  --r-xl:  16px;
+  --r-pill:9999px;
+
+  /* Typography */
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --fs-xs:  11px;
+  --fs-sm:  13px;
+  --fs-base:15px;
+  --fs-lg:  17px;
+  --fs-xl:  22px;
+
+  /* Spacing */
+  --sp-xs: 4px;
+  --sp-sm: 8px;
+  --sp-md: 12px;
+  --sp-lg: 16px;
+  --sp-xl: 24px;
+
+  /* Z-index layers */
+  --z-topbar:  10;
+  --z-overlay: 100;
+  --z-toast:   200;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────────── */
+html, body, #root {
+  height: 100%;
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+body { overscroll-behavior: none; }
+
+/* ─── Form elements ──────────────────────────────────────────────────────────── */
+input, select, textarea {
+  font-family: var(--font);
+  font-size: var(--fs-sm);
+  color: #0F172A;
+  background: #FFFFFF;
+  border: 0.5px solid #CBD5E1;
+  border-radius: var(--r-md);
+  padding: 9px 11px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: #0F766E;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.14);
+}
+input:read-only, input:disabled {
+  background: #F8FAFC;
+  color: #94A3B8;
+  cursor: not-allowed;
+}
+textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+
+/* ─── Screen reader only ──────────────────────────────────────────────────────── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); border: 0;
+}
+
+/* ─── App shell ──────────────────────────────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  max-width: 520px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: #F8FAFC;
+  position: relative;
+}
+
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--sp-lg) var(--sp-lg) 96px;
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.fade-in   { animation: fadeIn  0.2s ease forwards; }
+.slide-up  { animation: slideUp 0.25s ease forwards; }
