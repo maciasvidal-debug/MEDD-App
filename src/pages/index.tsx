@@ -157,7 +157,7 @@ export function DashboardPage() {
         {/* AS_SALUD */}
         {barAsSalud.length > 0 && (
           <Card style={{ marginBottom: 14 }}>
-            <SectionLabel>Distribución por régimen de salud (AS_SALUD)</SectionLabel>
+            <SectionLabel>Distribución por régimen de salud</SectionLabel>
             <div style={{ height: Math.max(80, barAsSalud.length * 30) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barAsSalud} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
@@ -174,7 +174,7 @@ export function DashboardPage() {
         {/* NV_ESTU */}
         {barNvEstu.length > 0 && (
           <Card style={{ marginBottom: 14 }}>
-            <SectionLabel>Distribución por nivel de estudios (NV_ESTU)</SectionLabel>
+            <SectionLabel>Distribución por nivel educativo</SectionLabel>
             <div style={{ height: Math.max(80, barNvEstu.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barNvEstu} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
@@ -191,7 +191,7 @@ export function DashboardPage() {
         {/* Etnia */}
         {barEtnia.length > 0 && (
           <Card style={{ marginBottom: 14 }}>
-            <SectionLabel>Distribución por pertenencia étnica (ETNIA)</SectionLabel>
+            <SectionLabel>Distribución por pertenencia étnica</SectionLabel>
             <div style={{ height: Math.max(80, barEtnia.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barEtnia} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
@@ -443,20 +443,20 @@ function MedDetailModal({ survey, onClose }: { survey: Survey; onClose: () => vo
                 <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>
                   {m.nmMed || '—'}
                 </div>
-                {m.dci && <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>DCI: {m.dci}</div>}
+                {m.dci && <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Princ. activo: {m.dci}</div>}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                   {m.concMed != null && m.undConc && (
                     <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
                   )}
                   {m.fVto && (
-                    <Badge label={`VTO: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
+                    <Badge label={`Vence: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
                   )}
                 </div>
                 {/* Time metrics (Excel logic) */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
-                  <MetricCell label="T_VTO" value={mx.tVto} unit="d" highlight={mx.isExpired} />
-                  <MetricCell label="T_DISP" value={mx.tDisp} unit="d" />
-                  <MetricCell label="V_UTIL" value={mx.vUtil} unit="d" />
+                  <MetricCell label="Días vencido" value={mx.tVto} unit="d" highlight={mx.isExpired} />
+                  <MetricCell label="En bodega" value={mx.tDisp} unit="d" />
+                  <MetricCell label="Vida útil" value={mx.vUtil} unit="d" />
                 </div>
               </Card>
             )
@@ -543,10 +543,10 @@ export function BuscarPage() {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {[
-                { key: `${i}-nm`,   val: r.producto,        label: 'Copiar NM_MED' },
-                { key: `${i}-dci`,  val: r.principioactivo, label: 'Copiar DCI' },
-                { key: `${i}-conc`, val: r.concentracion,   label: 'Copiar CONC' },
-                { key: `${i}-unit`, val: r.unidadmedida,    label: 'Copiar UND' },
+                { key: `${i}-nm`,   val: r.producto,        label: 'Nombre' },
+                { key: `${i}-dci`,  val: r.principioactivo, label: 'DCI' },
+                { key: `${i}-conc`, val: r.concentracion,   label: 'Concentración' },
+                { key: `${i}-unit`, val: r.unidadmedida,    label: 'Unidad' },
               ].map(({ key, val, label }) => (
                 <button
                   key={key}
@@ -661,7 +661,7 @@ export function AjustesPage() {
           />
         </Field>
 
-        <Field label="ID del encuestador (NUI_ETR predeterminado)" hint="Se prellena en cada nueva encuesta">
+        <Field label="ID del encuestador" hint="Se prellena en cada nueva encuesta">
           <input
             type="number" min={1}
             value={form.nuiEncuestador}

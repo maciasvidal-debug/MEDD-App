@@ -137,7 +137,7 @@ export function StepBar({ currentStep }: StepBarProps) {
               flex: 1, height: 3, borderRadius: 2,
               background:
                 i < stepIdx ? C.teal :
-                i === stepIdx ? '#CBD5E1' : '#E2E8F0',
+                i === stepIdx ? C.tealMid : '#E2E8F0',
               transition: 'background 0.25s',
             }}
           />
