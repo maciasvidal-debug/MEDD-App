@@ -73,15 +73,21 @@ alter table public.surveys enable row level security;
 create policy "Usuarios gestionan sus propias encuestas"
   on public.surveys
   for all
-  using  (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using  ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- ─── VISTA ANALÍTICA ─────────────────────────────────────────────────
 -- Métricas por medicamento con contexto sociogeográfico.
 -- T_VTO  = F_ETA - F_VTO   (días vencido en hogar)
 -- T_DISP = F_ETA - F_DISP  (ciclo total desde dispensación)
 -- V_UTIL = F_VTO - F_DISP  (vida útil remanente al dispensar)
-create or replace view public.v_product_metrics as
+--
+-- SECURITY INVOKER: la vista corre con los permisos del usuario que
+-- consulta, no del propietario. Esto garantiza que las políticas RLS
+-- de surveys se apliquen correctamente (cada usuario solo ve sus datos).
+create or replace view public.v_product_metrics
+  with (security_invoker = true)
+as
 select
   s.id          as survey_id,
   s.user_id,
