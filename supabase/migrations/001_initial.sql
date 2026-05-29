@@ -73,8 +73,8 @@ alter table public.surveys enable row level security;
 create policy "Usuarios gestionan sus propias encuestas"
   on public.surveys
   for all
-  using  (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using  ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- ─── VISTA ANALÍTICA ─────────────────────────────────────────────────
 -- Métricas por medicamento con contexto sociogeográfico.
