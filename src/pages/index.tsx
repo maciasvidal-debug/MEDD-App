@@ -21,7 +21,8 @@ import type { SurveyDraft, Survey } from '../types'
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
-  const { surveys, openWizard } = useStore()
+  const { surveys, openWizard, userRole } = useStore()
+  const isInvestigador = userRole === 'investigador'
   const n = surveys.length
 
   const nSob    = surveys.filter(s => s.medSob    === 'Sí').length
@@ -96,6 +97,20 @@ export function DashboardPage() {
     <div>
       <TopBar title="MEDD · Panel analítico" />
       <div className="page-content">
+
+        {/* Role badge */}
+        {isInvestigador && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: '#EFF6FF', border: '0.5px solid #BFDBFE',
+            borderRadius: 8, padding: '7px 10px', marginBottom: 12,
+          }}>
+            <i className="ti ti-shield-check" style={{ color: '#1D4ED8', fontSize: 14 }} />
+            <span style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 500 }}>
+              Vista de investigador — datos agregados de todos los encuestadores
+            </span>
+          </div>
+        )}
 
         {/* KPIs */}
         <p style={{ fontSize: 11, color: C.hint, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
@@ -271,7 +286,8 @@ export function WizardPage() {
 // ─── ENCUESTAS PAGE ───────────────────────────────────────────────────────
 
 export function EncuestasPage() {
-  const { surveys, removeSurvey, openEditWizard, openWizard } = useStore()
+  const { surveys, removeSurvey, openEditWizard, openWizard, user, userRole } = useStore()
+  const isInvestigador = userRole === 'investigador'
   const [filter, setFilter]     = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [detail, setDetail]     = useState<Survey | null>(null)
@@ -307,8 +323,12 @@ export function EncuestasPage() {
           <EmptyState
             icon="ti-clipboard-list"
             title="Sin registros"
-            description="Cuando registres encuestas aparecerán aquí."
-            action={<Button onClick={() => openWizard(0)} icon="ti-plus">Primera encuesta</Button>}
+            description={isInvestigador
+              ? 'Aún no hay encuestas registradas por los encuestadores.'
+              : 'Cuando registres encuestas aparecerán aquí.'}
+            action={isInvestigador ? undefined : (
+              <Button onClick={() => openWizard(0)} icon="ti-plus">Primera encuesta</Button>
+            )}
           />
         ) : filtered.length === 0 ? (
           <p style={{ color: C.muted, fontSize: 13, textAlign: 'center', padding: '32px 0' }}>
@@ -368,7 +388,8 @@ export function EncuestasPage() {
                   </div>
                 )}
 
-                {confirmId === sv.id ? (
+                {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
+                {!isInvestigador && confirmId === sv.id ? (
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
                     <Button size="sm" variant="danger" onClick={() => { removeSurvey(sv.id); setConfirmId(null) }}>
@@ -378,7 +399,7 @@ export function EncuestasPage() {
                       Cancelar
                     </Button>
                   </div>
-                ) : (
+                ) : !isInvestigador ? (
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                     <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => openEditWizard(sv)}>
                       Editar
@@ -391,7 +412,7 @@ export function EncuestasPage() {
                       Eliminar
                     </Button>
                   </div>
-                )}
+                ) : null}
               </Card>
             )
           })
@@ -635,11 +656,12 @@ export function ExportarPage() {
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────
 
 export function AjustesPage() {
-  const { settings, persistSettings, surveys, user, signOut, syncing, triggerSync } = useStore()
+  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync } = useStore()
   const [form, setForm] = useState(settings)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
-  const pendingCount = surveys.filter(s => s.syncStatus !== 'synced').length
+  const isInvestigador = userRole === 'investigador'
+  const pendingCount   = surveys.filter(s => s.syncStatus !== 'synced').length
 
   return (
     <div>
@@ -681,6 +703,19 @@ export function AjustesPage() {
         <Card style={{ background: C.bg }}>
           <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
             <InfoRow label="Sesión activa" value={user?.email ?? '—'} />
+            <InfoRow
+              label="Rol"
+              value={
+                <span style={{
+                  background: isInvestigador ? '#EFF6FF' : '#F0FDF9',
+                  color:      isInvestigador ? '#1D4ED8' : '#0F766E',
+                  border:     `0.5px solid ${isInvestigador ? '#BFDBFE' : '#99F6E4'}`,
+                  borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600,
+                }}>
+                  {isInvestigador ? 'Investigador' : 'Encuestador'}
+                </span>
+              }
+            />
             <InfoRow
               label="Encuestas pendientes de sync"
               value={pendingCount > 0 ? `${pendingCount} local(es)` : 'Al día'}

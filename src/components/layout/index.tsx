@@ -54,12 +54,18 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 export function BottomNav() {
-  const { view, setView, surveys, openWizard } = useStore()
+  const { view, setView, surveys, openWizard, userRole } = useStore()
+  const isInvestigador = userRole === 'investigador'
 
   function handleNav(id: NavItem['id']) {
     if (id === 'nueva') openWizard(surveys.length)
     else setView(id as AppView)
   }
+
+  // Investigators don't collect surveys — hide the FAB
+  const visibleItems = isInvestigador
+    ? NAV_ITEMS.filter(item => item.id !== 'nueva')
+    : NAV_ITEMS
 
   return (
     <nav
@@ -75,7 +81,7 @@ export function BottomNav() {
         zIndex: 10,
       }}
     >
-      {NAV_ITEMS.map(item => {
+      {visibleItems.map(item => {
         const active = view === item.id
         return (
           <button
