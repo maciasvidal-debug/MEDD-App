@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { getAllSurveys, saveSurvey } from './db'
-import type { Survey, Medication } from '../types'
+import type { Survey, Medication, UserRole } from '../types'
 
 // ─── Mapping helpers ─────────────────────────────────────────────────────────
 
@@ -106,33 +106,38 @@ export async function pullSurveys(): Promise<Survey[]> {
 }
 
 // ─── Full sync on login ──────────────────────────────────────────────────────
-// Strategy: upsert all local surveys → pull remote-only surveys → merge to IDB.
-// Last-write-wins on updatedAt. Each encuestador works solo, so conflicts are rare.
+// Encuestador : push local surveys → pull remote-only → merge to IDB.
+// Investigador: pull-only (read-only analyst — never pushes others' surveys).
+// Last-write-wins on updatedAt. Each encuestador works solo, conflicts are rare.
 
-export async function fullSync(userId: string): Promise<{ pushed: number; pulled: number }> {
-  const local = await getAllSurveys()
+export async function fullSync(
+  userId: string,
+  role: UserRole,
+): Promise<{ pushed: number; pulled: number }> {
+  const local    = await getAllSurveys()
   const localMap = new Map(local.map(s => [s.id, s]))
 
-  // 1. Push all local surveys to remote
+  // 1. Push (encuestadores only)
   let pushed = 0
-  for (const survey of local) {
-    const ok = await pushSurvey(survey, userId)
-    if (ok) {
-      await saveSurvey({ ...survey, syncStatus: 'synced' })
-      pushed++
+  if (role === 'encuestador') {
+    for (const survey of local) {
+      const ok = await pushSurvey(survey, userId)
+      if (ok) {
+        await saveSurvey({ ...survey, syncStatus: 'synced' })
+        pushed++
+      }
     }
   }
 
-  // 2. Pull remote surveys and add any missing from local IDB
+  // 2. Pull remote surveys and merge into local IDB
   const remote = await pullSurveys()
   let pulled = 0
   for (const remoteSurvey of remote) {
-    const local = localMap.get(remoteSurvey.id)
-    if (!local) {
+    const existing = localMap.get(remoteSurvey.id)
+    if (!existing) {
       await saveSurvey(remoteSurvey)
       pulled++
-    } else if (remoteSurvey.updatedAt > local.updatedAt) {
-      // Remote is newer (edited on another device)
+    } else if (remoteSurvey.updatedAt > existing.updatedAt) {
       await saveSurvey({ ...remoteSurvey, syncStatus: 'synced' })
       pulled++
     }

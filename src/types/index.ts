@@ -73,6 +73,7 @@ export interface Survey {
 }
 
 export type SyncStatus = 'local' | 'synced' | 'syncing' | 'error'
+export type UserRole   = 'encuestador' | 'investigador'
 
 export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>
 

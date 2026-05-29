@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { User, Session } from '@supabase/supabase-js'
-import type { Survey, AppView, WizardState, Settings, SurveyDraft } from '../types'
+import type { Survey, AppView, WizardState, Settings, SurveyDraft, UserRole } from '../types'
 import {
   getAllSurveys, saveSurvey, deleteSurvey,
   getSettings, saveSettings,
@@ -22,6 +22,7 @@ interface AppStore {
   user: User | null
   session: Session | null
   authReady: boolean
+  userRole: UserRole | null
   initAuth: () => () => void
   signIn: (email: string, password: string) => Promise<string | null>
   signUp: (email: string, password: string) => Promise<string | null>
@@ -65,19 +66,41 @@ export const useStore = create<AppStore>((set, get) => ({
   user: null,
   session: null,
   authReady: false,
+  userRole: null,
 
   initAuth() {
-    // Restore existing session
-    supabase.auth.getSession().then(({ data }) => {
-      set({ session: data.session, user: data.session?.user ?? null, authReady: true })
+    // Restore existing session and fetch role
+    supabase.auth.getSession().then(async ({ data }) => {
+      const user = data.session?.user ?? null
+      let userRole: UserRole | null = null
+      if (user) {
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single()
+        userRole = (roleRow?.role as UserRole) ?? 'encuestador'
+      }
+      set({ session: data.session, user, userRole, authReady: true })
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const prev = get().user
       const next = session?.user ?? null
-      set({ session, user: next })
 
-      // First login or token refresh → sync surveys
+      let userRole: UserRole | null = null
+      if (next) {
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', next.id)
+          .single()
+        userRole = (roleRow?.role as UserRole) ?? 'encuestador'
+      }
+
+      set({ session, user: next, userRole })
+
+      // First login → load local data and sync with remote
       if (next && !prev) {
         get().loadSurveys().then(() => get().triggerSync())
       }
@@ -98,20 +121,20 @@ export const useStore = create<AppStore>((set, get) => ({
 
   async signOut() {
     await supabase.auth.signOut()
-    set({ user: null, session: null, surveys: [], surveysLoaded: false })
+    set({ user: null, session: null, userRole: null, surveys: [], surveysLoaded: false })
   },
 
   // ── Sync ─────────────────────────────────────────────────────────────
   syncing: false,
 
   async triggerSync() {
-    const { user, syncing } = get()
+    const { user, userRole, syncing } = get()
     if (!user || syncing) return
     set({ syncing: true })
     try {
-      const { pushed, pulled } = await fullSync(user.id)
+      const role = userRole ?? 'encuestador'
+      const { pushed, pulled } = await fullSync(user.id, role)
       if (pulled > 0) {
-        // Reload local surveys after pulling remote ones
         const surveys = await getAllSurveys()
         set({ surveys })
       }
