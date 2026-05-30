@@ -14,6 +14,7 @@
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS surveys (
     nui            SERIAL PRIMARY KEY,                 -- NUI  : ID Único de Registro (auto-increment PK)
+    user_id        UUID        NOT NULL,               -- Dueño (auth.users.id de Supabase). Lo sella el backend desde el JWT; nunca llega del cliente.
     f_eta          DATE        NOT NULL,               -- F_ETA: Fecha de la entrevista (<= hoy)
     nui_etr        INTEGER     NOT NULL,               -- NUI_ETR: ID Único del Encuestador (entero positivo)
     f_nac          DATE        NOT NULL,               -- F_NAC: Fecha de nacimiento (< F_ETA)
@@ -85,9 +86,16 @@ CREATE TABLE IF NOT EXISTS medications (
     CONSTRAINT chk_conc_pos CHECK (conc_med IS NULL OR conc_med >= 0)
 );
 
+-- Despliegues previos: añade user_id sin romper filas existentes. Se crea
+-- nullable aquí porque puede haber datos históricos sin dueño conocido; tras
+-- poblarlo se puede endurecer con: ALTER TABLE surveys ALTER COLUMN user_id SET NOT NULL;
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS user_id UUID;
+
 CREATE INDEX IF NOT EXISTS idx_medications_nui ON medications(nui);
 CREATE INDEX IF NOT EXISTS idx_surveys_ciudad  ON surveys(ciudad);
 CREATE INDEX IF NOT EXISTS idx_surveys_estrato ON surveys(estrato);
+-- Filtra rápido las encuestas por dueño (autorización por propietario en el API).
+CREATE INDEX IF NOT EXISTS idx_surveys_user_id ON surveys(user_id);
 
 -- ---------------------------------------------------------------------
 -- ANALYTICS VIEW  (Revenue-critical time calculations, Excel logic)
