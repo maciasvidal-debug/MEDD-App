@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, type TooltipProps,
+  XAxis, YAxis, Tooltip,
 } from 'recharts'
 import { TopBar, StepBar } from '../components/layout'
 import {
@@ -51,7 +51,7 @@ export function DashboardPage() {
     background: C.surface, border: `0.5px solid ${C.border}`,
     borderRadius: 6, padding: '5px 9px', fontSize: 12,
   }
-  const CustomTip = ({ active, payload }: TooltipProps<number, string>) =>
+  const CustomTip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: { name: string } }> }) =>
     active && payload?.length
       ? <div style={tipStyle}><strong>{payload[0].payload.name}</strong>: {payload[0].value}</div>
       : null
