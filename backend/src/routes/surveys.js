@@ -12,6 +12,25 @@ const SURVEY_COLS = [
     'peso_med_nc', 'obs',
 ];
 
+// Ordered column list for the medications INSERT.
+const MED_COLS = ['nui', 'nm_med', 'dci', 'conc_med', 'und_conc', 'f_vto'];
+
+// SQL placeholders ($1, $2, ...) bind VALUES only — identifiers (table/column
+// names) can never be parameterized this way. Building them via raw string
+// concatenation is a SQL-injection anti-pattern, so every identifier is routed
+// through this helper, which applies PostgreSQL's identifier-escaping rules:
+// validate the shape, wrap in double quotes, and double any embedded quotes
+// (the same logic pg.escapeIdentifier / pg-format's %I use internally). This
+// keeps the pattern safe even if a column list is later extended or sourced
+// from outside this module.
+const SAFE_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+function quoteIdent(name) {
+    if (typeof name !== 'string' || !SAFE_IDENT.test(name)) {
+        throw new Error(`Invalid SQL identifier: ${JSON.stringify(name)}`);
+    }
+    return `"${name.replace(/"/g, '""')}"`;
+}
+
 // GET codebook metadata (enums + city list) so the UI never hard-codes vocab.
 router.get('/meta', (req, res) => {
     res.json({ enums: ENUMS, ciudades: CIUDADES });
@@ -65,10 +84,11 @@ router.post('/', async (req, res) => {
     try {
         await client.query('BEGIN');
 
+        const surveyCols = SURVEY_COLS.map(quoteIdent).join(', ');
         const placeholders = SURVEY_COLS.map((_, i) => `$${i + 1}`).join(', ');
         const params = SURVEY_COLS.map((c) => value[c]);
         const surveyResult = await client.query(
-            `INSERT INTO surveys (${SURVEY_COLS.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+            `INSERT INTO surveys (${surveyCols}) VALUES (${placeholders}) RETURNING *`,
             params
         );
         const survey = surveyResult.rows[0];
@@ -76,15 +96,16 @@ router.post('/', async (req, res) => {
         // Bulk insert all medications in a single query to avoid N+1.
         let insertedMeds = [];
         if (value.medications.length) {
-            const COLS_PER_MED = 6;
+            const medCols = MED_COLS.map(quoteIdent).join(', ');
+            const colCount = MED_COLS.length;
             const medParams = [];
             const valueGroups = value.medications.map((med, i) => {
-                const base = i * COLS_PER_MED;
+                const base = i * colCount;
                 medParams.push(survey.nui, med.nm_med, med.dci, med.conc_med, med.und_conc, med.f_vto);
-                return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`;
+                return `(${MED_COLS.map((_, j) => `$${base + j + 1}`).join(', ')})`;
             });
             const medsResult = await client.query(
-                `INSERT INTO medications (nui, nm_med, dci, conc_med, und_conc, f_vto)
+                `INSERT INTO medications (${medCols})
                  VALUES ${valueGroups.join(', ')} RETURNING *`,
                 medParams
             );
