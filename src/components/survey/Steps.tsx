@@ -786,12 +786,10 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
 
 // ─── Step 6 — Confirmar ───────────────────────────────────────────────────
 
-export function Step6({ draft, onNext, onBack }: StepProps) {
-  const { control, handleSubmit } = useForm({ defaultValues: { obs: draft.obs } })
-
-  const edad = calcEdad(draft.fEta, draft.fNac)
-
-  const Row = ({ label, value }: { label: string; value?: string | number | null }) => (
+// Read-only summary row. Declared at module scope (not inside Step6's render)
+// so it keeps a stable identity across renders — see react-hooks/static-components.
+function Row({ label, value }: { label: string; value?: string | number | null }) {
+  return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
       padding: '6px 0', borderBottom: `0.5px solid ${C.border}`,
@@ -802,6 +800,12 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
       </span>
     </div>
   )
+}
+
+export function Step6({ draft, onNext, onBack }: StepProps) {
+  const { control, handleSubmit } = useForm({ defaultValues: { obs: draft.obs } })
+
+  const edad = calcEdad(draft.fEta, draft.fNac)
 
   return (
     <form onSubmit={handleSubmit(({ obs }) => onNext({ obs }))} noValidate>

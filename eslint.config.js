@@ -18,5 +18,10 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Allow co-locating non-component constants (e.g. the `C` design tokens)
+      // alongside components — the recommended setting for Vite + Fast Refresh.
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
   },
 ])

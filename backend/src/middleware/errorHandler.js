@@ -21,8 +21,8 @@ function notFound(req, res) {
 }
 
 // Final error handler. Maps known DB constraint violations to 400 and hides
-// internal details for genuine 5xx errors.
-// eslint-disable-next-line no-unused-vars
+// internal details for genuine 5xx errors. The 4-arg signature is required by
+// Express to recognize this as an error-handling middleware.
 function errorHandler(err, req, res, next) {
     if (res.headersSent) return next(err);
 
