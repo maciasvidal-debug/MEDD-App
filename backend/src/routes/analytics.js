@@ -85,14 +85,14 @@ router.get('/socio', asyncHandler(async (req, res) => {
     const dim = dimMap[req.query.by] || 'estrato';
     const result = await pool.query(`
         SELECT
-            COALESCE(${dim}::text, 'Sin dato')           AS segment,
+            COALESCE(${col}::text, 'Sin dato')           AS segment,
             COUNT(*)                                     AS surveys,
             COALESCE(SUM(cant_med), 0)                   AS unused_units,
             COALESCE(SUM(cant_med_vto), 0)               AS expired_units,
             ROUND(COALESCE(SUM(peso_med_nc), 0)::numeric, 2) AS weight_g,
             ROUND(COALESCE(AVG(cant_med), 0)::numeric, 2)    AS avg_unused_per_survey
         FROM surveys
-        GROUP BY COALESCE(${dim}::text, 'Sin dato')
+        GROUP BY COALESCE(${col}::text, 'Sin dato')
         ORDER BY segment ASC
     `);
     res.json({ dimension: dim, data: result.rows.map(normalizeNums) });
