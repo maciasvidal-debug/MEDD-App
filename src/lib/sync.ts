@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { getAllSurveys, saveSurvey } from './db'
+import { getAllSurveys, saveSurvey, saveManySurveys } from './db'
 import type { Survey, Medication, UserRole } from '../types'
 
 // ─── Mapping helpers ─────────────────────────────────────────────────────────
@@ -117,31 +117,30 @@ export async function fullSync(
   const local    = await getAllSurveys()
   const localMap = new Map(local.map(s => [s.id, s]))
 
-  // 1. Push (encuestadores only)
+  // 1. Push (encuestadores only) — all requests in parallel, then batch-save synced ones
   let pushed = 0
   if (role === 'encuestador') {
-    for (const survey of local) {
-      const ok = await pushSurvey(survey, userId)
-      if (ok) {
-        await saveSurvey({ ...survey, syncStatus: 'synced' })
-        pushed++
-      }
-    }
+    const results = await Promise.all(
+      local.map(survey => pushSurvey(survey, userId).then(ok => ({ survey, ok })))
+    )
+    const synced = results.filter(r => r.ok).map(r => ({ ...r.survey, syncStatus: 'synced' as const }))
+    await saveManySurveys(synced)
+    pushed = synced.length
   }
 
-  // 2. Pull remote surveys and merge into local IDB
+  // 2. Pull remote surveys and merge into local IDB — single bulk write
   const remote = await pullSurveys()
-  let pulled = 0
+  const toSave: Survey[] = []
   for (const remoteSurvey of remote) {
     const existing = localMap.get(remoteSurvey.id)
     if (!existing) {
-      await saveSurvey(remoteSurvey)
-      pulled++
+      toSave.push(remoteSurvey)
     } else if (remoteSurvey.updatedAt > existing.updatedAt) {
-      await saveSurvey({ ...remoteSurvey, syncStatus: 'synced' })
-      pulled++
+      toSave.push({ ...remoteSurvey, syncStatus: 'synced' })
     }
   }
+  await saveManySurveys(toSave)
+  const pulled = toSave.length
 
   return { pushed, pulled }
 }

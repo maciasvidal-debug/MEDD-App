@@ -63,6 +63,13 @@ export async function saveSurvey(survey: Survey): Promise<void> {
   await db.put('surveys', survey)
 }
 
+export async function saveManySurveys(surveys: Survey[]): Promise<void> {
+  if (surveys.length === 0) return
+  const db = await getDB()
+  const tx = db.transaction('surveys', 'readwrite')
+  await Promise.all([...surveys.map(s => tx.store.put(s)), tx.done])
+}
+
 export async function deleteSurvey(id: string): Promise<void> {
   const db = await getDB()
   await db.delete('surveys', id)
