@@ -94,7 +94,7 @@ router.post('/', async (req, res) => {
         console.error(err);
         // Surface DB CHECK violations as 400 rather than opaque 500.
         if (err.code === '23514' || err.code === '23503') {
-            return res.status(400).json({ error: 'Restricción de integridad violada', details: [err.detail || err.message] });
+            return res.status(400).json({ error: 'Restricción de integridad violada', details: ['Datos inválidos o referencia no encontrada'] });
         }
         res.status(500).json({ error: 'Error creating survey' });
     } finally {
