@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { quoteIdent } = require('../utils/sql');
 
 // All analytics endpoints expose aggregate data across every survey, so they
 // require authentication and are restricted to the 'investigador' role, in

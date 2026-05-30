@@ -4,6 +4,7 @@ const pool = require('../db');
 const { ENUMS, CIUDADES, validateSurvey, productMetrics } = require('../schema');
 const { requireAuth } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { quoteIdent } = require('../utils/sql');
 
 // Survey data is sensitive: every endpoint below requires a valid Supabase
 // JWT. This is enforced at the router level so protection travels with the
@@ -30,22 +31,6 @@ const SURVEY_COLS = [
 
 // Ordered column list for the medications INSERT.
 const MED_COLS = ['nui', 'nm_med', 'dci', 'conc_med', 'und_conc', 'f_vto'];
-
-// SQL placeholders ($1, $2, ...) bind VALUES only — identifiers (table/column
-// names) can never be parameterized this way. Building them via raw string
-// concatenation is a SQL-injection anti-pattern, so every identifier is routed
-// through this helper, which applies PostgreSQL's identifier-escaping rules:
-// validate the shape, wrap in double quotes, and double any embedded quotes
-// (the same logic pg.escapeIdentifier / pg-format's %I use internally). This
-// keeps the pattern safe even if a column list is later extended or sourced
-// from outside this module.
-const SAFE_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
-function quoteIdent(name) {
-    if (typeof name !== 'string' || !SAFE_IDENT.test(name)) {
-        throw new Error(`Invalid SQL identifier: ${JSON.stringify(name)}`);
-    }
-    return `"${name.replace(/"/g, '""')}"`;
-}
 
 // GET codebook metadata (enums + city list) so the UI never hard-codes vocab.
 router.get('/meta', (req, res) => {

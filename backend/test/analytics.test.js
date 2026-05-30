@@ -48,3 +48,33 @@ describe('analytics authorization', () => {
         expect(res.body.total_weight_g).toBe(5.5);
     });
 });
+
+describe('analytics /socio dimension is allowlisted (SQL injection guard)', () => {
+    test('a valid dimension is used and quoted', async () => {
+        pool.query.mockResolvedValueOnce({ rows: [] });
+        const token = await mintToken({ role: 'investigador' });
+        const res = await request(app)
+            .get('/api/analytics/socio?by=ciudad')
+            .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.dimension).toBe('ciudad');
+        const [sql] = pool.query.mock.calls[0];
+        expect(sql).toContain('"ciudad"');
+    });
+
+    test('a malicious ?by falls back to the safe default and never reaches the SQL', async () => {
+        pool.query.mockResolvedValueOnce({ rows: [] });
+        const token = await mintToken({ role: 'investigador' });
+        const evil = "ciudad)::text,'x') AS s, (SELECT pg_sleep(5))--";
+        const res = await request(app)
+            .get(`/api/analytics/socio?by=${encodeURIComponent(evil)}`)
+            .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.dimension).toBe('estrato');
+        const [sql] = pool.query.mock.calls[0];
+        expect(sql).not.toContain('pg_sleep');
+        expect(sql).toContain('"estrato"');
+    });
+});
