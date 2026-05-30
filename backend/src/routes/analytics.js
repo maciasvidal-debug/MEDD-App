@@ -81,8 +81,12 @@ router.get('/risk', asyncHandler(async (req, res) => {
 // chosen dimension: ESTRATO | AS_SALUD | CIUDAD (?by=estrato default).
 // ---------------------------------------------------------------------
 router.get('/socio', asyncHandler(async (req, res) => {
+    // Allowlist the grouping dimension: ?by is constrained to known columns and
+    // any unknown/malicious value falls back to 'estrato'. quoteIdent is applied
+    // as defense-in-depth so a raw identifier can never reach the SQL string.
     const dimMap = { estrato: 'estrato', as_salud: 'as_salud', ciudad: 'ciudad' };
     const dim = dimMap[req.query.by] || 'estrato';
+    const col = quoteIdent(dim);
     const result = await pool.query(`
         SELECT
             COALESCE(${col}::text, 'Sin dato')           AS segment,
