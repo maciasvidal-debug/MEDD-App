@@ -73,14 +73,22 @@ router.post('/', async (req, res) => {
         );
         const survey = surveyResult.rows[0];
 
-        const insertedMeds = [];
-        for (const med of value.medications) {
-            const r = await client.query(
+        // Bulk insert all medications in a single query to avoid N+1.
+        let insertedMeds = [];
+        if (value.medications.length) {
+            const COLS_PER_MED = 6;
+            const medParams = [];
+            const valueGroups = value.medications.map((med, i) => {
+                const base = i * COLS_PER_MED;
+                medParams.push(survey.nui, med.nm_med, med.dci, med.conc_med, med.und_conc, med.f_vto);
+                return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`;
+            });
+            const medsResult = await client.query(
                 `INSERT INTO medications (nui, nm_med, dci, conc_med, und_conc, f_vto)
-                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-                [survey.nui, med.nm_med, med.dci, med.conc_med, med.und_conc, med.f_vto]
+                 VALUES ${valueGroups.join(', ')} RETURNING *`,
+                medParams
             );
-            insertedMeds.push(r.rows[0]);
+            insertedMeds = medsResult.rows;
         }
 
         await client.query('COMMIT');
