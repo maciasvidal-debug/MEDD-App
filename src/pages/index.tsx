@@ -6,19 +6,48 @@ import {
 import { TopBar, StepBar } from '../components/layout'
 import {
   StatCard, Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, C, ChipGroup,
+  Field, SectionHead, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
 import {
-  freqTable, groupSum, pct, calcEdad, fmtDate, fmtTimestamp,
+  freqTable, groupSum, pct, calcEdad, fmtDate,
   toCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
 import { OPT, TOTAL_STEPS } from '../lib/constants'
 import type { SurveyDraft, Survey } from '../types'
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
+
+// Chart helpers declared at module scope (not inside DashboardPage's render)
+// so they keep a stable identity across renders — see react-hooks/static-components.
+const tipStyle = {
+  background: C.surface, border: `0.5px solid ${C.border}`,
+  borderRadius: 6, padding: '5px 9px', fontSize: 12,
+}
+
+const CustomTip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: { name: string } }> }) =>
+  active && payload?.length
+    ? <div style={tipStyle}><strong>{payload[0].payload.name}</strong>: {payload[0].value}</div>
+    : null
+
+const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; label: string; color: string }) => {
+  const data = [{ v: val }, { v: Math.max(0, outOf - val) }]
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <PieChart width={72} height={72}>
+        <Pie data={data} cx={36} cy={36} innerRadius={22} outerRadius={34} dataKey="v" stroke="none">
+          <Cell fill={color} />
+          <Cell fill="#E2E8F0" />
+        </Pie>
+      </PieChart>
+      <span style={{ fontSize: 16, fontWeight: 500, color }}>{pct(val, outOf)}%</span>
+      <span style={{ fontSize: 10, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
+      <span style={{ fontSize: 10, color: C.hint }}>{val}/{outOf}</span>
+    </div>
+  )
+}
 
 export function DashboardPage() {
   const { surveys, openWizard, userRole } = useStore()
@@ -46,32 +75,6 @@ export function DashboardPage() {
   const ciudadVenc = groupSum(surveys, 'ciudad', 'cantMedVto')
     .filter(d => d.name && d.name !== 'Sin dato')
     .slice(0, 8)
-
-  const tipStyle = {
-    background: C.surface, border: `0.5px solid ${C.border}`,
-    borderRadius: 6, padding: '5px 9px', fontSize: 12,
-  }
-  const CustomTip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: { name: string } }> }) =>
-    active && payload?.length
-      ? <div style={tipStyle}><strong>{payload[0].payload.name}</strong>: {payload[0].value}</div>
-      : null
-
-  const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; label: string; color: string }) => {
-    const data = [{ v: val }, { v: Math.max(0, outOf - val) }]
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-        <PieChart width={72} height={72}>
-          <Pie data={data} cx={36} cy={36} innerRadius={22} outerRadius={34} dataKey="v" stroke="none">
-            <Cell fill={color} />
-            <Cell fill="#E2E8F0" />
-          </Pie>
-        </PieChart>
-        <span style={{ fontSize: 16, fontWeight: 500, color }}>{pct(val, outOf)}%</span>
-        <span style={{ fontSize: 10, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
-        <span style={{ fontSize: 10, color: C.hint }}>{val}/{outOf}</span>
-      </div>
-    )
-  }
 
   if (n === 0) {
     return (
@@ -286,7 +289,7 @@ export function WizardPage() {
 // ─── ENCUESTAS PAGE ───────────────────────────────────────────────────────
 
 export function EncuestasPage() {
-  const { surveys, removeSurvey, openEditWizard, openWizard, user, userRole } = useStore()
+  const { surveys, removeSurvey, openEditWizard, openWizard, userRole } = useStore()
   const isInvestigador = userRole === 'investigador'
   const [filter, setFilter]     = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)

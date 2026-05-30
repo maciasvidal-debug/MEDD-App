@@ -26,7 +26,7 @@ let _db: IDBPDatabase<MEDDSchema> | null = null
 async function getDB(): Promise<IDBPDatabase<MEDDSchema>> {
   if (_db) return _db
   _db = await openDB<MEDDSchema>(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion, _newVersion, tx) {
+    upgrade(db) {
       // Version 1 → 2: recreate surveys store with new indexes.
       // Field schema changed completely; old records are incompatible.
       if (db.objectStoreNames.contains('surveys')) {
