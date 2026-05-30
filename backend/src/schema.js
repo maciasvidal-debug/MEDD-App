@@ -66,17 +66,7 @@ function toNumOrNull(v) {
     return Number.isFinite(n) ? n : NaN;
 }
 
-// ---------------------------------------------------------------------
-// Normalize + validate a survey payload. Returns { value, errors }.
-// `value` is a clean object with the deterministic field-logic applied
-// (child fields blanked when their parent gate is closed).
-// ---------------------------------------------------------------------
-function validateSurvey(body) {
-    const errors = [];
-    const today = new Date().toISOString().slice(0, 10);
-    const v = {};
-
-    // --- Identity / dates -------------------------------------------------
+function validateIdentity(body, v, errors, today) {
     v.nui_etr = toIntOrNull(body.nui_etr);
     if (v.nui_etr === null || Number.isNaN(v.nui_etr) || v.nui_etr <= 0)
         errors.push('NUI_ETR (ID del encuestador) debe ser un entero positivo.');
@@ -90,8 +80,9 @@ function validateSurvey(body) {
     else if (v.f_eta && v.f_nac >= v.f_eta) errors.push('F_NAC debe ser anterior a F_ETA.');
 
     v.edad = calcEdad(v.f_eta, v.f_nac); // EDAD is always derived server-side.
+}
 
-    // --- Socio-demographic ------------------------------------------------
+function validateSocioDemographic(body, v, errors) {
     v.ciudad = body.ciudad ? String(body.ciudad).trim() : null;
     v.dir = body.dir ? String(body.dir).trim() : null;
 
@@ -99,14 +90,17 @@ function validateSurvey(body) {
     if (v.estrato !== null && !ENUMS.estrato.includes(v.estrato))
         errors.push('ESTRATO debe ser un valor entre 1 y 6.');
 
-    v.etnia = enumOrNull('ETNIA', body.etnia, ENUMS.etnia, errors);
-    v.as_salud = enumOrNull('AS_SALUD', body.as_salud, ENUMS.as_salud, errors);
-    v.est_lab = enumOrNull('EST_LAB', body.est_lab, ENUMS.est_lab, errors);
-    v.ingreso = enumOrNull('INGRESO', body.ingreso, ENUMS.ingreso, errors);
-    v.nv_estu = enumOrNull('NV_ESTU', body.nv_estu, ENUMS.nv_estu, errors);
+    v.etnia     = enumOrNull('ETNIA',     body.etnia,     ENUMS.etnia,     errors);
+    v.as_salud  = enumOrNull('AS_SALUD',  body.as_salud,  ENUMS.as_salud,  errors);
+    v.est_lab   = enumOrNull('EST_LAB',   body.est_lab,   ENUMS.est_lab,   errors);
+    v.ingreso   = enumOrNull('INGRESO',   body.ingreso,   ENUMS.ingreso,   errors);
+    v.nv_estu   = enumOrNull('NV_ESTU',   body.nv_estu,   ENUMS.nv_estu,   errors);
     v.per_salud = enumOrNull('PER_SALUD', body.per_salud, ENUMS.per_salud, errors);
+}
 
-    // --- Health gate chain (deterministic sanitization) -------------------
+// Deterministic health gate chain: child fields are cleared when their parent gate is closed.
+// EST_SALUD=No → clear PRB_SALUD, CON_MED | CON_MED=No → clear MED_PRC | MED_PRC=No → clear F_PRC, F_DISP, IND_MED
+function validateHealthChain(body, v, errors) {
     v.est_salud = toBool(body.est_salud);
 
     if (v.est_salud === true) {
@@ -115,7 +109,6 @@ function validateSurvey(body) {
         v.con_med = toBool(body.con_med);
         if (v.con_med === null) errors.push('CON_MED es obligatorio cuando EST_SALUD = Sí.');
     } else {
-        // EST_SALUD == 0 -> clear PRB_SALUD, CON_MED, MED_PRC, F_PRC, F_DISP, IND_MED
         v.prb_salud = null;
         v.con_med = null;
     }
@@ -124,12 +117,11 @@ function validateSurvey(body) {
         v.med_prc = toBool(body.med_prc);
         if (v.med_prc === null) errors.push('MED_PRC es obligatorio cuando CON_MED = Sí.');
     } else {
-        // CON_MED == 0 -> clear MED_PRC, F_PRC, F_DISP, IND_MED
         v.med_prc = null;
     }
 
     if (v.med_prc === true) {
-        v.f_prc = isValidDateStr(body.f_prc) ? body.f_prc : null;
+        v.f_prc  = isValidDateStr(body.f_prc)  ? body.f_prc  : null;
         v.f_disp = isValidDateStr(body.f_disp) ? body.f_disp : null;
         v.ind_med = toBool(body.ind_med);
         if (v.ind_med === null) errors.push('IND_MED es obligatorio cuando MED_PRC = Sí.');
@@ -142,13 +134,13 @@ function validateSurvey(body) {
             if (v.f_eta && v.f_disp > v.f_eta) errors.push('F_DISP no puede ser posterior a F_ETA.');
         }
     } else {
-        // MED_PRC == 0 -> clear F_PRC, F_DISP, IND_MED
         v.f_prc = null;
         v.f_disp = null;
         v.ind_med = null;
     }
+}
 
-    // --- Storage / disposal ----------------------------------------------
+function validateStorage(body, v, errors) {
     v.med_sob = toBool(body.med_sob);
 
     v.disp_med_vc = toBool(body.disp_med_vc);
@@ -156,7 +148,6 @@ function validateSurvey(body) {
         v.cto_disp_vc = body.cto_disp_vc ? String(body.cto_disp_vc).trim() : null;
         if (!v.cto_disp_vc) errors.push('CTO_DISP_VC es obligatorio cuando DISP_MED_VC = Sí.');
     } else {
-        // DISP_MED_VC == 0 -> clear CTO_DISP_VC
         v.cto_disp_vc = null;
     }
 
@@ -181,16 +172,17 @@ function validateSurvey(body) {
         errors.push('PESO_MED_NC debe ser un número >= 0.');
 
     v.obs = body.obs ? String(body.obs).trim() : null;
+}
 
-    // --- Medications (1:N sub-form) --------------------------------------
+function validateMedications(body, v, errors) {
     const meds = Array.isArray(body.medications) ? body.medications : [];
     v.medications = meds.map((m, i) => {
         const med = {
-            nm_med: m.nm_med ? String(m.nm_med).trim() : null,
-            dci: m.dci ? String(m.dci).trim() : null,
+            nm_med:   m.nm_med   ? String(m.nm_med).trim() : null,
+            dci:      m.dci      ? String(m.dci).trim()    : null,
             conc_med: toNumOrNull(m.conc_med),
             und_conc: m.und_conc || null,
-            f_vto: isValidDateStr(m.f_vto) ? m.f_vto : null,
+            f_vto:    isValidDateStr(m.f_vto) ? m.f_vto : null,
         };
         if (!med.nm_med && !med.dci)
             errors.push(`Medicamento #${i + 1}: requiere al menos Nombre comercial (NM_MED) o DCI.`);
@@ -202,6 +194,23 @@ function validateSurvey(body) {
             errors.push(`Medicamento #${i + 1}: F_VTO debe tener formato YYYY-MM-DD.`);
         return med;
     });
+}
+
+// ---------------------------------------------------------------------
+// Normalize + validate a survey payload. Returns { value, errors }.
+// `value` is a clean object with the deterministic field-logic applied
+// (child fields blanked when their parent gate is closed).
+// ---------------------------------------------------------------------
+function validateSurvey(body) {
+    const errors = [];
+    const today  = new Date().toISOString().slice(0, 10);
+    const v      = {};
+
+    validateIdentity(body, v, errors, today);
+    validateSocioDemographic(body, v, errors);
+    validateHealthChain(body, v, errors);
+    validateStorage(body, v, errors);
+    validateMedications(body, v, errors);
 
     return { value: v, errors };
 }

@@ -13,7 +13,7 @@ import {
   step1Schema, step2Schema, step3Schema, step4Schema,
   type Step1Data, type Step2Data, type Step3Data, type Step4Data,
 } from '../../lib/validators'
-import type { SurveyDraft, Medication } from '../../types'
+import type { SurveyDraft, Medication, UnidadConc } from '../../types'
 
 // ─── Municipio combobox ───────────────────────────────────────────────────────
 
@@ -189,7 +189,7 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
   })
 
   return (
-    <form onSubmit={handleSubmit(data => onNext(data as any))} noValidate>
+    <form onSubmit={handleSubmit(data => onNext(data as Partial<SurveyDraft>))} noValidate>
       <SectionHead icon="ti-id-badge" label="Datos de identificación" />
 
       <Field label="Fecha de la entrevista" required error={errors.fEta?.message}>
@@ -238,7 +238,7 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
   const edad  = calcEdad(draft.fEta, fNac)
 
   return (
-    <form onSubmit={handleSubmit(data => onNext(data as any))} noValidate>
+    <form onSubmit={handleSubmit(data => onNext(data as Partial<SurveyDraft>))} noValidate>
       <SectionHead icon="ti-users" label="Datos sociodemográficos" />
 
       <Field label="Fecha de nacimiento" required error={errors.fNac?.message}>
@@ -357,7 +357,7 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
   const fPrc     = watch('fPrc')
 
   function handleNext(data: Step3Data) {
-    const patch: Partial<SurveyDraft> = { ...data } as any
+    const patch: Partial<SurveyDraft> = { ...data } as Partial<SurveyDraft>
     if (data.estSalud !== 'Sí') {
       Object.assign(patch, { prbSalud: '', conMed: '', medPrc: '', fPrc: '', fDisp: '', indMed: '' })
     }
@@ -476,7 +476,7 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
   const cantMed   = watch('cantMed')
 
   function handleNext(data: Step4Data) {
-    const patch: Partial<SurveyDraft> = { ...data } as any
+    const patch: Partial<SurveyDraft> = { ...data } as Partial<SurveyDraft>
     if (data.dispMedVc !== 'Sí') patch.ctoDispVc = ''
     onNext(patch)
   }
@@ -571,7 +571,7 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
       nmMed:   r.producto ?? '',
       dci:     r.principioactivo ?? '',
       concMed: r.concentracion ? parseFloat(r.concentracion) : null,
-      undConc: (r.unidadmedida ?? '') as any,
+      undConc: (r.unidadmedida ?? '') as UnidadConc,
     }))
     setSelIdx(idx)
   }
@@ -687,7 +687,7 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
           <ChipGroup
             options={OPT.undConc}
             value={entry.undConc}
-            onChange={v => setEntry(e => ({ ...e, undConc: v as any }))}
+            onChange={v => setEntry(e => ({ ...e, undConc: v as UnidadConc }))}
           />
         </Field>
       </div>

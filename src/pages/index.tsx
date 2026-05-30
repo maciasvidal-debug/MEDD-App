@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip,
+  XAxis, YAxis, Tooltip, type TooltipProps,
 } from 'recharts'
 import { TopBar, StepBar } from '../components/layout'
 import {
@@ -51,7 +51,7 @@ export function DashboardPage() {
     background: C.surface, border: `0.5px solid ${C.border}`,
     borderRadius: 6, padding: '5px 9px', fontSize: 12,
   }
-  const CustomTip = ({ active, payload }: any) =>
+  const CustomTip = ({ active, payload }: TooltipProps<number, string>) =>
     active && payload?.length
       ? <div style={tipStyle}><strong>{payload[0].payload.name}</strong>: {payload[0].value}</div>
       : null
@@ -319,7 +319,7 @@ export function EncuestasPage() {
           </div>
         )}
 
-        {surveys.length === 0 ? (
+        {surveys.length === 0 && (
           <EmptyState
             icon="ti-clipboard-list"
             title="Sin registros"
@@ -330,12 +330,13 @@ export function EncuestasPage() {
               <Button onClick={() => openWizard(0)} icon="ti-plus">Primera encuesta</Button>
             )}
           />
-        ) : filtered.length === 0 ? (
+        )}
+        {surveys.length > 0 && filtered.length === 0 && (
           <p style={{ color: C.muted, fontSize: 13, textAlign: 'center', padding: '32px 0' }}>
             Sin resultados para "{filter}".
           </p>
-        ) : (
-          filtered.map(sv => {
+        )}
+        {surveys.length > 0 && filtered.length > 0 && filtered.map(sv => {
             const edad = calcEdad(sv.fEta, sv.fNac)
             const expiredMeds = sv.medications?.filter(m => {
               const mx = productMetrics(sv.fEta, sv.fDisp, m)
@@ -389,30 +390,32 @@ export function EncuestasPage() {
                 )}
 
                 {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
-                {!isInvestigador && confirmId === sv.id ? (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
-                    <Button size="sm" variant="danger" onClick={() => { removeSurvey(sv.id); setConfirmId(null) }}>
-                      Sí, eliminar
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setConfirmId(null)}>
-                      Cancelar
-                    </Button>
-                  </div>
-                ) : !isInvestigador ? (
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                    <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => openEditWizard(sv)}>
-                      Editar
-                    </Button>
-                    <Button
-                      size="sm" variant="ghost" icon="ti-trash"
-                      style={{ color: C.red, borderColor: `${C.red}50` }}
-                      onClick={() => setConfirmId(sv.id)}
-                    >
-                      Eliminar
-                    </Button>
-                  </div>
-                ) : null}
+                {!isInvestigador && (
+                  confirmId === sv.id ? (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
+                      <Button size="sm" variant="danger" onClick={() => { removeSurvey(sv.id); setConfirmId(null) }}>
+                        Sí, eliminar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmId(null)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => openEditWizard(sv)}>
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm" variant="ghost" icon="ti-trash"
+                        style={{ color: C.red, borderColor: `${C.red}50` }}
+                        onClick={() => setConfirmId(sv.id)}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  )
+                )}
               </Card>
             )
           })
