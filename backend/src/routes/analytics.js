@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { quoteIdent } = require('../utils/sql');
 
 // All analytics endpoints expose aggregate data across every survey, so they
 // require authentication and are restricted to the 'investigador' role, in
@@ -80,18 +81,22 @@ router.get('/risk', asyncHandler(async (req, res) => {
 // chosen dimension: ESTRATO | AS_SALUD | CIUDAD (?by=estrato default).
 // ---------------------------------------------------------------------
 router.get('/socio', asyncHandler(async (req, res) => {
+    // Allowlist the grouping dimension: ?by is constrained to known columns and
+    // any unknown/malicious value falls back to 'estrato'. quoteIdent is applied
+    // as defense-in-depth so a raw identifier can never reach the SQL string.
     const dimMap = { estrato: 'estrato', as_salud: 'as_salud', ciudad: 'ciudad' };
     const dim = dimMap[req.query.by] || 'estrato';
+    const col = quoteIdent(dim);
     const result = await pool.query(`
         SELECT
-            COALESCE(${dim}::text, 'Sin dato')           AS segment,
+            COALESCE(${col}::text, 'Sin dato')           AS segment,
             COUNT(*)                                     AS surveys,
             COALESCE(SUM(cant_med), 0)                   AS unused_units,
             COALESCE(SUM(cant_med_vto), 0)               AS expired_units,
             ROUND(COALESCE(SUM(peso_med_nc), 0)::numeric, 2) AS weight_g,
             ROUND(COALESCE(AVG(cant_med), 0)::numeric, 2)    AS avg_unused_per_survey
         FROM surveys
-        GROUP BY COALESCE(${dim}::text, 'Sin dato')
+        GROUP BY COALESCE(${col}::text, 'Sin dato')
         ORDER BY segment ASC
     `);
     res.json({ dimension: dim, data: result.rows.map(normalizeNums) });

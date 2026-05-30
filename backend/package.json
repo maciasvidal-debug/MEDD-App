@@ -5,7 +5,8 @@
   "description": "MEDD-App Express API (surveys + analytics)",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "jest --runInBand"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -14,5 +15,14 @@
     "helmet": "^8.0.0",
     "jose": "^5.9.6",
     "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFiles": ["<rootDir>/test/env.js"],
+    "testMatch": ["<rootDir>/test/**/*.test.js"]
   }
 }
