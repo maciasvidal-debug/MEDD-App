@@ -2,6 +2,12 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { ENUMS, CIUDADES, validateSurvey, productMetrics } = require('../schema');
+const { requireAuth } = require('../middleware/auth');
+
+// Survey data is sensitive: every endpoint below requires a valid Supabase
+// JWT. This is enforced at the router level so protection travels with the
+// router regardless of how/where it is mounted in the app.
+router.use(requireAuth);
 
 // Full ordered column list shared by INSERT and SELECT mapping.
 const SURVEY_COLS = [

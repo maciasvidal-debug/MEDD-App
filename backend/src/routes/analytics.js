@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { requireAuth, requireRole } = require('../middleware/auth');
+
+// All analytics endpoints expose aggregate data across every survey, so they
+// require authentication and are restricted to the 'investigador' role, in
+// line with the role model defined in the SQL migrations (002_roles.sql).
+router.use(requireAuth);
+router.use(requireRole('investigador'));
 
 // ---------------------------------------------------------------------
 // Summary KPIs

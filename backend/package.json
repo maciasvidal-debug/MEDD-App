@@ -1,0 +1,12 @@
+{
+  "name": "medd-app-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MEDD-App Express API (surveys + analytics)",
+  "main": "src/index.js",
+  "dependencies": {
+    "express": "^4.19.2",
+    "jose": "^5.9.6",
+    "pg": "^8.11.5"
+  }
+}
