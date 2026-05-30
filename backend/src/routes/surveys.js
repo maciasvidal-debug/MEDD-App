@@ -42,13 +42,19 @@ router.get('/meta', (req, res) => {
     res.json({ enums: ENUMS, ciudades: CIUDADES });
 });
 
-// GET all surveys (summary list)
+// GET all surveys (summary list). Owner-scoped: an encuestador only sees its
+// own surveys; an investigador sees all (mirrors the survey_select RLS policy).
+// Fail-closed — any role other than investigador is restricted to its own rows.
 router.get('/', async (req, res) => {
     try {
+        const all = req.user.role === 'investigador';
+        const where = all ? '' : 'WHERE s.user_id = $1';
+        const params = all ? [] : [req.user.id];
         const result = await pool.query(
             `SELECT s.*,
                     (SELECT COUNT(*) FROM medications m WHERE m.nui = s.nui) AS med_count
-             FROM surveys s ORDER BY s.nui DESC`
+             FROM surveys s ${where} ORDER BY s.nui DESC`,
+            params
         );
         res.json(result.rows);
     } catch (err) {
@@ -57,10 +63,19 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET single survey with medications + computed time metrics
+// GET single survey with medications + computed time metrics. Owner-scoped:
+// non-investigador users can only read their own surveys. A survey that exists
+// but belongs to someone else returns 404 (not 403) so the API never reveals
+// the existence of other users' records.
 router.get('/:id', async (req, res) => {
     try {
-        const surveyResult = await pool.query('SELECT * FROM surveys WHERE nui = $1', [req.params.id]);
+        const all = req.user.role === 'investigador';
+        const surveyResult = await pool.query(
+            all
+                ? 'SELECT * FROM surveys WHERE nui = $1'
+                : 'SELECT * FROM surveys WHERE nui = $1 AND user_id = $2',
+            all ? [req.params.id] : [req.params.id, req.user.id]
+        );
         if (surveyResult.rows.length === 0) {
             return res.status(404).json({ error: 'Survey not found' });
         }
@@ -90,9 +105,12 @@ router.post('/', async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        const surveyCols = SURVEY_COLS.map(quoteIdent).join(', ');
-        const placeholders = SURVEY_COLS.map((_, i) => `$${i + 1}`).join(', ');
-        const params = SURVEY_COLS.map((c) => value[c]);
+        // Ownership is stamped server-side from the verified JWT, never taken
+        // from the request body — the client cannot spoof or even see it.
+        const insertCols = [...SURVEY_COLS, 'user_id'];
+        const params = [...SURVEY_COLS.map((c) => value[c]), req.user.id];
+        const surveyCols = insertCols.map(quoteIdent).join(', ');
+        const placeholders = insertCols.map((_, i) => `$${i + 1}`).join(', ');
         const surveyResult = await client.query(
             `INSERT INTO surveys (${surveyCols}) VALUES (${placeholders}) RETURNING *`,
             params
