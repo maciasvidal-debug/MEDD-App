@@ -3,11 +3,21 @@ const router = express.Router();
 const pool = require('../db');
 const { ENUMS, CIUDADES, validateSurvey, productMetrics } = require('../schema');
 const { requireAuth } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/errorHandler');
 
 // Survey data is sensitive: every endpoint below requires a valid Supabase
 // JWT. This is enforced at the router level so protection travels with the
 // router regardless of how/where it is mounted in the app.
 router.use(requireAuth);
+
+// Validate the :id route param once: nui is a positive integer. Rejects
+// garbage like /surveys/abc before it ever reaches a query.
+router.param('id', (req, res, next, id) => {
+    if (!/^[1-9]\d*$/.test(id)) {
+        return res.status(400).json({ error: 'ID inválido', details: ['nui debe ser un entero positivo'] });
+    }
+    next();
+});
 
 // Full ordered column list shared by INSERT and SELECT mapping.
 const SURVEY_COLS = [
@@ -45,57 +55,47 @@ router.get('/meta', (req, res) => {
 // GET all surveys (summary list). Owner-scoped: an encuestador only sees its
 // own surveys; an investigador sees all (mirrors the survey_select RLS policy).
 // Fail-closed — any role other than investigador is restricted to its own rows.
-router.get('/', async (req, res) => {
-    try {
-        const all = req.user.role === 'investigador';
-        const where = all ? '' : 'WHERE s.user_id = $1';
-        const params = all ? [] : [req.user.id];
-        const result = await pool.query(
-            `SELECT s.*,
-                    (SELECT COUNT(*) FROM medications m WHERE m.nui = s.nui) AS med_count
-             FROM surveys s ${where} ORDER BY s.nui DESC`,
-            params
-        );
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Error fetching surveys' });
-    }
-});
+router.get('/', asyncHandler(async (req, res) => {
+    const all = req.user.role === 'investigador';
+    const where = all ? '' : 'WHERE s.user_id = $1';
+    const params = all ? [] : [req.user.id];
+    const result = await pool.query(
+        `SELECT s.*,
+                (SELECT COUNT(*) FROM medications m WHERE m.nui = s.nui) AS med_count
+         FROM surveys s ${where} ORDER BY s.nui DESC`,
+        params
+    );
+    res.json(result.rows);
+}));
 
 // GET single survey with medications + computed time metrics. Owner-scoped:
 // non-investigador users can only read their own surveys. A survey that exists
 // but belongs to someone else returns 404 (not 403) so the API never reveals
 // the existence of other users' records.
-router.get('/:id', async (req, res) => {
-    try {
-        const all = req.user.role === 'investigador';
-        const surveyResult = await pool.query(
-            all
-                ? 'SELECT * FROM surveys WHERE nui = $1'
-                : 'SELECT * FROM surveys WHERE nui = $1 AND user_id = $2',
-            all ? [req.params.id] : [req.params.id, req.user.id]
-        );
-        if (surveyResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Survey not found' });
-        }
-        const survey = surveyResult.rows[0];
-        const medsResult = await pool.query(
-            'SELECT * FROM medications WHERE nui = $1 ORDER BY id', [req.params.id]
-        );
-        survey.medications = medsResult.rows.map((m) => ({
-            ...m,
-            metrics: productMetrics(toIso(survey), toIsoMed(m)),
-        }));
-        res.json(survey);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Error fetching survey' });
+router.get('/:id', asyncHandler(async (req, res) => {
+    const all = req.user.role === 'investigador';
+    const surveyResult = await pool.query(
+        all
+            ? 'SELECT * FROM surveys WHERE nui = $1'
+            : 'SELECT * FROM surveys WHERE nui = $1 AND user_id = $2',
+        all ? [req.params.id] : [req.params.id, req.user.id]
+    );
+    if (surveyResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Survey not found' });
     }
-});
+    const survey = surveyResult.rows[0];
+    const medsResult = await pool.query(
+        'SELECT * FROM medications WHERE nui = $1 ORDER BY id', [req.params.id]
+    );
+    survey.medications = medsResult.rows.map((m) => ({
+        ...m,
+        metrics: productMetrics(toIso(survey), toIsoMed(m)),
+    }));
+    res.json(survey);
+}));
 
 // POST create survey (atomic with its N medications)
-router.post('/', async (req, res) => {
+router.post('/', asyncHandler(async (req, res) => {
     const { value, errors } = validateSurvey(req.body);
     if (errors.length) {
         return res.status(400).json({ error: 'Validación fallida', details: errors });
@@ -144,16 +144,13 @@ router.post('/', async (req, res) => {
         res.status(201).json(survey);
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error(err);
-        // Surface DB CHECK violations as 400 rather than opaque 500.
-        if (err.code === '23514' || err.code === '23503') {
-            return res.status(400).json({ error: 'Restricción de integridad violada', details: ['Datos inválidos o referencia no encontrada'] });
-        }
-        res.status(500).json({ error: 'Error creating survey' });
+        // Rethrow: the central error handler maps DB constraint violations
+        // (e.g. 23514/23503) to 400 and everything else to 500.
+        throw err;
     } finally {
         client.release();
     }
-});
+}));
 
 // PG returns DATE columns as JS Date objects; normalize to YYYY-MM-DD for calc.
 function isoDate(d) {
