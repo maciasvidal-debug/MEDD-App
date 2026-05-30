@@ -419,7 +419,7 @@ export function EncuestasPage() {
               </Card>
             )
           })
-        )}
+        }
       </div>
 
       {/* Medication detail modal */}
