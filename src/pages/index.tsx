@@ -54,27 +54,44 @@ export function DashboardPage() {
   const isInvestigador = userRole === 'investigador'
   const n = surveys.length
 
-  const nSob    = surveys.filter(s => s.medSob    === 'Sí').length
-  const nVenc   = surveys.filter(s => s.vtoMedNc  === 'Sí').length
-  const nDisp   = surveys.filter(s => s.dispMedVc === 'Sí').length
-  const pesoTotal = surveys.reduce((a, s) => a + (s.pesoMedNc ?? 0), 0)
-  const unidTotal = surveys.reduce((a, s) => a + (s.cantMed   ?? 0), 0)
-  const vencTotal = surveys.reduce((a, s) => a + (s.cantMedVto ?? 0), 0)
-  const totalMeds = surveys.reduce((a, s) => a + (s.medications?.length ?? 0), 0)
+  const {
+    nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
+    barAsSalud, barNvEstu, barEtnia, barEstrato, ciudadVenc
+  } = useMemo(() => {
+    let nSob = 0, nVenc = 0, nDisp = 0
+    let pesoTotal = 0, unidTotal = 0, vencTotal = 0, totalMeds = 0
 
-  const barAsSalud = freqTable(surveys, 'asSalud', OPT.asSalud).filter(d => d.n > 0)
-  const barNvEstu  = freqTable(surveys, 'nvEstu',  OPT.nvEstu).filter(d => d.n > 0)
-  const barEtnia   = freqTable(surveys, 'etnia',   OPT.etnia).filter(d => d.n > 0)
+    // ⚡ Bolt: Single pass for scalar KPIs (reduces 7 array passes to 1)
+    for (let i = 0; i < surveys.length; i++) {
+      const s = surveys[i]
+      if (s.medSob === 'Sí') nSob++
+      if (s.vtoMedNc === 'Sí') nVenc++
+      if (s.dispMedVc === 'Sí') nDisp++
+      pesoTotal += s.pesoMedNc ?? 0
+      unidTotal += s.cantMed ?? 0
+      vencTotal += s.cantMedVto ?? 0
+      totalMeds += s.medications?.length ?? 0
+    }
 
-  // ESTRATO distribution (new)
-  const barEstrato = OPT.estrato
-    .map(e => ({ name: `Estrato ${e}`, n: surveys.filter(s => s.estrato === e).length }))
-    .filter(d => d.n > 0)
+    const barAsSalud = freqTable(surveys, 'asSalud', OPT.asSalud).filter(d => d.n > 0)
+    const barNvEstu  = freqTable(surveys, 'nvEstu',  OPT.nvEstu).filter(d => d.n > 0)
+    const barEtnia   = freqTable(surveys, 'etnia',   OPT.etnia).filter(d => d.n > 0)
 
-  // CIUDAD: top cities by expired units (CANT_MED_VTO)
-  const ciudadVenc = groupSum(surveys, 'ciudad', 'cantMedVto')
-    .filter(d => d.name && d.name !== 'Sin dato')
-    .slice(0, 8)
+    // ESTRATO distribution (new)
+    const barEstrato = OPT.estrato
+      .map(e => ({ name: `Estrato ${e}`, n: surveys.filter(s => s.estrato === e).length }))
+      .filter(d => d.n > 0)
+
+    // CIUDAD: top cities by expired units (CANT_MED_VTO)
+    const ciudadVenc = groupSum(surveys, 'ciudad', 'cantMedVto')
+      .filter(d => d.name && d.name !== 'Sin dato')
+      .slice(0, 8)
+
+    return {
+      nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
+      barAsSalud, barNvEstu, barEtnia, barEstrato, ciudadVenc
+    }
+  }, [surveys])
 
   if (n === 0) {
     return (
