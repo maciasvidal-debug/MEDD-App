@@ -26,5 +26,6 @@ $$;
 -- ─── 2. handle_new_user(): revocar acceso directo ────────────────────
 -- Es una función trigger; sólo debe ejecutarse por el motor de triggers,
 -- nunca directamente por un rol de aplicación.
-revoke execute on function public.handle_new_user() from anon;
-revoke execute on function public.handle_new_user() from authenticated;
+-- PostgreSQL otorga EXECUTE a PUBLIC por defecto; anon/authenticated
+-- heredan ese grant, así que hay que revocar de PUBLIC.
+revoke execute on function public.handle_new_user() from public;
