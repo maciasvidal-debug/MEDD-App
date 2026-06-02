@@ -117,6 +117,21 @@ export function wilsonCI(successes: number, total: number, z = 1.96): Proportion
   }
 }
 
+/**
+ * Sample quantile with linear interpolation (R type-7 / NumPy default). Returns
+ * NaN for an empty input. Sorts a copy, so the caller's array is untouched.
+ */
+export function quantile(values: number[], q: number): number {
+  if (values.length === 0) return NaN
+  const sorted = [...values].sort((a, b) => a - b)
+  if (sorted.length === 1) return sorted[0]
+  const pos = (sorted.length - 1) * q
+  const lo  = Math.floor(pos)
+  const hi  = Math.ceil(pos)
+  if (lo === hi) return sorted[lo]
+  return sorted[lo] + (pos - lo) * (sorted[hi] - sorted[lo])
+}
+
 export interface RiskRatio {
   rr:  number   // prevalence/risk ratio vs reference
   lo:  number   // 95% CI lower
@@ -169,6 +184,42 @@ export function chiSquareTest(table: number[][]): ChiSquare {
   }
   const df = (rows - 1) * (cols - 1)
   return { chi2, df, p: chiSquareP(chi2, df), minExpected }
+}
+
+export interface TrendTest {
+  z:         number  // standardized trend statistic
+  chi2:      number  // z² ~ chi-square with 1 df
+  p:         number  // two-sided p-value
+  direction: 'creciente' | 'decreciente' | 'plano'
+}
+
+/**
+ * Cochran–Armitage test for trend in a binomial proportion across an ORDERED
+ * exposure. Unlike a plain chi-square (which treats the groups as unordered and
+ * loses power), this tests for a monotone dose-response with the exposure score,
+ * the relevant question for a socioeconomic gradient. Each group carries a score
+ * (e.g. 1,2,3 for low/mid/high), its size n and its case count. Two-sided
+ * p-value via z² ~ χ²₁. Returns null when there is no informative table.
+ */
+export function cochranArmitage(groups: { score: number; n: number; cases: number }[]): TrendTest | null {
+  const N = groups.reduce((s, g) => s + g.n, 0)
+  const R = groups.reduce((s, g) => s + g.cases, 0)
+  if (groups.length < 2 || N === 0 || R === 0 || R === N) return null
+
+  const pBar  = R / N
+  const u     = groups.reduce((s, g) => s + g.score * (g.cases - g.n * pBar), 0)
+  const sumNS  = groups.reduce((s, g) => s + g.n * g.score, 0)
+  const sumNS2 = groups.reduce((s, g) => s + g.n * g.score * g.score, 0)
+  const v = pBar * (1 - pBar) * (sumNS2 - (sumNS * sumNS) / N)
+  if (v <= 0) return null
+
+  const z = u / Math.sqrt(v)
+  return {
+    z,
+    chi2: z * z,
+    p: chiSquareP(z * z, 1),
+    direction: z > 0 ? 'creciente' : z < 0 ? 'decreciente' : 'plano',
+  }
 }
 
 // Upper-tail p-value of the chi-square distribution: P(X > chi2) with df.
