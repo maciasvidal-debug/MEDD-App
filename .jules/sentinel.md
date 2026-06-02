@@ -10,3 +10,7 @@
 **Vulnerability:** The API endpoint `/api/surveys` crashed with a 500 error when receiving a null or missing JSON body due to the validation logic unconditionally accessing properties (`body.nui_etr`).
 **Learning:** Relying on upstream JSON parsing to always provide an object without explicit defensive checks leaves the server open to unhandled type errors when `null` or array structures are submitted.
 **Prevention:** Validation layers must explicitly assert that the input is a valid object before attempting to extract its fields.
+## 2026-06-02 - Secure UUID generation
+**Vulnerability:** The `uuid` utility used `Math.random` when `crypto.randomUUID` was unavailable. This is cryptographically insecure and could lead to predictable IDs or collisions.
+**Learning:** In frontend applications, always ensure a cryptographically secure random number generator is used for identifiers, particularly when offline sync could cause collisions if IDs are predictable.
+**Prevention:** Fallback UUID generators should use `crypto.getRandomValues()` to obtain randomness securely.
