@@ -4,3 +4,6 @@
 ## 2024-06-01 - Dashboard Render Loop Consolidation
 **Learning:** Re-rendering charts relying on `.map` and `.filter` combinations for large object arrays leads to redundant O(M * N) complexity loops inside a `useMemo` hook, causing noticeable blocking issues on the main thread when data size increases. Replacing several grouped metric computations (`freqTable`, `groupSum`, etc.) with manual counting variables in a single O(N) loop dramatically improves execution time.
 **Action:** When extracting multiple scalar KPIs and frequency distributions from a single source array, replace multiple chained array helper methods with dictionary/map counters inside a single standard `for` loop pass.
+## 2026-06-02 - Eliminate redundant sort and clone during quantile calculations
+**Learning:** Calculating multiple quantiles sequentially on the same array triggers repeated clones and `O(N log N)` sort operations. Further, using `Math.max(...array)` spreads a large array into the call stack, potentially exceeding it for large data.
+**Action:** When extracting multiple percentiles from a single dataset, sort the array once in-place and provide an `isSorted=true` flag to bypass repetitive and expensive sorting allocations. Access minimum or maximum values directly using array bounds (`arr[0]` or `arr[arr.length - 1]`) instead of mapping or spreading.

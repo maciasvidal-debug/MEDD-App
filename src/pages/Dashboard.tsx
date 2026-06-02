@@ -311,13 +311,20 @@ function buildRetention(surveys: Survey[]): DaysSummary | null {
     }
   }
   if (days.length === 0) return null
+
+  // ⚡ Bolt: Sort once to avoid redundant O(N log N) operations and memory allocations
+  // in 4 consecutive `quantile` calls.
+  days.sort((a, b) => a - b)
+
   return {
     n:      days.length,
-    median: quantile(days, 0.5),
-    q1:     quantile(days, 0.25),
-    q3:     quantile(days, 0.75),
-    p90:    quantile(days, 0.9),
-    max:    Math.max(...days),
+    median: quantile(days, 0.5, true),
+    q1:     quantile(days, 0.25, true),
+    q3:     quantile(days, 0.75, true),
+    p90:    quantile(days, 0.9, true),
+    // ⚡ Bolt: Get max directly from sorted array instead of Math.max(...days)
+    // which avoids another O(N) pass and potential Maximum Call Stack Size Exceeded error
+    max:    days[days.length - 1],
   }
 }
 

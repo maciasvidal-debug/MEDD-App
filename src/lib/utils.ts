@@ -119,11 +119,12 @@ export function wilsonCI(successes: number, total: number, z = 1.96): Proportion
 
 /**
  * Sample quantile with linear interpolation (R type-7 / NumPy default). Returns
- * NaN for an empty input. Sorts a copy, so the caller's array is untouched.
+ * NaN for an empty input. Sorts a copy, so the caller's array is untouched,
+ * unless isSorted is true, in which case it uses the array directly.
  */
-export function quantile(values: number[], q: number): number {
+export function quantile(values: number[], q: number, isSorted = false): number {
   if (values.length === 0) return NaN
-  const sorted = [...values].sort((a, b) => a - b)
+  const sorted = isSorted ? values : [...values].sort((a, b) => a - b)
   if (sorted.length === 1) return sorted[0]
   const pos = (sorted.length - 1) * q
   const lo  = Math.floor(pos)
