@@ -19,7 +19,7 @@ export const C = {
   border:     '#E2E8F0',
   text:       '#0F172A',
   muted:      '#64748B',
-  hint:       '#94A3B8',
+  hint:       '#5C6B7A',
   surface:    '#FFFFFF',
   bg:         '#F8FAFC',
 }
@@ -135,7 +135,7 @@ interface IconBtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string
   size?: number
 }
-export function IconButton({ icon, label, size = 34, style, ...rest }: IconBtnProps) {
+export function IconButton({ icon, label, size = 40, style, ...rest }: IconBtnProps) {
   return (
     <button
       aria-label={label}
@@ -171,7 +171,7 @@ export function Chip({ label, active, onClick, disabled }: ChipProps) {
       disabled={disabled}
       onClick={onClick}
       style={{
-        padding: '7px 13px', fontSize: 13, fontWeight: active ? 500 : 400,
+        minHeight: 40, padding: '7px 14px', fontSize: 13, fontWeight: active ? 500 : 400,
         border: active ? `1.5px solid ${C.teal}` : `0.5px solid ${C.border}`,
         borderRadius: 20, cursor: disabled ? 'not-allowed' : 'pointer',
         whiteSpace: 'nowrap',

@@ -109,7 +109,7 @@ export function BottomNav() {
             ) : (
               <i className={`ti ${item.icon}`} style={{ fontSize: 22 }} aria-hidden />
             )}
-            <span style={{ fontSize: 10, fontWeight: active ? 500 : 400 }}>
+            <span style={{ fontSize: 11, fontWeight: active ? 500 : 400 }}>
               {item.label}
             </span>
           </button>

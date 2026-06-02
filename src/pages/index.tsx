@@ -43,8 +43,8 @@ const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; l
         </Pie>
       </PieChart>
       <span style={{ fontSize: 16, fontWeight: 500, color }}>{pct(val, outOf)}%</span>
-      <span style={{ fontSize: 10, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
-      <span style={{ fontSize: 10, color: C.hint }}>{val}/{outOf}</span>
+      <span style={{ fontSize: 11, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
+      <span style={{ fontSize: 11, color: C.hint }}>{val}/{outOf}</span>
     </div>
   )
 }
@@ -295,7 +295,7 @@ export function WizardPage() {
           <button
             aria-label="Cancelar"
             onClick={closeWizard}
-            style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
+            style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
           >
             <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden />
           </button>
@@ -609,7 +609,7 @@ export function BuscarPage() {
                   onClick={() => val && copy(val, key)}
                   disabled={!val}
                   style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: val ? 'pointer' : 'not-allowed',
+                    fontSize: 11, minHeight: 36, padding: '8px 12px', borderRadius: 20, cursor: val ? 'pointer' : 'not-allowed',
                     border: `0.5px solid ${copied === key ? '#BBF7D0' : C.border}`,
                     background: copied === key ? '#DCFCE7' : C.bg,
                     color: copied === key ? C.green : C.muted,
