@@ -6,7 +6,7 @@ import {
 import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, C } from '../components/ui'
 import { useStore } from '../lib/store'
-import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, type Proportion, type RiskRatio, type ChiSquare, type TrendTest } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, quantile, productMetrics, type Proportion, type RiskRatio, type ChiSquare, type TrendTest } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
 
@@ -99,6 +99,7 @@ export default function DashboardPage() {
   }, [surveys])
 
   const assoc = useMemo(() => buildEstratoAssociation(surveys), [surveys])
+  const retention = useMemo(() => buildRetention(surveys), [surveys])
 
   if (n === 0) {
     return (
@@ -177,6 +178,9 @@ export default function DashboardPage() {
 
         {/* Asociación exposición–desenlace */}
         {assoc && <AssociationCard assoc={assoc} />}
+
+        {/* Tiempo de retención de vencidos */}
+        {retention && <RetentionCard s={retention} />}
 
         {/* Hotspots geográficos: CIUDAD x CANT_MED_VTO */}
         {ciudadVenc.length > 0 && (
@@ -288,6 +292,75 @@ function PrevalenceCard({ rows }: { rows: { label: string; ci: Proportion }[] })
         El intervalo refleja la incertidumbre por tamaño muestral: a menor base, más ancho.
       </p>
     </Card>
+  )
+}
+
+// ─── Retention time of expired medications (days-overdue distribution) ──────
+
+interface DaysSummary { n: number; median: number; q1: number; q3: number; p90: number; max: number }
+
+// Distribution of how many days each expired product has been past its expiry
+// at the time of the interview (t_vto = f_eta − f_vto, only when > 0). This
+// quantifies the risk window during which expired meds linger in the home.
+function buildRetention(surveys: Survey[]): DaysSummary | null {
+  const days: number[] = []
+  for (const s of surveys) {
+    for (const m of s.medications ?? []) {
+      const mx = productMetrics(s.fEta, s.fDisp, m)
+      if (mx.isExpired && mx.tVto != null && mx.tVto > 0) days.push(mx.tVto)
+    }
+  }
+  if (days.length === 0) return null
+  return {
+    n:      days.length,
+    median: quantile(days, 0.5),
+    q1:     quantile(days, 0.25),
+    q3:     quantile(days, 0.75),
+    p90:    quantile(days, 0.9),
+    max:    Math.max(...days),
+  }
+}
+
+function RetentionCard({ s }: { s: DaysSummary }) {
+  const scale = s.max > 0 ? s.max : 1
+  const x = (v: number) => `${Math.min(100, (v / scale) * 100)}%`
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Tiempo de retención de medicamentos vencidos</SectionLabel>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+        <span style={{ fontSize: 13, color: C.muted }}>Mediana de días vencido</span>
+        <span style={{ fontSize: 22, fontWeight: 600, color: C.amber }}>{Math.round(s.median)} d</span>
+      </div>
+      {/* IQR box (Q1–Q3) with the median marker, scaled 0..max */}
+      <div style={{ position: 'relative', height: 10, background: C.bg, borderRadius: 5, margin: '6px 0' }}>
+        <div style={{
+          position: 'absolute', top: 0, bottom: 0,
+          left: x(s.q1), width: `calc(${x(s.q3)} - ${x(s.q1)})`,
+          background: `${C.amber}40`, borderRadius: 5,
+        }} />
+        <div style={{
+          position: 'absolute', top: -2, bottom: -2,
+          left: `calc(${x(s.median)} - 1px)`, width: 2, background: C.amber,
+        }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
+        <DaysStat label="RIC (Q1–Q3)" value={`${Math.round(s.q1)}–${Math.round(s.q3)} d`} />
+        <DaysStat label="Percentil 90" value={`${Math.round(s.p90)} d`} />
+        <DaysStat label="Máximo" value={`${Math.round(s.max)} d`} />
+      </div>
+      <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+        Sobre {s.n} producto(s) vencido(s). Mide cuánto tiempo permanecen los medicamentos vencidos en el hogar — la ventana de riesgo sanitario y ambiental.
+      </p>
+    </Card>
+  )
+}
+
+function DaysStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 8, background: C.bg }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{value}</div>
+      <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{label}</div>
+    </div>
   )
 }
 
