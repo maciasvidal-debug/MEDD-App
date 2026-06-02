@@ -117,6 +117,109 @@ export function wilsonCI(successes: number, total: number, z = 1.96): Proportion
   }
 }
 
+export interface RiskRatio {
+  rr:  number   // prevalence/risk ratio vs reference
+  lo:  number   // 95% CI lower
+  hi:  number   // 95% CI upper
+  ref: boolean  // true for the reference group itself
+}
+
+/**
+ * Prevalence ratio (a/n1 ÷ c/n0) of an outcome in an exposed group vs a
+ * reference group, with a 95% CI from the log-ratio (Katz) method. When any
+ * cell is empty the Haldane–Anscombe 0.5 correction keeps the estimate finite.
+ * A CI that excludes 1 indicates a statistically significant association.
+ */
+export function prevalenceRatio(a: number, n1: number, c: number, n0: number): RiskRatio {
+  if (n1 <= 0 || n0 <= 0) return { rr: NaN, lo: NaN, hi: NaN, ref: false }
+  let A = a, C = c, N1 = n1, N0 = n0
+  const b = n1 - a, d = n0 - c
+  if (a === 0 || c === 0 || b === 0 || d === 0) {
+    A = a + 0.5; C = c + 0.5; N1 = n1 + 1; N0 = n0 + 1
+  }
+  const rr = (A / N1) / (C / N0)
+  const se = Math.sqrt(1 / A + 1 / C - 1 / N1 - 1 / N0)
+  return { rr, lo: rr * Math.exp(-1.96 * se), hi: rr * Math.exp(1.96 * se), ref: false }
+}
+
+export interface ChiSquare {
+  chi2:        number  // Pearson statistic
+  df:          number  // degrees of freedom
+  p:           number  // upper-tail p-value
+  minExpected: number  // smallest expected cell (chi² unreliable if < 5)
+}
+
+/** Pearson chi-square test of independence for an R×C contingency table. */
+export function chiSquareTest(table: number[][]): ChiSquare {
+  const rows = table.length
+  const cols = rows ? table[0].length : 0
+  const rowSums = table.map(r => r.reduce((s, v) => s + v, 0))
+  const colSums = Array.from({ length: cols }, (_, j) => table.reduce((s, r) => s + r[j], 0))
+  const total = rowSums.reduce((s, v) => s + v, 0)
+  if (total === 0 || rows < 2 || cols < 2) return { chi2: 0, df: 0, p: 1, minExpected: 0 }
+
+  let chi2 = 0
+  let minExpected = Infinity
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const expected = (rowSums[i] * colSums[j]) / total
+      minExpected = Math.min(minExpected, expected)
+      if (expected > 0) chi2 += (table[i][j] - expected) ** 2 / expected
+    }
+  }
+  const df = (rows - 1) * (cols - 1)
+  return { chi2, df, p: chiSquareP(chi2, df), minExpected }
+}
+
+// Upper-tail p-value of the chi-square distribution: P(X > chi2) with df.
+function chiSquareP(chi2: number, df: number): number {
+  if (chi2 <= 0 || df <= 0) return 1
+  return 1 - regLowerGamma(df / 2, chi2 / 2)
+}
+
+// Lanczos approximation of ln Γ(x).
+function lnGamma(x: number): number {
+  /* eslint-disable no-loss-of-precision -- canonical full-precision Lanczos coefficients */
+  const g = [
+    76.18009172947146, -86.50532032941677, 24.01409824083091,
+    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5,
+  ]
+  /* eslint-enable no-loss-of-precision */
+  let y = x
+  let tmp = x + 5.5
+  tmp -= (x + 0.5) * Math.log(tmp)
+  let ser = 1.000000000190015
+  for (let j = 0; j < 6; j++) { y++; ser += g[j] / y }
+  return -tmp + Math.log(Math.sqrt(2 * Math.PI) * ser / x)
+}
+
+// Regularized lower incomplete gamma P(a,x) (series + continued fraction).
+function regLowerGamma(a: number, x: number): number {
+  if (x < 0 || a <= 0) return NaN
+  if (x === 0) return 0
+  if (x < a + 1) {
+    let ap = a, sum = 1 / a, del = sum
+    for (let n = 0; n < 300; n++) {
+      ap++; del *= x / ap; sum += del
+      if (Math.abs(del) < Math.abs(sum) * 1e-13) break
+    }
+    return sum * Math.exp(-x + a * Math.log(x) - lnGamma(a))
+  }
+  const FPMIN = 1e-300
+  let b = x + 1 - a, c = 1 / FPMIN, d = 1 / b, h = d
+  for (let i = 1; i <= 300; i++) {
+    const an = -i * (i - a)
+    b += 2
+    d = an * d + b; if (Math.abs(d) < FPMIN) d = FPMIN
+    c = b + an / c; if (Math.abs(c) < FPMIN) c = FPMIN
+    d = 1 / d
+    const del = d * c; h *= del
+    if (Math.abs(del - 1) < 1e-13) break
+  }
+  const q = Math.exp(-x + a * Math.log(x) - lnGamma(a)) * h
+  return 1 - q
+}
+
 // ─── Frequency table ──────────────────────────────────────────────────────
 
 export function freqTable<T extends string>(
