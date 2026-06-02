@@ -18,11 +18,15 @@
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "supertest": "^7.0.0"
+    "supertest": "^7.2.2"
   },
   "jest": {
     "testEnvironment": "node",
-    "setupFiles": ["<rootDir>/test/env.js"],
-    "testMatch": ["<rootDir>/test/**/*.test.js"]
+    "setupFiles": [
+      "<rootDir>/test/env.js"
+    ],
+    "testMatch": [
+      "<rootDir>/test/**/*.test.js"
+    ]
   }
 }

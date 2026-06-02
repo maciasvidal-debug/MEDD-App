@@ -2,3 +2,7 @@
 **Vulnerability:** The error handler for the survey creation route (`POST /` in `backend/src/routes/surveys.js`) was directly exposing database error details (`err.detail` and `err.message`) to the client when a database constraint violation occurred (codes 23514 or 23503).
 **Learning:** Returning low-level database error strings directly can expose schema information (like column names and constraint definitions) or internal states to potential attackers, facilitating further attacks or intelligence gathering about the architecture.
 **Prevention:** Always map generic error messages on the server side when dealing with database constraint violations, instead of passing the raw SQL error details down to the client.
+## 2026-06-02 - Unhandled Null/Undefined Request Body Leading to 500 Errors
+**Vulnerability:** The API endpoint `/api/surveys` crashed with a 500 error when receiving a null or missing JSON body due to the validation logic unconditionally accessing properties (`body.nui_etr`).
+**Learning:** Relying on upstream JSON parsing to always provide an object without explicit defensive checks leaves the server open to unhandled type errors when `null` or array structures are submitted.
+**Prevention:** Validation layers must explicitly assert that the input is a valid object before attempting to extract its fields.

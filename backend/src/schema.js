@@ -202,6 +202,10 @@ function validateMedications(body, v, errors) {
 // (child fields blanked when their parent gate is closed).
 // ---------------------------------------------------------------------
 function validateSurvey(body) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return { value: null, errors: ['El cuerpo de la petición debe ser un objeto JSON válido.'] };
+    }
+
     const errors = [];
     const today  = new Date().toISOString().slice(0, 10);
     const v      = {};

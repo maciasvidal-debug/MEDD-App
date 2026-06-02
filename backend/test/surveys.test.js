@@ -67,6 +67,18 @@ describe('surveys creation', () => {
         expect(pool.connect).not.toHaveBeenCalled();
     });
 
+    test('null body returns 400', async () => {
+        // Here we clear the mock so the real implementation throws its validation
+        // error about body being an invalid JSON object, verifying 500 crashes are gone
+        schema.validateSurvey.mockRestore();
+        const token = await mintToken();
+        const res = await request(app).post('/api/surveys').send(null).set('Authorization', `Bearer ${token}`);
+        expect(res.status).toBe(400);
+        expect(pool.connect).not.toHaveBeenCalled();
+        // re-mock for following tests
+        jest.spyOn(schema, 'validateSurvey');
+    });
+
     test('stamps user_id from the JWT and bulk-inserts medications (201)', async () => {
         schema.validateSurvey.mockReturnValue({
             value: {
