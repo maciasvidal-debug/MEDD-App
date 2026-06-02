@@ -44,7 +44,10 @@ router.get('/geo-hotspots', asyncHandler(async (req, res) => {
         SELECT
             COALESCE(ciudad, 'Sin dato')                AS ciudad,
             COUNT(*)                                    AS surveys,
-            ROUND(AVG(estrato)::numeric, 2)             AS avg_estrato,
+            -- ESTRATO is an ordinal scale (1-6): its arithmetic mean has no valid
+            -- interpretation (the 1->2 step is not equal to 5->6). Report the
+            -- median, which for ordinal data lands on an actual stratum level.
+            PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY estrato) AS median_estrato,
             COALESCE(SUM(cant_med), 0)                  AS unused_units,
             COALESCE(SUM(cant_med_vto), 0)              AS expired_units,
             ROUND(COALESCE(SUM(peso_med_nc), 0)::numeric, 2) AS weight_g

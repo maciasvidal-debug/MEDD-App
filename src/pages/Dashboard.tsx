@@ -6,8 +6,9 @@ import {
 import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, C } from '../components/ui'
 import { useStore } from '../lib/store'
-import { pct, wilsonCI, type Proportion } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, type Proportion, type RiskRatio, type ChiSquare } from '../lib/utils'
 import { OPT } from '../lib/constants'
+import type { Survey } from '../types'
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
 // Split into its own lazily-loaded chunk: Recharts is heavy and only this view
@@ -97,6 +98,8 @@ export default function DashboardPage() {
     }
   }, [surveys])
 
+  const assoc = useMemo(() => buildEstratoAssociation(surveys), [surveys])
+
   if (n === 0) {
     return (
       <div>
@@ -171,6 +174,9 @@ export default function DashboardPage() {
             { label: 'Conoce disposición (entre quienes almacenan)', ci: wilsonCI(nDisp, nSob) },
           ]}
         />
+
+        {/* Asociación exposición–desenlace */}
+        {assoc && <AssociationCard assoc={assoc} />}
 
         {/* Hotspots geográficos: CIUDAD x CANT_MED_VTO */}
         {ciudadVenc.length > 0 && (
@@ -282,6 +288,96 @@ function PrevalenceCard({ rows }: { rows: { label: string; ci: Proportion }[] })
         El intervalo refleja la incertidumbre por tamaño muestral: a menor base, más ancho.
       </p>
     </Card>
+  )
+}
+
+// ─── Exposure → outcome association (estrato gradient) ──────────────────────
+
+interface AssocGroup { label: string; total: number; cases: number; prev: Proportion; rr: RiskRatio }
+interface Association { groups: AssocGroup[]; chi: ChiSquare; ref: string }
+
+// Tests whether harbouring confirmed expired meds (vtoMedNc='Sí') is associated
+// with socioeconomic stratum. Estrato is collapsed to Bajo/Medio/Alto so cells
+// stay large enough for the chi-square; the lowest present group is the PR
+// reference. Outcome base = all households in the group (a non-storing home has
+// zero expired stored meds by definition, so the denominator is valid).
+function buildEstratoAssociation(surveys: Survey[]): Association | null {
+  const defs = [
+    { label: 'bajo (1–2)',  min: 1, max: 2 },
+    { label: 'medio (3–4)', min: 3, max: 4 },
+    { label: 'alto (5–6)',  min: 5, max: 6 },
+  ]
+  const acc = defs.map(d => ({ ...d, total: 0, cases: 0 }))
+  for (const s of surveys) {
+    const e = s.estrato
+    if (e == null) continue
+    const g = acc.find(d => e >= d.min && e <= d.max)
+    if (!g) continue
+    g.total++
+    if (s.vtoMedNc === 'Sí') g.cases++
+  }
+
+  const present = acc.filter(g => g.total > 0)
+  if (present.length < 2) return null
+
+  const ref = present[0] // lowest present stratum
+  const groups: AssocGroup[] = present.map(g => ({
+    label: g.label,
+    total: g.total,
+    cases: g.cases,
+    prev: wilsonCI(g.cases, g.total),
+    rr: g === ref
+      ? { rr: 1, lo: 1, hi: 1, ref: true }
+      : prevalenceRatio(g.cases, g.total, ref.cases, ref.total),
+  }))
+  const chi = chiSquareTest(present.map(g => [g.cases, g.total - g.cases]))
+  return { groups, chi, ref: ref.label }
+}
+
+function AssociationCard({ assoc }: { assoc: Association }) {
+  const { groups, chi, ref } = assoc
+  const sig = chi.df > 0 && chi.p < 0.05
+  const prettyP = chi.p < 0.001 ? '< 0,001' : chi.p.toFixed(3).replace('.', ',')
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Asociación: vencidos en casa según estrato</SectionLabel>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        {groups.map(g => <AssocRow key={g.label} g={g} />)}
+      </div>
+      <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        <strong style={{ color: sig ? C.amber : C.text }}>
+          χ² = {chi.chi2.toFixed(2)} (gl {chi.df}), p = {prettyP}
+        </strong>
+        {' — '}
+        {sig ? 'asociación significativa' : 'sin evidencia de asociación'} (α = 0,05).
+        {chi.minExpected < 5 && (
+          <div style={{ color: C.amber, marginTop: 4 }}>
+            ⚠ Celda esperada &lt; 5: interpretar con cautela (preferir test exacto).
+          </div>
+        )}
+        <div style={{ marginTop: 4, color: C.hint }}>
+          Referencia: estrato {ref}. RP = razón de prevalencia vs. referencia (IC 95%).
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function AssocRow({ g }: { g: AssocGroup }) {
+  const fmt = (x: number) => (x * 100).toFixed(1)
+  const sig = !g.rr.ref && (g.rr.lo > 1 || g.rr.hi < 1)
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+      <span style={{ fontSize: 13, color: C.text }}>
+        Estrato {g.label} <span style={{ fontSize: 11, color: C.hint }}>(n = {g.total})</span>
+      </span>
+      <span style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: C.teal }}>{fmt(g.prev.p)}%</span>
+        <span style={{ fontSize: 11, color: sig ? C.amber : C.muted, minWidth: 118, textAlign: 'right' }}>
+          {g.rr.ref ? 'referencia' : `RP ${g.rr.rr.toFixed(2)} [${g.rr.lo.toFixed(2)}–${g.rr.hi.toFixed(2)}]`}
+        </span>
+      </span>
+    </div>
   )
 }
 
