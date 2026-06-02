@@ -6,7 +6,7 @@ import {
 import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, C } from '../components/ui'
 import { useStore } from '../lib/store'
-import { pct } from '../lib/utils'
+import { pct, wilsonCI, type Proportion } from '../lib/utils'
 import { OPT } from '../lib/constants'
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
@@ -153,11 +153,24 @@ export default function DashboardPage() {
         <Card style={{ marginBottom: 14 }}>
           <SectionLabel>Variables clave de resultado</SectionLabel>
           <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-            <MiniDonut val={nDisp} outOf={n} label="Conoce disposición" color={C.teal} />
-            <MiniDonut val={nSob}  outOf={n} label="Med. sin consumir"  color={C.navy} />
-            <MiniDonut val={nVenc} outOf={n} label="Vencidos conf."     color={C.amber} />
+            <MiniDonut val={nSob}  outOf={n}    label="Med. sin consumir"   color={C.navy} />
+            <MiniDonut val={nVenc} outOf={n}    label="Vencidos conf."      color={C.amber} />
+            <MiniDonut val={nDisp} outOf={nSob} label="Conoce disposición*" color={C.teal} />
           </div>
+          <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, textAlign: 'center', lineHeight: 1.5 }}>
+            «Med. sin consumir» y «Vencidos conf.» sobre el total ({n} hogares).
+            <br />*«Conoce disposición» se calcula solo sobre los {nSob} hogares que almacenan medicamentos.
+          </p>
         </Card>
+
+        {/* Prevalencias con incertidumbre */}
+        <PrevalenceCard
+          rows={[
+            { label: 'Almacena medicamentos sin consumir', ci: wilsonCI(nSob, n) },
+            { label: 'Tiene vencidos confirmados en casa', ci: wilsonCI(nVenc, n) },
+            { label: 'Conoce disposición (entre quienes almacenan)', ci: wilsonCI(nDisp, nSob) },
+          ]}
+        />
 
         {/* Hotspots geográficos: CIUDAD x CANT_MED_VTO */}
         {ciudadVenc.length > 0 && (
@@ -252,6 +265,56 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
       {children}
+    </div>
+  )
+}
+
+// Point prevalence with its Wilson 95% CI, drawn as a value + interval bar so a
+// wide band (small base) is visually obvious and not mistaken for a hard number.
+function PrevalenceCard({ rows }: { rows: { label: string; ci: Proportion }[] }) {
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Prevalencias estimadas · IC 95% (Wilson)</SectionLabel>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {rows.map(({ label, ci }) => <PrevalenceRow key={label} label={label} ci={ci} />)}
+      </div>
+      <p style={{ margin: '12px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+        El intervalo refleja la incertidumbre por tamaño muestral: a menor base, más ancho.
+      </p>
+    </Card>
+  )
+}
+
+function PrevalenceRow({ label, ci }: { label: string; ci: Proportion }) {
+  const lowBase = ci.total > 0 && ci.total < 30
+  const fmt = (x: number) => (x * 100).toFixed(1)
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5, gap: 8 }}>
+        <span style={{ fontSize: 13, color: C.text }}>{label}</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: C.teal, flexShrink: 0 }}>
+          {ci.total > 0 ? `${fmt(ci.p)}%` : '—'}
+        </span>
+      </div>
+      <div style={{ position: 'relative', height: 6, background: C.bg, borderRadius: 3 }}>
+        <div style={{
+          position: 'absolute', top: 0, bottom: 0,
+          left: `${ci.lo * 100}%`, width: `${Math.max(0, (ci.hi - ci.lo) * 100)}%`,
+          background: `${C.teal}40`, borderRadius: 3,
+        }} />
+        <div style={{
+          position: 'absolute', top: -1, bottom: -1,
+          left: `calc(${ci.p * 100}% - 1px)`, width: 2, background: C.teal,
+        }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+        <span style={{ fontSize: 11, color: C.muted }}>
+          IC 95%: {ci.total > 0 ? `${fmt(ci.lo)}–${fmt(ci.hi)}%` : 'sin base'}
+        </span>
+        <span style={{ fontSize: 11, color: lowBase ? C.amber : C.hint }}>
+          {ci.n}/{ci.total}{lowBase ? ' · base pequeña' : ''}
+        </span>
+      </div>
     </div>
   )
 }

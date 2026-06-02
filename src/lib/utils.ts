@@ -84,6 +84,39 @@ export const pct = (n: number, total: number) =>
 export const safeNum = (v: string | number | null | undefined): number =>
   typeof v === 'number' ? v : parseFloat(String(v ?? '')) || 0
 
+// ─── Inferential statistics ─────────────────────────────────────────────────
+
+export interface Proportion {
+  n:     number  // successes
+  total: number  // base (denominator)
+  p:     number  // point estimate, 0..1
+  lo:    number  // 95% CI lower bound, 0..1
+  hi:    number  // 95% CI upper bound, 0..1
+}
+
+/**
+ * Wilson score confidence interval for a binomial proportion (default 95%).
+ * Preferred over the naive Wald interval because it stays inside [0,1] and
+ * remains reliable for small samples and proportions near 0 or 1 — the typical
+ * case for per-city / per-stratum cells in this survey. Returns a zero-width
+ * interval when there is no base to avoid division by zero.
+ */
+export function wilsonCI(successes: number, total: number, z = 1.96): Proportion {
+  if (total <= 0) return { n: successes, total: 0, p: 0, lo: 0, hi: 0 }
+  const p      = successes / total
+  const z2     = z * z
+  const denom  = 1 + z2 / total
+  const centre = p + z2 / (2 * total)
+  const margin = z * Math.sqrt((p * (1 - p) + z2 / (4 * total)) / total)
+  return {
+    n: successes,
+    total,
+    p,
+    lo: Math.max(0, (centre - margin) / denom),
+    hi: Math.min(1, (centre + margin) / denom),
+  }
+}
+
 // ─── Frequency table ──────────────────────────────────────────────────────
 
 export function freqTable<T extends string>(
