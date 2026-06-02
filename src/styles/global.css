@@ -98,6 +98,13 @@ a:focus-visible,
 }
 button:focus:not(:focus-visible) { outline: none; }
 
+/* ─── Interactive feedback ───────────────────────────────────────────────────── */
+/* Controls are inline-styled, so hover/press states are centralized here. */
+@media (hover: hover) {
+  button:not(:disabled):hover { filter: brightness(0.97); }
+}
+button:not(:disabled):active { transform: scale(0.98); }
+
 /* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }

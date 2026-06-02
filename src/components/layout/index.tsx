@@ -191,17 +191,29 @@ export function ToastContainer() {
             className="slide-up"
             style={{
               background: bg, color: '#fff',
-              padding: '9px 16px', borderRadius: 20,
+              padding: t.action ? '9px 10px 9px 16px' : '9px 16px', borderRadius: 20,
               fontSize: 13, fontWeight: 500,
               boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
               whiteSpace: 'nowrap', pointerEvents: 'auto',
               display: 'flex', alignItems: 'center', gap: 8,
-              cursor: 'pointer',
+              cursor: t.action ? 'default' : 'pointer',
             }}
-            onClick={() => removeToast(t.id)}
+            onClick={t.action ? undefined : () => removeToast(t.id)}
           >
             <i className={`ti ${icon}`} style={{ fontSize: 15 }} aria-hidden />
             {t.message}
+            {t.action && (
+              <button
+                onClick={() => { t.action!.onClick(); removeToast(t.id) }}
+                style={{
+                  marginLeft: 4, minHeight: 32, padding: '4px 12px', borderRadius: 16,
+                  border: '1px solid rgba(255,255,255,0.5)', background: 'transparent',
+                  color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
         )
       })}
