@@ -483,6 +483,7 @@ function MedDetailModal({ survey, onClose }: { survey: Survey; onClose: () => vo
             Encuesta #{String(survey.nui).padStart(3, '0')} — Medicamentos
           </span>
           <button
+            aria-label="Cerrar"
             onClick={onClose}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 22, lineHeight: 1 }}
           >×</button>
