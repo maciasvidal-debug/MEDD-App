@@ -1,267 +1,21 @@
 import React, { useState, useMemo } from 'react'
-import {
-  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip,
-} from 'recharts'
 import { TopBar, StepBar } from '../components/layout'
 import {
-  StatCard, Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, C,
+  Card, Button, Badge, EmptyState, Divider,
+  Field, SectionHead, Dialog, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
 import {
-  pct, calcEdad, fmtDate,
+  calcEdad, fmtDate,
   toCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
-import { OPT, TOTAL_STEPS } from '../lib/constants'
+import { TOTAL_STEPS } from '../lib/constants'
 import type { SurveyDraft, Survey } from '../types'
 
-// ─── DASHBOARD ────────────────────────────────────────────────────────────
-
-// Chart helpers declared at module scope (not inside DashboardPage's render)
-// so they keep a stable identity across renders — see react-hooks/static-components.
-const tipStyle = {
-  background: C.surface, border: `0.5px solid ${C.border}`,
-  borderRadius: 6, padding: '5px 9px', fontSize: 12,
-}
-
-const CustomTip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: { name: string } }> }) =>
-  active && payload?.length
-    ? <div style={tipStyle}><strong>{payload[0].payload.name}</strong>: {payload[0].value}</div>
-    : null
-
-const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; label: string; color: string }) => {
-  const data = [{ v: val }, { v: Math.max(0, outOf - val) }]
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-      <PieChart width={72} height={72}>
-        <Pie data={data} cx={36} cy={36} innerRadius={22} outerRadius={34} dataKey="v" stroke="none">
-          <Cell fill={color} />
-          <Cell fill="#E2E8F0" />
-        </Pie>
-      </PieChart>
-      <span style={{ fontSize: 16, fontWeight: 500, color }}>{pct(val, outOf)}%</span>
-      <span style={{ fontSize: 10, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
-      <span style={{ fontSize: 10, color: C.hint }}>{val}/{outOf}</span>
-    </div>
-  )
-}
-
-export function DashboardPage() {
-  const { surveys, openWizard, userRole } = useStore()
-  const isInvestigador = userRole === 'investigador'
-  const n = surveys.length
-
-  const {
-    nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
-    barAsSalud, barNvEstu, barEtnia, barEstrato, ciudadVenc
-  } = useMemo(() => {
-    let nSob = 0, nVenc = 0, nDisp = 0
-    let pesoTotal = 0, unidTotal = 0, vencTotal = 0, totalMeds = 0
-
-    const asSaludCounts: Record<string, number> = {}
-    const nvEstuCounts: Record<string, number> = {}
-    const etniaCounts: Record<string, number> = {}
-    const estratoCounts: Record<number, number> = {}
-    const ciudadVencMap = new Map<string, number>()
-
-    // ⚡ Bolt: Single pass for scalar KPIs and distributions (reduces 21+ array passes to 1)
-    for (let i = 0; i < surveys.length; i++) {
-      const s = surveys[i]
-      if (s.medSob === 'Sí') nSob++
-      if (s.vtoMedNc === 'Sí') nVenc++
-      if (s.dispMedVc === 'Sí') nDisp++
-      pesoTotal += s.pesoMedNc ?? 0
-      unidTotal += s.cantMed ?? 0
-      vencTotal += s.cantMedVto ?? 0
-      totalMeds += s.medications?.length ?? 0
-
-      if (s.asSalud) asSaludCounts[s.asSalud] = (asSaludCounts[s.asSalud] || 0) + 1
-      if (s.nvEstu) nvEstuCounts[s.nvEstu] = (nvEstuCounts[s.nvEstu] || 0) + 1
-      if (s.etnia) etniaCounts[s.etnia] = (etniaCounts[s.etnia] || 0) + 1
-      if (s.estrato !== null && s.estrato !== undefined) estratoCounts[s.estrato] = (estratoCounts[s.estrato] || 0) + 1
-
-      const ciudadKey = String(s.ciudad ?? 'Sin dato') || 'Sin dato'
-      ciudadVencMap.set(ciudadKey, (ciudadVencMap.get(ciudadKey) ?? 0) + (s.cantMedVto ?? 0))
-    }
-
-    const barAsSalud = OPT.asSalud.map(v => ({ name: v, n: asSaludCounts[v] || 0 })).filter(d => d.n > 0)
-    const barNvEstu  = OPT.nvEstu.map(v => ({ name: v, n: nvEstuCounts[v] || 0 })).filter(d => d.n > 0)
-    const barEtnia   = OPT.etnia.map(v => ({ name: v, n: etniaCounts[v] || 0 })).filter(d => d.n > 0)
-    const barEstrato = OPT.estrato.map(e => ({ name: `Estrato ${e}`, n: estratoCounts[e] || 0 })).filter(d => d.n > 0)
-
-    const ciudadVenc = Array.from(ciudadVencMap.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .filter(d => d.name && d.name !== 'Sin dato')
-      .slice(0, 8)
-
-    return {
-      nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
-      barAsSalud, barNvEstu, barEtnia, barEstrato, ciudadVenc
-    }
-  }, [surveys])
-
-  if (n === 0) {
-    return (
-      <div>
-        <TopBar title="MEDD · Panel analítico" />
-        <div className="page-content">
-          <EmptyState
-            icon="ti-clipboard-data"
-            title="Sin encuestas aún"
-            description="Comience registrando la primera encuesta con el botón + de la barra inferior."
-            action={
-              <Button onClick={() => openWizard(0)} icon="ti-plus">
-                Registrar primera encuesta
-              </Button>
-            }
-          />
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <TopBar title="MEDD · Panel analítico" />
-      <div className="page-content">
-
-        {/* Role badge */}
-        {isInvestigador && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: '#EFF6FF', border: '0.5px solid #BFDBFE',
-            borderRadius: 8, padding: '7px 10px', marginBottom: 12,
-          }}>
-            <i className="ti ti-shield-check" style={{ color: '#1D4ED8', fontSize: 14 }} />
-            <span style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 500 }}>
-              Vista de investigador — datos agregados de todos los encuestadores
-            </span>
-          </div>
-        )}
-
-        {/* KPIs */}
-        <p style={{ fontSize: 11, color: C.hint, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-          Indicadores clave · {n} encuesta{n !== 1 ? 's' : ''}
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-          <StatCard icon="ti-users"          label="Total encuestados"    value={n}                                  color={C.navy} />
-          <StatCard icon="ti-pill"           label="Productos registrados" value={totalMeds}                          color={C.teal} />
-          <StatCard icon="ti-package"        label="Unidades sin consumir" value={unidTotal}                          color={C.teal} />
-          <StatCard icon="ti-alert-triangle" label="Unidades vencidas"    value={vencTotal}  sub={`${pct(vencTotal,unidTotal)}%`} color={C.amber} />
-          <StatCard icon="ti-scale"          label="Peso total (g)"       value={pesoTotal.toFixed(1)}               color={C.gray} />
-          <StatCard icon="ti-map-pin"        label="Con vencidos conf."   value={nVenc}      sub={`${pct(nVenc,n)}%`}             color={C.red} />
-        </div>
-
-        {/* Donuts */}
-        <Card style={{ marginBottom: 14 }}>
-          <SectionLabel>Variables clave de resultado</SectionLabel>
-          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-            <MiniDonut val={nDisp} outOf={n} label="Conoce disposición" color={C.teal} />
-            <MiniDonut val={nSob}  outOf={n} label="Med. sin consumir"  color={C.navy} />
-            <MiniDonut val={nVenc} outOf={n} label="Vencidos conf."     color={C.amber} />
-          </div>
-        </Card>
-
-        {/* Hotspots geográficos: CIUDAD x CANT_MED_VTO */}
-        {ciudadVenc.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
-            <SectionLabel>Hotspots geográficos — Unidades vencidas por ciudad</SectionLabel>
-            <div style={{ height: Math.max(80, ciudadVenc.length * 28) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ciudadVenc} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={85} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="value" fill={C.amber} radius={[0, 3, 3, 0]} name="Unidades vencidas" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        )}
-
-        {/* ESTRATO distribution */}
-        {barEstrato.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
-            <SectionLabel>Distribución por estrato socioeconómico</SectionLabel>
-            <div style={{ height: Math.max(80, barEstrato.length * 28) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barEstrato} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.navy} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        )}
-
-        {/* AS_SALUD */}
-        {barAsSalud.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
-            <SectionLabel>Distribución por régimen de salud</SectionLabel>
-            <div style={{ height: Math.max(80, barAsSalud.length * 30) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barAsSalud} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.teal} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        )}
-
-        {/* NV_ESTU */}
-        {barNvEstu.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
-            <SectionLabel>Distribución por nivel educativo</SectionLabel>
-            <div style={{ height: Math.max(80, barNvEstu.length * 28) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barNvEstu} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill="#7030A0" radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        )}
-
-        {/* Etnia */}
-        {barEtnia.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
-            <SectionLabel>Distribución por pertenencia étnica</SectionLabel>
-            <div style={{ height: Math.max(80, barEtnia.length * 28) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barEtnia} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.gray} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-      {children}
-    </div>
-  )
-}
+// DashboardPage lives in its own lazily-loaded chunk (pages/Dashboard.tsx) to
+// keep Recharts out of the initial bundle; App.tsx imports it via React.lazy.
 
 // ─── WIZARD PAGE ──────────────────────────────────────────────────────────
 
@@ -295,7 +49,7 @@ export function WizardPage() {
           <button
             aria-label="Cancelar"
             onClick={closeWizard}
-            style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
+            style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
           >
             <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden />
           </button>
@@ -463,63 +217,40 @@ export function EncuestasPage() {
 
 function MedDetailModal({ survey, onClose }: { survey: Survey; onClose: () => void }) {
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-        zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      }}
+    <Dialog
+      title={`Encuesta #${String(survey.nui).padStart(3, '0')} — Medicamentos`}
+      onClose={onClose}
     >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: C.surface, borderRadius: '12px 12px 0 0',
-          padding: '20px 16px', width: '100%', maxWidth: 520,
-          maxHeight: '80vh', overflowY: 'auto',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <span style={{ fontSize: 15, fontWeight: 500 }}>
-            Encuesta #{String(survey.nui).padStart(3, '0')} — Medicamentos
-          </span>
-          <button
-            aria-label="Cerrar"
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 22, lineHeight: 1 }}
-          >×</button>
-        </div>
-
-        {survey.medications.length === 0 ? (
-          <p style={{ color: C.hint, fontSize: 13 }}>Sin productos registrados.</p>
-        ) : (
-          survey.medications.map((m, i) => {
-            const mx = productMetrics(survey.fEta, survey.fDisp, m)
-            return (
-              <Card key={i} style={{ marginBottom: 10, background: mx.isExpired ? '#FEF3C7' : C.bg }}>
-                <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>
-                  {m.nmMed || '—'}
-                </div>
-                {m.dci && <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Princ. activo: {m.dci}</div>}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                  {m.concMed != null && m.undConc && (
-                    <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
-                  )}
-                  {m.fVto && (
-                    <Badge label={`Vence: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
-                  )}
-                </div>
-                {/* Time metrics (Excel logic) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
-                  <MetricCell label="Días vencido" value={mx.tVto} unit="d" highlight={mx.isExpired} />
-                  <MetricCell label="En bodega" value={mx.tDisp} unit="d" />
-                  <MetricCell label="Vida útil" value={mx.vUtil} unit="d" />
-                </div>
-              </Card>
-            )
-          })
-        )}
-      </div>
-    </div>
+      {survey.medications.length === 0 ? (
+        <p style={{ color: C.hint, fontSize: 13 }}>Sin productos registrados.</p>
+      ) : (
+        survey.medications.map((m, i) => {
+          const mx = productMetrics(survey.fEta, survey.fDisp, m)
+          return (
+            <Card key={i} style={{ marginBottom: 10, background: mx.isExpired ? '#FEF3C7' : C.bg }}>
+              <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>
+                {m.nmMed || '—'}
+              </div>
+              {m.dci && <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Princ. activo: {m.dci}</div>}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                {m.concMed != null && m.undConc && (
+                  <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
+                )}
+                {m.fVto && (
+                  <Badge label={`Vence: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
+                )}
+              </div>
+              {/* Time metrics (Excel logic) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
+                <MetricCell label="Días vencido" value={mx.tVto} unit="d" highlight={mx.isExpired} />
+                <MetricCell label="En bodega" value={mx.tDisp} unit="d" />
+                <MetricCell label="Vida útil" value={mx.vUtil} unit="d" />
+              </div>
+            </Card>
+          )
+        })
+      )}
+    </Dialog>
   )
 }
 
@@ -609,7 +340,7 @@ export function BuscarPage() {
                   onClick={() => val && copy(val, key)}
                   disabled={!val}
                   style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: val ? 'pointer' : 'not-allowed',
+                    fontSize: 11, minHeight: 36, padding: '8px 12px', borderRadius: 20, cursor: val ? 'pointer' : 'not-allowed',
                     border: `0.5px solid ${copied === key ? '#BBF7D0' : C.border}`,
                     background: copied === key ? '#DCFCE7' : C.bg,
                     color: copied === key ? C.green : C.muted,

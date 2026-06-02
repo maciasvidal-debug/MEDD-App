@@ -1,4 +1,4 @@
-import React, { type ButtonHTMLAttributes } from 'react'
+import React, { useEffect, useId, useRef, type ButtonHTMLAttributes } from 'react'
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ export const C = {
   border:     '#E2E8F0',
   text:       '#0F172A',
   muted:      '#64748B',
-  hint:       '#94A3B8',
+  hint:       '#5C6B7A',
   surface:    '#FFFFFF',
   bg:         '#F8FAFC',
 }
@@ -135,7 +135,7 @@ interface IconBtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string
   size?: number
 }
-export function IconButton({ icon, label, size = 34, style, ...rest }: IconBtnProps) {
+export function IconButton({ icon, label, size = 40, style, ...rest }: IconBtnProps) {
   return (
     <button
       aria-label={label}
@@ -171,7 +171,7 @@ export function Chip({ label, active, onClick, disabled }: ChipProps) {
       disabled={disabled}
       onClick={onClick}
       style={{
-        padding: '7px 13px', fontSize: 13, fontWeight: active ? 500 : 400,
+        minHeight: 40, padding: '7px 14px', fontSize: 13, fontWeight: active ? 500 : 400,
         border: active ? `1.5px solid ${C.teal}` : `0.5px solid ${C.border}`,
         borderRadius: 20, cursor: disabled ? 'not-allowed' : 'pointer',
         whiteSpace: 'nowrap',
@@ -265,6 +265,93 @@ export function Card({ children, style = {}, as: Tag = 'div' }: Omit<CardProps, 
     >
       {children}
     </Tag>
+  )
+}
+
+// ─── Dialog ───────────────────────────────────────────────────────────────────
+// Accessible modal: role="dialog" + aria-modal, focus moved in and restored on
+// close, focus trapped with Tab, Escape to dismiss, and background scroll locked
+// (WAI-ARIA dialog pattern). Closes on overlay click.
+
+interface DialogProps {
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+}
+export function Dialog({ title, onClose, children }: DialogProps) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  const titleId  = useId()
+
+  useEffect(() => {
+    const prevFocus    = document.activeElement as HTMLElement | null
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    panelRef.current?.focus()
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return }
+      if (e.key !== 'Tab') return
+      const panel = panelRef.current
+      if (!panel) return
+      const focusables = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        )
+      )
+      if (focusables.length === 0) { e.preventDefault(); return }
+      const first = focusables[0]
+      const last  = focusables[focusables.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && active === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus() }
+    }
+
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('keydown', onKey, true)
+      document.body.style.overflow = prevOverflow
+      prevFocus?.focus?.()
+    }
+  }, [onClose])
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+        zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      }}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: C.surface, borderRadius: '12px 12px 0 0',
+          padding: '20px 16px', width: '100%', maxWidth: 520,
+          maxHeight: '80vh', overflowY: 'auto', outline: 'none',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <h2 id={titleId} style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{title}</h2>
+          <button
+            aria-label="Cerrar"
+            onClick={onClose}
+            style={{
+              width: 40, height: 40, borderRadius: 8, border: 'none',
+              background: 'transparent', cursor: 'pointer', color: C.muted,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}
+          >
+            <i className="ti ti-x" style={{ fontSize: 20 }} aria-hidden />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
   )
 }
 

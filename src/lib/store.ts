@@ -4,6 +4,7 @@ import type { Survey, AppView, WizardState, Settings, SurveyDraft, UserRole } fr
 import {
   getAllSurveys, saveSurvey, deleteSurvey,
   getSettings, saveSettings,
+  getDraft, saveDraft, clearDraft,
 } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { pushSurvey, deleteSurveyRemote, fullSync } from '../lib/sync'
@@ -48,6 +49,12 @@ interface AppStore {
   closeWizard: () => void
   setWizardStep: (step: number) => void
   updateDraft: (patch: Partial<SurveyDraft>) => void
+
+  // Persisted draft for resuming an in-progress survey after a reload
+  pendingDraft: WizardState | null
+  loadDraft: () => Promise<void>
+  resumeDraft: () => void
+  discardDraft: () => Promise<void>
 
   settings: Settings
   settingsLoaded: boolean
@@ -121,7 +128,8 @@ export const useStore = create<AppStore>((set, get) => ({
 
   async signOut() {
     await supabase.auth.signOut()
-    set({ user: null, session: null, userRole: null, surveys: [], surveysLoaded: false })
+    await clearDraft()
+    set({ user: null, session: null, userRole: null, surveys: [], surveysLoaded: false, pendingDraft: null })
   },
 
   // ── Sync ─────────────────────────────────────────────────────────────
@@ -173,7 +181,8 @@ export const useStore = create<AppStore>((set, get) => ({
     await saveSurvey(survey)
     set(s => ({ surveys: [survey, ...s.surveys] }))
     get().pushToast('Encuesta guardada correctamente')
-    set({ view: 'encuestas', wizard: null })
+    clearDraft()
+    set({ view: 'encuestas', wizard: null, pendingDraft: null })
 
     // Push to remote in background
     const { user } = get()
@@ -193,10 +202,12 @@ export const useStore = create<AppStore>((set, get) => ({
       syncStatus: 'local',
     }
     await saveSurvey(updated)
+    clearDraft()
     set(s => ({
       surveys: s.surveys.map(sv => (sv.id === id ? updated : sv)),
       view: 'encuestas',
       wizard: null,
+      pendingDraft: null,
     }))
     get().pushToast('Encuesta actualizada')
 
@@ -219,6 +230,7 @@ export const useStore = create<AppStore>((set, get) => ({
 
   // ── Wizard ────────────────────────────────────────────────────────────
   wizard: null,
+  pendingDraft: null,
   openWizard(surveyCount) {
     const { settings } = get()
     const nuiEtr = settings.nuiEncuestador ? parseInt(settings.nuiEncuestador, 10) || null : null
@@ -228,21 +240,49 @@ export const useStore = create<AppStore>((set, get) => ({
       nuiEtr,
       nui:    surveyCount + 1,
     }
-    set({ wizard: { step: 1, draft }, view: 'wizard' })
+    const wizard: WizardState = { step: 1, draft }
+    set({ wizard, view: 'wizard', pendingDraft: null })
+    saveDraft(wizard)
   },
   openEditWizard(survey) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, createdAt, updatedAt, syncStatus, ...draft } = survey
-    set({ wizard: { step: 1, draft, editingId: id }, view: 'wizard' })
+    const wizard: WizardState = { step: 1, draft, editingId: id }
+    set({ wizard, view: 'wizard', pendingDraft: null })
+    saveDraft(wizard)
   },
-  closeWizard() { set({ wizard: null, view: 'encuestas' }) },
-  setWizardStep(step) { set(s => s.wizard ? { wizard: { ...s.wizard, step } } : {}) },
+  closeWizard() {
+    clearDraft()
+    set({ wizard: null, view: 'encuestas', pendingDraft: null })
+  },
+  setWizardStep(step) {
+    set(s => s.wizard ? { wizard: { ...s.wizard, step } } : {})
+    const { wizard } = get()
+    if (wizard) saveDraft(wizard)
+  },
   updateDraft(patch) {
     set(s =>
       s.wizard
         ? { wizard: { ...s.wizard, draft: { ...s.wizard.draft, ...patch } } }
         : {}
     )
+    const { wizard } = get()
+    if (wizard) saveDraft(wizard)
+  },
+
+  // Resume / discard a persisted in-progress survey
+  async loadDraft() {
+    const pendingDraft = await getDraft()
+    set({ pendingDraft })
+  },
+  resumeDraft() {
+    const { pendingDraft } = get()
+    if (!pendingDraft) return
+    set({ wizard: pendingDraft, view: 'wizard', pendingDraft: null })
+  },
+  async discardDraft() {
+    await clearDraft()
+    set({ pendingDraft: null })
   },
 
   // ── Settings ──────────────────────────────────────────────────────────

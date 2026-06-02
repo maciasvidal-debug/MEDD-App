@@ -81,6 +81,23 @@ input:read-only, input:disabled {
 }
 textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
 
+/* Placeholder contrast (default UA placeholder fails WCAG AA on white). */
+::placeholder { color: #6B7280; opacity: 1; }
+
+/* ─── Keyboard focus ─────────────────────────────────────────────────────────── */
+/* Custom controls (chips, Yes/No toggles, nav, icon buttons) are <button>s with
+   inline styles and otherwise expose no focus state — invisible to keyboard
+   users (WCAG 2.4.7). Provide a consistent focus-visible ring for all of them. */
+button:focus-visible,
+a:focus-visible,
+[role="radio"]:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #0F766E;
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible) { outline: none; }
+
 /* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
