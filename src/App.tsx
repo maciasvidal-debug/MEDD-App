@@ -73,6 +73,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <h1 className="sr-only">MEDD — Aplicación de investigación de medicamentos no utilizados</h1>
+      <NetworkBanner />
       <ToastContainer />
 
       {/* Resume an in-progress survey saved before a reload */}
@@ -102,6 +103,39 @@ export default function App() {
 
       {/* Bottom navigation — hidden during wizard */}
       {view !== 'wizard' && <BottomNav />}
+    </div>
+  )
+}
+
+// Persistent offline indicator: the app is offline-first (IndexedDB + deferred
+// sync), so the key reassurance is that data is being saved locally meanwhile.
+function NetworkBanner() {
+  const [online, setOnline] = React.useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true,
+  )
+  useEffect(() => {
+    const goOnline  = () => setOnline(true)
+    const goOffline = () => setOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
+  if (online) return null
+  return (
+    <div
+      role="status"
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        background: C.amberLight, color: C.amber, fontSize: 12, fontWeight: 500,
+        padding: '6px 12px', borderBottom: `0.5px solid ${C.amber}40`,
+      }}
+    >
+      <i className="ti ti-wifi-off" style={{ fontSize: 14 }} aria-hidden />
+      Sin conexión — los datos se guardan localmente y se sincronizarán al reconectar
     </div>
   )
 }

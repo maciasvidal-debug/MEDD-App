@@ -14,7 +14,8 @@ import { EMPTY_DRAFT, DEFAULT_SETTINGS } from '../lib/constants'
 // ─── Toast ────────────────────────────────────────────────────────────────
 
 export type ToastLevel = 'success' | 'error' | 'info'
-export interface Toast { id: string; message: string; level: ToastLevel }
+export interface ToastAction { label: string; onClick: () => void }
+export interface Toast { id: string; message: string; level: ToastLevel; action?: ToastAction }
 
 // ─── Store interface ──────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ interface AppStore {
   persistSettings: (s: Settings) => Promise<void>
 
   toasts: Toast[]
-  pushToast: (message: string, level?: ToastLevel) => void
+  pushToast: (message: string, level?: ToastLevel, action?: ToastAction, duration?: number) => void
   removeToast: (id: string) => void
 }
 
@@ -220,12 +221,31 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   async removeSurvey(id) {
-    await deleteSurvey(id)
-    set(s => ({ surveys: s.surveys.filter(sv => sv.id !== id) }))
-    get().pushToast('Encuesta eliminada', 'info')
+    const existing = get().surveys.find(sv => sv.id === id)
+    if (!existing) return
 
-    const { user } = get()
-    if (user) deleteSurveyRemote(id)
+    // Optimistic removal from the UI; the durable delete (IDB + remote) is
+    // deferred so an accidental delete can be undone within the grace window.
+    set(s => ({ surveys: s.surveys.filter(sv => sv.id !== id) }))
+
+    let undone = false
+    const GRACE_MS = 5000
+    get().pushToast('Encuesta eliminada', 'info', {
+      label: 'Deshacer',
+      onClick: () => {
+        undone = true
+        set(s => ({
+          surveys: [...s.surveys, existing].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+        }))
+      },
+    }, GRACE_MS)
+
+    setTimeout(async () => {
+      if (undone) return
+      await deleteSurvey(id)
+      const { user } = get()
+      if (user) deleteSurveyRemote(id)
+    }, GRACE_MS)
   },
 
   // ── Wizard ────────────────────────────────────────────────────────────
@@ -300,10 +320,10 @@ export const useStore = create<AppStore>((set, get) => ({
 
   // ── Toasts ────────────────────────────────────────────────────────────
   toasts: [],
-  pushToast(message, level = 'success') {
+  pushToast(message, level = 'success', action, duration = 3200) {
     const id = uuid()
-    set(s => ({ toasts: [...s.toasts, { id, message, level }] }))
-    setTimeout(() => get().removeToast(id), 3200)
+    set(s => ({ toasts: [...s.toasts, { id, message, level, action }] }))
+    setTimeout(() => get().removeToast(id), duration)
   },
   removeToast(id) {
     set(s => ({ toasts: s.toasts.filter(t => t.id !== id) }))
