@@ -6,3 +6,7 @@
 **Vulnerability:** Missing input length limits on text fields in the backend.
 **Learning:** The Express backend parses JSON up to 100kb, but the application's schema validation did not check individual field string lengths. This poses a Denial of Service (DoS) and resource exhaustion risk.
 **Prevention:** Always cap strings at their expected maximum length as a layer of defense in depth before passing them to the database.
+## 2026-06-02 - Unhandled Null/Undefined Request Body Leading to 500 Errors
+**Vulnerability:** The API endpoint `/api/surveys` crashed with a 500 error when receiving a null or missing JSON body due to the validation logic unconditionally accessing properties (`body.nui_etr`).
+**Learning:** Relying on upstream JSON parsing to always provide an object without explicit defensive checks leaves the server open to unhandled type errors when `null` or array structures are submitted.
+**Prevention:** Validation layers must explicitly assert that the input is a valid object before attempting to extract its fields.

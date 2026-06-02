@@ -12,7 +12,7 @@ import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/S
 import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
 import {
-  freqTable, groupSum, pct, calcEdad, fmtDate,
+  pct, calcEdad, fmtDate,
   toCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
 import { OPT, TOTAL_STEPS } from '../lib/constants'
@@ -61,7 +61,13 @@ export function DashboardPage() {
     let nSob = 0, nVenc = 0, nDisp = 0
     let pesoTotal = 0, unidTotal = 0, vencTotal = 0, totalMeds = 0
 
-    // ⚡ Bolt: Single pass for scalar KPIs (reduces 7 array passes to 1)
+    const asSaludCounts: Record<string, number> = {}
+    const nvEstuCounts: Record<string, number> = {}
+    const etniaCounts: Record<string, number> = {}
+    const estratoCounts: Record<number, number> = {}
+    const ciudadVencMap = new Map<string, number>()
+
+    // ⚡ Bolt: Single pass for scalar KPIs and distributions (reduces 21+ array passes to 1)
     for (let i = 0; i < surveys.length; i++) {
       const s = surveys[i]
       if (s.medSob === 'Sí') nSob++
@@ -71,19 +77,24 @@ export function DashboardPage() {
       unidTotal += s.cantMed ?? 0
       vencTotal += s.cantMedVto ?? 0
       totalMeds += s.medications?.length ?? 0
+
+      if (s.asSalud) asSaludCounts[s.asSalud] = (asSaludCounts[s.asSalud] || 0) + 1
+      if (s.nvEstu) nvEstuCounts[s.nvEstu] = (nvEstuCounts[s.nvEstu] || 0) + 1
+      if (s.etnia) etniaCounts[s.etnia] = (etniaCounts[s.etnia] || 0) + 1
+      if (s.estrato !== null && s.estrato !== undefined) estratoCounts[s.estrato] = (estratoCounts[s.estrato] || 0) + 1
+
+      const ciudadKey = String(s.ciudad ?? 'Sin dato') || 'Sin dato'
+      ciudadVencMap.set(ciudadKey, (ciudadVencMap.get(ciudadKey) ?? 0) + (s.cantMedVto ?? 0))
     }
 
-    const barAsSalud = freqTable(surveys, 'asSalud', OPT.asSalud).filter(d => d.n > 0)
-    const barNvEstu  = freqTable(surveys, 'nvEstu',  OPT.nvEstu).filter(d => d.n > 0)
-    const barEtnia   = freqTable(surveys, 'etnia',   OPT.etnia).filter(d => d.n > 0)
+    const barAsSalud = OPT.asSalud.map(v => ({ name: v, n: asSaludCounts[v] || 0 })).filter(d => d.n > 0)
+    const barNvEstu  = OPT.nvEstu.map(v => ({ name: v, n: nvEstuCounts[v] || 0 })).filter(d => d.n > 0)
+    const barEtnia   = OPT.etnia.map(v => ({ name: v, n: etniaCounts[v] || 0 })).filter(d => d.n > 0)
+    const barEstrato = OPT.estrato.map(e => ({ name: `Estrato ${e}`, n: estratoCounts[e] || 0 })).filter(d => d.n > 0)
 
-    // ESTRATO distribution (new)
-    const barEstrato = OPT.estrato
-      .map(e => ({ name: `Estrato ${e}`, n: surveys.filter(s => s.estrato === e).length }))
-      .filter(d => d.n > 0)
-
-    // CIUDAD: top cities by expired units (CANT_MED_VTO)
-    const ciudadVenc = groupSum(surveys, 'ciudad', 'cantMedVto')
+    const ciudadVenc = Array.from(ciudadVencMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
       .filter(d => d.name && d.name !== 'Sin dato')
       .slice(0, 8)
 
@@ -472,6 +483,7 @@ function MedDetailModal({ survey, onClose }: { survey: Survey; onClose: () => vo
             Encuesta #{String(survey.nui).padStart(3, '0')} — Medicamentos
           </span>
           <button
+            aria-label="Cerrar"
             onClick={onClose}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 22, lineHeight: 1 }}
           >×</button>

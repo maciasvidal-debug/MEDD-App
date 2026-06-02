@@ -44,9 +44,13 @@ export function useCUM(): UseCUMResult {
     setResults([])
 
     try {
+      // Escape single quotes (SoQL string-literal escaping) before interpolating
+      // the user term into the $where clause — mirrors useMunicipios and prevents
+      // query breakage / SoQL injection from terms containing apostrophes.
+      const safe = trimmed.toUpperCase().replace(/'/g, "''")
       const where = encodeURIComponent(
-        `(upper(producto) like '%${trimmed.toUpperCase()}%' OR ` +
-        `upper(principioactivo) like '%${trimmed.toUpperCase()}%') AND ` +
+        `(upper(producto) like '%${safe}%' OR ` +
+        `upper(principioactivo) like '%${safe}%') AND ` +
         `estadoregistro='Vigente'`
       )
       const url =
@@ -71,8 +75,12 @@ export function useCUM(): UseCUMResult {
       setError('Sin conexión a datos.gov.co. Verifique su acceso a internet.')
       setResults([])
     } finally {
-      setLoading(false)
-      setSearched(true)
+      // Only settle UI state if this request is still the current one; a request
+      // superseded by a newer search must not clobber the in-flight request's state.
+      if (abortRef.current === controller) {
+        setLoading(false)
+        setSearched(true)
+      }
     }
   }, [])
 

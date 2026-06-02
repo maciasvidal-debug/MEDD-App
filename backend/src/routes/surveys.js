@@ -81,10 +81,11 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 // POST create survey (atomic with its N medications)
 router.post('/', asyncHandler(async (req, res) => {
-    const { value, errors } = validateSurvey(req.body);
-    if (errors.length) {
-        return res.status(400).json({ error: 'Validación fallida', details: errors });
+    const validated = validateSurvey(req.body);
+    if (!validated || !validated.errors || validated.errors.length) {
+        return res.status(400).json({ error: 'Validación fallida', details: validated?.errors || ['Cuerpo de la petición inválido.'] });
     }
+    const { value } = validated;
 
     const client = await pool.connect();
     try {
