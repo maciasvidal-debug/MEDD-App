@@ -1,12 +1,24 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, Suspense } from 'react'
 import { useStore } from './lib/store'
 import { BottomNav, ToastContainer } from './components/layout'
-import { C } from './components/ui'
+import { C, Spinner } from './components/ui'
 import {
-  DashboardPage, WizardPage, EncuestasPage,
+  WizardPage, EncuestasPage,
   BuscarPage, ExportarPage, AjustesPage,
 } from './pages'
 import AuthPage from './pages/auth'
+
+// Dashboard pulls in Recharts (heavy); load it on demand so it stays out of the
+// initial bundle and only downloads when the user opens the panel.
+const DashboardPage = React.lazy(() => import('./pages/Dashboard'))
+
+function PageLoader() {
+  return (
+    <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Spinner size={28} />
+    </div>
+  )
+}
 
 export default function App() {
   const {
@@ -77,7 +89,11 @@ export default function App() {
       )}
 
       {/* Pages */}
-      {view === 'dashboard'  && <DashboardPage />}
+      {view === 'dashboard'  && (
+        <Suspense fallback={<PageLoader />}>
+          <DashboardPage />
+        </Suspense>
+      )}
       {view === 'encuestas'  && <EncuestasPage />}
       {view === 'wizard'     && <WizardPage />}
       {view === 'buscar'     && <BuscarPage />}
