@@ -6,7 +6,7 @@ import {
 import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, C } from '../components/ui'
 import { useStore } from '../lib/store'
-import { pct, wilsonCI, prevalenceRatio, chiSquareTest, type Proportion, type RiskRatio, type ChiSquare } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, type Proportion, type RiskRatio, type ChiSquare, type TrendTest } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
 
@@ -294,7 +294,7 @@ function PrevalenceCard({ rows }: { rows: { label: string; ci: Proportion }[] })
 // ─── Exposure → outcome association (estrato gradient) ──────────────────────
 
 interface AssocGroup { label: string; total: number; cases: number; prev: Proportion; rr: RiskRatio }
-interface Association { groups: AssocGroup[]; chi: ChiSquare; ref: string }
+interface Association { groups: AssocGroup[]; chi: ChiSquare; trend: TrendTest | null; ref: string }
 
 // Tests whether harbouring confirmed expired meds (vtoMedNc='Sí') is associated
 // with socioeconomic stratum. Estrato is collapsed to Bajo/Medio/Alto so cells
@@ -331,13 +331,17 @@ function buildEstratoAssociation(surveys: Survey[]): Association | null {
       : prevalenceRatio(g.cases, g.total, ref.cases, ref.total),
   }))
   const chi = chiSquareTest(present.map(g => [g.cases, g.total - g.cases]))
-  return { groups, chi, ref: ref.label }
+  // Ordered exposure → also test for a monotone gradient (scores 1..k by rank).
+  const trend = cochranArmitage(present.map((g, i) => ({ score: i + 1, n: g.total, cases: g.cases })))
+  return { groups, chi, trend, ref: ref.label }
 }
 
+const fmtP = (p: number) => (p < 0.001 ? '< 0,001' : p.toFixed(3).replace('.', ','))
+
 function AssociationCard({ assoc }: { assoc: Association }) {
-  const { groups, chi, ref } = assoc
+  const { groups, chi, trend, ref } = assoc
   const sig = chi.df > 0 && chi.p < 0.05
-  const prettyP = chi.p < 0.001 ? '< 0,001' : chi.p.toFixed(3).replace('.', ',')
+  const trendSig = trend !== null && trend.p < 0.05
   return (
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>Asociación: vencidos en casa según estrato</SectionLabel>
@@ -346,10 +350,21 @@ function AssociationCard({ assoc }: { assoc: Association }) {
       </div>
       <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
         <strong style={{ color: sig ? C.amber : C.text }}>
-          χ² = {chi.chi2.toFixed(2)} (gl {chi.df}), p = {prettyP}
+          χ² = {chi.chi2.toFixed(2)} (gl {chi.df}), p = {fmtP(chi.p)}
         </strong>
         {' — '}
-        {sig ? 'asociación significativa' : 'sin evidencia de asociación'} (α = 0,05).
+        {sig ? 'diferencia entre estratos significativa' : 'sin evidencia de diferencia'} (α = 0,05).
+        {trend && (
+          <div style={{ marginTop: 4 }}>
+            <strong style={{ color: trendSig ? C.amber : C.text }}>
+              Tendencia (Cochran–Armitage): χ² = {trend.chi2.toFixed(2)} (gl 1), p = {fmtP(trend.p)}
+            </strong>
+            {' — '}
+            {trendSig
+              ? `gradiente ${trend.direction} con el estrato`
+              : 'sin gradiente monótono'}.
+          </div>
+        )}
         {chi.minExpected < 5 && (
           <div style={{ color: C.amber, marginTop: 4 }}>
             ⚠ Celda esperada &lt; 5: interpretar con cautela (preferir test exacto).
