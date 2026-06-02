@@ -6,7 +6,7 @@ import {
 import { TopBar, StepBar } from '../components/layout'
 import {
   StatCard, Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, C,
+  Field, SectionHead, Dialog, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
@@ -463,63 +463,40 @@ export function EncuestasPage() {
 
 function MedDetailModal({ survey, onClose }: { survey: Survey; onClose: () => void }) {
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-        zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      }}
+    <Dialog
+      title={`Encuesta #${String(survey.nui).padStart(3, '0')} — Medicamentos`}
+      onClose={onClose}
     >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: C.surface, borderRadius: '12px 12px 0 0',
-          padding: '20px 16px', width: '100%', maxWidth: 520,
-          maxHeight: '80vh', overflowY: 'auto',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <span style={{ fontSize: 15, fontWeight: 500 }}>
-            Encuesta #{String(survey.nui).padStart(3, '0')} — Medicamentos
-          </span>
-          <button
-            aria-label="Cerrar"
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 22, lineHeight: 1 }}
-          >×</button>
-        </div>
-
-        {survey.medications.length === 0 ? (
-          <p style={{ color: C.hint, fontSize: 13 }}>Sin productos registrados.</p>
-        ) : (
-          survey.medications.map((m, i) => {
-            const mx = productMetrics(survey.fEta, survey.fDisp, m)
-            return (
-              <Card key={i} style={{ marginBottom: 10, background: mx.isExpired ? '#FEF3C7' : C.bg }}>
-                <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>
-                  {m.nmMed || '—'}
-                </div>
-                {m.dci && <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Princ. activo: {m.dci}</div>}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                  {m.concMed != null && m.undConc && (
-                    <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
-                  )}
-                  {m.fVto && (
-                    <Badge label={`Vence: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
-                  )}
-                </div>
-                {/* Time metrics (Excel logic) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
-                  <MetricCell label="Días vencido" value={mx.tVto} unit="d" highlight={mx.isExpired} />
-                  <MetricCell label="En bodega" value={mx.tDisp} unit="d" />
-                  <MetricCell label="Vida útil" value={mx.vUtil} unit="d" />
-                </div>
-              </Card>
-            )
-          })
-        )}
-      </div>
-    </div>
+      {survey.medications.length === 0 ? (
+        <p style={{ color: C.hint, fontSize: 13 }}>Sin productos registrados.</p>
+      ) : (
+        survey.medications.map((m, i) => {
+          const mx = productMetrics(survey.fEta, survey.fDisp, m)
+          return (
+            <Card key={i} style={{ marginBottom: 10, background: mx.isExpired ? '#FEF3C7' : C.bg }}>
+              <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>
+                {m.nmMed || '—'}
+              </div>
+              {m.dci && <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Princ. activo: {m.dci}</div>}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                {m.concMed != null && m.undConc && (
+                  <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
+                )}
+                {m.fVto && (
+                  <Badge label={`Vence: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
+                )}
+              </div>
+              {/* Time metrics (Excel logic) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
+                <MetricCell label="Días vencido" value={mx.tVto} unit="d" highlight={mx.isExpired} />
+                <MetricCell label="En bodega" value={mx.tDisp} unit="d" />
+                <MetricCell label="Vida útil" value={mx.vUtil} unit="d" />
+              </div>
+            </Card>
+          )
+        })
+      )}
+    </Dialog>
   )
 }
 
