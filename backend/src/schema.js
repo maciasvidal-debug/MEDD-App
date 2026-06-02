@@ -83,8 +83,8 @@ function validateIdentity(body, v, errors, today) {
 }
 
 function validateSocioDemographic(body, v, errors) {
-    v.ciudad = body.ciudad ? String(body.ciudad).trim() : null;
-    v.dir = body.dir ? String(body.dir).trim() : null;
+    v.ciudad = body.ciudad ? String(body.ciudad).trim().slice(0, 120) : null;
+    v.dir = body.dir ? String(body.dir).trim().slice(0, 500) : null;
 
     v.estrato = toIntOrNull(body.estrato);
     if (v.estrato !== null && !ENUMS.estrato.includes(v.estrato))
@@ -104,7 +104,7 @@ function validateHealthChain(body, v, errors) {
     v.est_salud = toBool(body.est_salud);
 
     if (v.est_salud === true) {
-        v.prb_salud = body.prb_salud ? String(body.prb_salud).trim() : null;
+        v.prb_salud = body.prb_salud ? String(body.prb_salud).trim().slice(0, 500) : null;
         if (!v.prb_salud) errors.push('PRB_SALUD es obligatorio cuando EST_SALUD = Sí.');
         v.con_med = toBool(body.con_med);
         if (v.con_med === null) errors.push('CON_MED es obligatorio cuando EST_SALUD = Sí.');
@@ -145,7 +145,7 @@ function validateStorage(body, v, errors) {
 
     v.disp_med_vc = toBool(body.disp_med_vc);
     if (v.disp_med_vc === true) {
-        v.cto_disp_vc = body.cto_disp_vc ? String(body.cto_disp_vc).trim() : null;
+        v.cto_disp_vc = body.cto_disp_vc ? String(body.cto_disp_vc).trim().slice(0, 500) : null;
         if (!v.cto_disp_vc) errors.push('CTO_DISP_VC es obligatorio cuando DISP_MED_VC = Sí.');
     } else {
         v.cto_disp_vc = null;
@@ -171,15 +171,15 @@ function validateStorage(body, v, errors) {
     if (v.peso_med_nc !== null && (Number.isNaN(v.peso_med_nc) || v.peso_med_nc < 0))
         errors.push('PESO_MED_NC debe ser un número >= 0.');
 
-    v.obs = body.obs ? String(body.obs).trim() : null;
+    v.obs = body.obs ? String(body.obs).trim().slice(0, 2000) : null;
 }
 
 function validateMedications(body, v, errors) {
     const meds = Array.isArray(body.medications) ? body.medications : [];
     v.medications = meds.map((m, i) => {
         const med = {
-            nm_med:   m.nm_med   ? String(m.nm_med).trim() : null,
-            dci:      m.dci      ? String(m.dci).trim()    : null,
+            nm_med:   m.nm_med   ? String(m.nm_med).trim().slice(0, 200) : null,
+            dci:      m.dci      ? String(m.dci).trim().slice(0, 200)    : null,
             conc_med: toNumOrNull(m.conc_med),
             und_conc: m.und_conc || null,
             f_vto:    isValidDateStr(m.f_vto) ? m.f_vto : null,
