@@ -737,7 +737,7 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
                     </div>
                     <button
                       type="button"
-                      aria-label="Eliminar medicamento"
+                      aria-label={`Eliminar medicamento ${m.nmMed || ''}`}
                       onClick={() => removeMed(i)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.red, fontSize: 12, padding: 0, flexShrink: 0 }}
                     >
