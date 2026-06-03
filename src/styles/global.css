@@ -246,7 +246,26 @@ button:not(:disabled):active { transform: scale(0.98); }
   .bottom-nav { display: none !important; }
 }
 
+/* Reading measure: forms and single-column pages stay comfortably narrow on
+   wide screens instead of stretching edge-to-edge (better legibility, less
+   "sparse card" feel). The dashboard keeps the full --content-max. */
+@media (min-width: 900px) {
+  .page-content.narrow { max-width: 720px; }
+}
+
 /* ─── Fluid grids ────────────────────────────────────────────────────────────── */
+.records-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 720px) {
+  .records-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+}
+@media (min-width: 1100px) {
+  .records-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

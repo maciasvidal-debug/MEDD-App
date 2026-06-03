@@ -56,7 +56,7 @@ export function WizardPage() {
         }
       />
       <StepBar currentStep={step} />
-      <div className="page-content" style={{ paddingBottom: 24 }}>
+      <div className="page-content narrow" style={{ paddingBottom: 24 }}>
         {step === 1 && <Step1 {...stepProps} />}
         {step === 2 && <Step2 {...stepProps} />}
         {step === 3 && <Step3 {...stepProps} />}
@@ -121,7 +121,9 @@ export function EncuestasPage() {
             Sin resultados para "{filter}".
           </p>
         )}
-        {surveys.length > 0 && filtered.length > 0 && filtered.map(sv => {
+        {surveys.length > 0 && filtered.length > 0 && (
+          <div className="records-grid">
+          {filtered.map(sv => {
             const edad = calcEdad(sv.fEta, sv.fNac)
             const expiredMeds = sv.medications?.filter(m => {
               const mx = productMetrics(sv.fEta, sv.fDisp, m)
@@ -129,7 +131,7 @@ export function EncuestasPage() {
             }).length ?? 0
 
             return (
-              <Card key={sv.id} style={{ marginBottom: 10 }}>
+              <Card key={sv.id} style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <div>
                     <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>#{String(sv.nui).padStart(3, '0')}</span>
@@ -177,7 +179,7 @@ export function EncuestasPage() {
                 {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
                 {!isInvestigador && (
                   confirmId === sv.id ? (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 'auto', paddingTop: 4 }}>
                       <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
                       <Button size="sm" variant="danger" onClick={() => { removeSurvey(sv.id); setConfirmId(null) }}>
                         Sí, eliminar
@@ -187,7 +189,7 @@ export function EncuestasPage() {
                       </Button>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 'auto', paddingTop: 4 }}>
                       <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => openEditWizard(sv)}>
                         Editar
                       </Button>
@@ -203,8 +205,9 @@ export function EncuestasPage() {
                 )}
               </Card>
             )
-          })
-        }
+          })}
+          </div>
+        )}
       </div>
 
       {/* Medication detail modal */}
@@ -287,7 +290,7 @@ export function BuscarPage() {
   return (
     <div>
       <TopBar title="Buscador CUM-INVIMA" />
-      <div className="page-content">
+      <div className="page-content narrow">
         <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
           <input
             value={query}
@@ -369,7 +372,7 @@ export function ExportarPage() {
   return (
     <div>
       <TopBar title="Exportar datos" />
-      <div className="page-content">
+      <div className="page-content narrow">
         <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>
           {n} registro{n !== 1 ? 's' : ''} en sesión actual.
           Los datos persisten en IndexedDB del navegador y sobreviven cierres de pestaña.
@@ -432,7 +435,7 @@ export function AjustesPage() {
   return (
     <div>
       <TopBar title="Ajustes" />
-      <div className="page-content">
+      <div className="page-content narrow">
         <SectionHead icon="ti-settings" label="Configuración del proyecto" />
 
         <Field label="Nombre del proyecto">

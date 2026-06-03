@@ -245,26 +245,48 @@ export function StepBar({ currentStep }: StepBarProps) {
       aria-valuemin={1}
       aria-valuemax={TOTAL_STEPS}
       aria-label={`Paso ${currentStep} de ${TOTAL_STEPS}: ${label}`}
-      style={{ padding: '12px 16px 0' }}
+      style={{
+        padding: '14px 16px 12px', background: C.surface,
+        borderBottom: `1px solid ${C.border}`,
+      }}
     >
-      <div style={{ display: 'flex', gap: 4 }}>
-        {STEP_LABELS.map((s, i) => (
-          <div
-            key={s.n}
-            style={{
-              flex: 1, height: 3, borderRadius: 2,
-              background:
-                i < stepIdx ? C.teal :
-                i === stepIdx ? C.tealMid : '#E2E8F0',
-              transition: 'background 0.25s',
-            }}
-          />
-        ))}
+      {/* Numbered stepper with check-marks for completed steps (goal-gradient) */}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        {STEP_LABELS.map((s, i) => {
+          const done = i < stepIdx
+          const current = i === stepIdx
+          return (
+            <React.Fragment key={s.n}>
+              <div
+                title={s.label}
+                aria-current={current ? 'step' : undefined}
+                style={{
+                  width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700,
+                  background: done ? C.primary : current ? C.tealLight : C.surface2,
+                  color: done ? '#fff' : current ? C.teal : C.muted,
+                  border: current ? `2px solid ${C.teal}` : `1px solid ${C.border}`,
+                  transition: 'all 0.2s',
+                }}
+              >
+                {done ? <i className="ti ti-check" style={{ fontSize: 15 }} aria-hidden /> : s.n}
+              </div>
+              {i < TOTAL_STEPS - 1 && (
+                <div style={{
+                  flex: 1, height: 2, margin: '0 4px',
+                  background: i < stepIdx ? C.primary : C.border,
+                  transition: 'background 0.25s',
+                }} />
+              )}
+            </React.Fragment>
+          )
+        })}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 7 }}>
-        <span style={{ fontSize: 12, color: C.teal, fontWeight: 500 }}>{label}</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 9 }}>
+        <span style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{label}</span>
         <span style={{ fontSize: 12, color: C.muted }}>
-          {currentStep} / {TOTAL_STEPS}
+          Paso {currentStep} de {TOTAL_STEPS}
         </span>
       </div>
     </div>
