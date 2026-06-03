@@ -422,7 +422,7 @@ export function ExportarPage() {
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────
 
 export function AjustesPage() {
-  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync } = useStore()
+  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, theme, toggleTheme } = useStore()
   const [form, setForm] = useState(settings)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -463,6 +463,40 @@ export function AjustesPage() {
         <Button fullWidth onClick={() => persistSettings(form)} icon="ti-device-floppy">
           Guardar ajustes
         </Button>
+
+        <Divider label="apariencia" />
+
+        <Card style={{ background: C.surface }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <i className={`ti ${theme === 'dark' ? 'ti-moon' : 'ti-sun'}`} style={{ fontSize: 19, color: C.teal }} aria-hidden />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Tema {theme === 'dark' ? 'oscuro' : 'claro'}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Ajusta la app a tu entorno de trabajo.</div>
+            </div>
+            <button
+              role="switch"
+              aria-checked={theme === 'dark'}
+              aria-label="Alternar tema oscuro"
+              onClick={toggleTheme}
+              style={{
+                width: 52, height: 30, borderRadius: 999, border: 'none', cursor: 'pointer',
+                background: theme === 'dark' ? C.primary : C.border, flexShrink: 0,
+                position: 'relative', transition: 'background 0.18s',
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 3, left: theme === 'dark' ? 25 : 3,
+                width: 24, height: 24, borderRadius: '50%', background: '#fff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left 0.18s',
+              }} />
+            </button>
+          </div>
+        </Card>
 
         <Divider label="cuenta" />
 

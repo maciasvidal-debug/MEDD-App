@@ -2,19 +2,47 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Brand */
+  /* ── Brand accents (stable across themes) ── */
   --c-navy:       #1E3A5F;
   --c-navy-mid:   #2B4C73;
-  --c-navy-light: #EFF6FF;
   --c-teal:       #0F766E;
   --c-teal-mid:   #14B8A6;
-  --c-teal-light: #CCFBF1;
+  /* Interactive/action colors — kept dark enough for white text in BOTH themes
+     (not re-themed in dark, so contrast stays AA on filled buttons). */
+  --c-primary:    #0F766E;
+  --c-primary-hover:#115E59;
+  --c-danger:     #B91C1C;
   --c-amber:      #B45309;
-  --c-amber-light:#FEF3C7;
   --c-red:        #B91C1C;
-  --c-red-light:  #FEE2E2;
   --c-green:      #166534;
-  --c-green-light:#DCFCE7;
+  --c-gray:       #475569;
+
+  /* ── Semantic surfaces / text (overridden in dark) ── */
+  --c-bg:          #EEF2F6;  /* app background (slightly deeper than cards → depth) */
+  --c-surface:     #FFFFFF;  /* card / elevated surface */
+  --c-surface-2:   #F8FAFC;  /* inset / secondary surface (stat tiles, code) */
+  --c-border:      #E2E8F0;
+  --c-border-strong:#CBD5E1;
+  --c-text:        #0F172A;
+  --c-muted:       #64748B;
+  --c-hint:        #5C6B7A;
+
+  /* ── Tinted "light" accent fills (badges, soft chips) ── */
+  --c-navy-light:  #EFF6FF;
+  --c-teal-light:  #CCFBF1;
+  --c-amber-light: #FEF3C7;
+  --c-red-light:   #FEE2E2;
+  --c-green-light: #DCFCE7;
+  --c-gray-light:  #F1F5F9;
+
+  /* ── Brand header gradient ── */
+  --grad-brand: linear-gradient(135deg, #0F766E 0%, #115E59 55%, #1E3A5F 100%);
+
+  /* ── Elevation ── */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 2px 4px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.07);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.12);
+  --shadow-brand: 0 6px 20px rgba(15, 118, 110, 0.28);
 
   /* Radius */
   --r-sm:  6px;
@@ -28,8 +56,9 @@
   --fs-xs:  11px;
   --fs-sm:  13px;
   --fs-base:15px;
-  --fs-lg:  17px;
-  --fs-xl:  22px;
+  --fs-lg:  18px;
+  --fs-xl:  24px;
+  --fs-2xl: 30px;
 
   /* Spacing */
   --sp-xs: 4px;
@@ -38,10 +67,51 @@
   --sp-lg: 16px;
   --sp-xl: 24px;
 
+  /* Layout */
+  --shell-max:   520px;   /* phone column cap */
+  --content-max: 1040px;  /* desktop content cap */
+  --sidebar-w:   232px;
+  --bp-wide:     900px;
+
   /* Z-index layers */
   --z-topbar:  10;
+  --z-sidebar: 20;
   --z-overlay: 100;
   --z-toast:   200;
+}
+
+/* ── Dark theme ── */
+[data-theme="dark"] {
+  --c-bg:          #0B1220;
+  --c-surface:     #131C2E;
+  --c-surface-2:   #1B2638;
+  --c-border:      #25324A;
+  --c-border-strong:#33415C;
+  --c-text:        #E8EDF5;
+  --c-muted:       #94A3B8;
+  --c-hint:        #8597AC;
+
+  --c-teal:        #2DD4BF;
+  --c-teal-mid:    #14B8A6;
+  --c-amber:       #FBBF24;
+  --c-red:         #F87171;
+  --c-green:       #4ADE80;
+  --c-navy:        #93C5FD;
+  --c-gray:        #94A3B8;
+
+  --c-navy-light:  #18233B;
+  --c-teal-light:  #0E2E2C;
+  --c-amber-light: #332408;
+  --c-red-light:   #3A1A1A;
+  --c-green-light: #122A1B;
+  --c-gray-light:  #1B2638;
+
+  --grad-brand: linear-gradient(135deg, #0F766E 0%, #0E3A39 60%, #0B1220 100%);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.55);
+  --shadow-brand: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────────── */
@@ -51,9 +121,13 @@ html, body, #root {
   font-size: var(--fs-base);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  background: #F8FAFC;
-  color: #0F172A;
+  text-rendering: optimizeLegibility;
+  background: var(--c-bg);
+  color: var(--c-text);
 }
+
+/* Tabular figures for data/stats consistency */
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
 
 body { overscroll-behavior: none; }
 
@@ -61,54 +135,49 @@ body { overscroll-behavior: none; }
 input, select, textarea {
   font-family: var(--font);
   font-size: var(--fs-sm);
-  color: #0F172A;
-  background: #FFFFFF;
-  border: 0.5px solid #CBD5E1;
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
   border-radius: var(--r-md);
-  padding: 9px 11px;
+  padding: 10px 12px;
   width: 100%;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 input:focus, select:focus, textarea:focus {
-  border-color: #0F766E;
-  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.14);
+  border-color: var(--c-teal);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16);
 }
 input:read-only, input:disabled {
-  background: #F8FAFC;
-  color: #94A3B8;
+  background: var(--c-surface-2);
+  color: var(--c-muted);
   cursor: not-allowed;
 }
 textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
 
-/* Placeholder contrast (default UA placeholder fails WCAG AA on white). */
-::placeholder { color: #6B7280; opacity: 1; }
+::placeholder { color: var(--c-muted); opacity: 1; }
 
 /* ─── Keyboard focus ─────────────────────────────────────────────────────────── */
-/* Custom controls (chips, Yes/No toggles, nav, icon buttons) are <button>s with
-   inline styles and otherwise expose no focus state — invisible to keyboard
-   users (WCAG 2.4.7). Provide a consistent focus-visible ring for all of them. */
 button:focus-visible,
 a:focus-visible,
 [role="radio"]:focus-visible,
 [role="button"]:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid #0F766E;
+  outline: 2px solid var(--c-teal);
   outline-offset: 2px;
 }
 button:focus:not(:focus-visible) { outline: none; }
 
 /* ─── Interactive feedback ───────────────────────────────────────────────────── */
-/* Controls are inline-styled, so hover/press states are centralized here. */
 @media (hover: hover) {
   button:not(:disabled):hover { filter: brightness(0.97); }
 }
 button:not(:disabled):active { transform: scale(0.98); }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--c-border-strong); border-radius: 3px; }
 
 /* ─── Screen reader only ──────────────────────────────────────────────────────── */
 .sr-only {
@@ -117,14 +186,24 @@ button:not(:disabled):active { transform: scale(0.98); }
   clip: rect(0,0,0,0); border: 0;
 }
 
-/* ─── App shell ──────────────────────────────────────────────────────────────── */
+/* ─── Responsive app shell ───────────────────────────────────────────────────── */
+/* Mobile-first: a single centred column with a bottom nav (thumb zone).
+   ≥900px: a persistent sidebar appears and the content column expands to use
+   the available width (kills the "narrow column floating in white" problem). */
+.app-root {
+  display: flex;
+  min-height: 100dvh;
+  background: var(--c-bg);
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;
-  max-width: 520px;
+  flex: 1;
+  min-width: 0;
+  max-width: var(--shell-max);
   margin: 0 auto;
   min-height: 100dvh;
-  background: #F8FAFC;
   position: relative;
 }
 
@@ -134,6 +213,77 @@ button:not(:disabled):active { transform: scale(0.98); }
   -webkit-overflow-scrolling: touch;
   padding: var(--sp-lg) var(--sp-lg) 96px;
 }
+
+/* Sidebar is desktop-only */
+.app-sidebar { display: none; }
+
+@media (min-width: 900px) {
+  .app-shell {
+    max-width: none;
+    margin: 0;
+  }
+  .page-content {
+    padding: var(--sp-xl) var(--sp-xl) var(--sp-xl);
+  }
+  /* Centre the actual content within the wide column for comfortable measure */
+  .page-content > .content-wrap,
+  .page-content {
+    max-width: var(--content-max);
+    margin-inline: auto;
+  }
+  .app-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    background: var(--c-surface);
+    border-right: 1px solid var(--c-border);
+    z-index: var(--z-sidebar);
+  }
+  .bottom-nav { display: none !important; }
+}
+
+/* ─── Fluid grids ────────────────────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+@media (min-width: 640px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 900px) {
+  .kpi-grid   { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .chart-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-grid .chart-span-2 { grid-column: 1 / -1; }
+}
+@media (min-width: 1200px) {
+  .kpi-grid { grid-template-columns: repeat(6, 1fr); }
+}
+
+/* ─── Skeleton loading (Doherty threshold: perceived speed) ──────────────────── */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--c-surface-2);
+  border-radius: var(--r-md);
+}
+.skeleton::after {
+  content: '';
+  position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.18), transparent);
+  animation: shimmer 1.3s infinite;
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
 
 /* ─── Animations ─────────────────────────────────────────────────────────────── */
 @keyframes fadeIn {
@@ -147,11 +297,17 @@ button:not(:disabled):active { transform: scale(0.98); }
 .fade-in   { animation: fadeIn  0.2s ease forwards; }
 .slide-up  { animation: slideUp 0.25s ease forwards; }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes slideProgress {
   0%   { transform: translateX(-100%); }
   50%  { transform: translateX(0); }
   100% { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

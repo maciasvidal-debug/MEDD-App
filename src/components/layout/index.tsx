@@ -17,14 +17,15 @@ export function TopBar({ title, onBack, actions }: TopBarProps) {
       role="banner"
       style={{
         position: 'sticky', top: 0, zIndex: 10,
-        background: C.surface, borderBottom: `0.5px solid ${C.border}`,
-        display: 'flex', alignItems: 'center', padding: '10px 16px', gap: 10,
+        background: C.surface, borderBottom: `1px solid ${C.border}`,
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+        display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 10,
       }}
     >
       {onBack && (
         <IconButton icon="ti-arrow-left" label="Regresar" onClick={onBack} />
       )}
-      <span style={{ fontSize: 16, fontWeight: 500, flex: 1, color: C.text }}>
+      <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.3px', flex: 1, color: C.text }}>
         {title}
       </span>
       {actions && (
@@ -70,13 +71,15 @@ export function BottomNav() {
 
   return (
     <nav
+      className="bottom-nav"
       aria-label="Navegación principal"
       style={{
         position: 'fixed', bottom: 0, left: '50%',
         transform: 'translateX(-50%)',
         width: '100%', maxWidth: 520,
         background: C.surface,
-        borderTop: `0.5px solid ${C.border}`,
+        borderTop: `1px solid ${C.border}`,
+        boxShadow: '0 -2px 12px rgba(15, 23, 42, 0.06)',
         display: 'flex', alignItems: 'center',
         padding: '6px 0 calc(6px + env(safe-area-inset-bottom))',
         zIndex: 10,
@@ -101,7 +104,7 @@ export function BottomNav() {
             {item.fab ? (
               <div style={{
                 width: 46, height: 46, borderRadius: '50%',
-                background: C.teal, display: 'flex', alignItems: 'center',
+                background: C.primary, display: 'flex', alignItems: 'center',
                 justifyContent: 'center', marginBottom: -2, marginTop: -12,
                 boxShadow: '0 2px 8px rgba(15,118,110,0.30)',
               }}>
@@ -117,6 +120,114 @@ export function BottomNav() {
         )
       })}
     </nav>
+  )
+}
+
+// ─── Sidebar (tablet / desktop) ────────────────────────────────────────────────
+// Persistent left rail shown ≥900px (hidden on phones, where BottomNav takes over).
+// Reuses the same NAV_ITEMS + store state so navigation stays in sync across both.
+
+export function SideNav() {
+  const { view, setView, surveys, openWizard, userRole, user, theme, toggleTheme } = useStore()
+  const isInvestigador = userRole === 'investigador'
+
+  const items = NAV_ITEMS.filter(item => item.id !== 'nueva')
+
+  return (
+    <aside className="app-sidebar" aria-label="Navegación principal">
+      {/* Brand header */}
+      <div style={{
+        padding: '20px 18px 16px', borderBottom: `1px solid ${C.border}`,
+        display: 'flex', alignItems: 'center', gap: 11,
+      }}>
+        <div style={{
+          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+          background: C.gradBrand, boxShadow: C.shadowBrand,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <i className="ti ti-vaccine-bottle" style={{ fontSize: 20, color: '#fff' }} aria-hidden />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.4px', color: C.text, lineHeight: 1.1 }}>MEDD</div>
+          <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.2 }}>Medicamentos no utilizados</div>
+        </div>
+      </div>
+
+      {/* Primary CTA (encuestadores collect data) */}
+      {!isInvestigador && (
+        <div style={{ padding: '14px 14px 6px' }}>
+          <button
+            onClick={() => openWizard(surveys.length)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '11px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: C.primary, color: '#fff', fontSize: 14, fontWeight: 600,
+              boxShadow: C.shadowBrand,
+            }}
+          >
+            <i className="ti ti-plus" style={{ fontSize: 18 }} aria-hidden />
+            Nueva encuesta
+          </button>
+        </div>
+      )}
+
+      {/* Nav items */}
+      <nav style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+        {items.map(item => {
+          const active = view === item.id
+          return (
+            <button
+              key={item.id}
+              aria-current={active ? 'page' : undefined}
+              onClick={() => setView(item.id as AppView)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                background: active ? C.tealLight : 'transparent',
+                color: active ? C.teal : C.muted,
+                fontSize: 14, fontWeight: active ? 600 : 500, textAlign: 'left',
+                transition: 'background 0.12s, color 0.12s',
+              }}
+            >
+              <i className={`ti ${item.icon}`} style={{ fontSize: 20, flexShrink: 0 }} aria-hidden />
+              {item.label}
+            </button>
+          )
+        })}
+      </nav>
+
+      {/* Footer: theme toggle + session */}
+      <div style={{ padding: '12px 14px', borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <button
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+            borderRadius: 10, border: `1px solid ${C.border}`, background: C.surface2,
+            color: C.muted, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+          }}
+        >
+          <i className={`ti ${theme === 'dark' ? 'ti-sun' : 'ti-moon'}`} style={{ fontSize: 17 }} aria-hidden />
+          {theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
+        </button>
+        {user?.email && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 2px', minWidth: 0 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+              background: C.tealLight, color: C.teal,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
+            }}>
+              {user.email[0]}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: C.text, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
+              <div style={{ fontSize: 11, color: C.muted }}>{isInvestigador ? 'Investigador' : 'Encuestador'}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </aside>
   )
 }
 

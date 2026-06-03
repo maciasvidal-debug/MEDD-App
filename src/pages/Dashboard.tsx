@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, Tooltip,
 } from 'recharts'
 import { TopBar } from '../components/layout'
-import { StatCard, Card, Button, EmptyState, C } from '../components/ui'
+import { StatCard, Card, Button, EmptyState, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
 import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, quantile, productMetrics, type Proportion, type RiskRatio, type ChiSquare, type TrendTest } from '../lib/utils'
 import { OPT } from '../lib/constants'
@@ -33,10 +33,10 @@ const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; l
       <PieChart width={72} height={72}>
         <Pie data={data} cx={36} cy={36} innerRadius={22} outerRadius={34} dataKey="v" stroke="none">
           <Cell fill={color} />
-          <Cell fill="#E2E8F0" />
+          <Cell fill={CHART.track} />
         </Pie>
       </PieChart>
-      <span style={{ fontSize: 16, fontWeight: 500, color }}>{pct(val, outOf)}%</span>
+      <span className="tnum" style={{ fontSize: 18, fontWeight: 700, color }}>{pct(val, outOf)}%</span>
       <span style={{ fontSize: 11, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
       <span style={{ fontSize: 11, color: C.hint }}>{val}/{outOf}</span>
     </div>
@@ -147,7 +147,7 @@ export default function DashboardPage() {
         <p style={{ fontSize: 11, color: C.hint, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
           Indicadores clave · {n} encuesta{n !== 1 ? 's' : ''}
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div className="kpi-grid" style={{ marginBottom: 16 }}>
           <StatCard icon="ti-users"          label="Total encuestados"    value={n}                                  color={C.navy} />
           <StatCard icon="ti-pill"           label="Productos registrados" value={totalMeds}                          color={C.teal} />
           <StatCard icon="ti-package"        label="Unidades sin consumir" value={unidTotal}                          color={C.teal} />
@@ -160,9 +160,9 @@ export default function DashboardPage() {
         <Card style={{ marginBottom: 14 }}>
           <SectionLabel>Variables clave de resultado</SectionLabel>
           <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-            <MiniDonut val={nSob}  outOf={n}    label="Med. sin consumir"   color={C.navy} />
-            <MiniDonut val={nVenc} outOf={n}    label="Vencidos conf."      color={C.amber} />
-            <MiniDonut val={nDisp} outOf={nSob} label="Conoce disposición*" color={C.teal} />
+            <MiniDonut val={nSob}  outOf={n}    label="Med. sin consumir"   color={CHART.navy} />
+            <MiniDonut val={nVenc} outOf={n}    label="Vencidos conf."      color={CHART.amber} />
+            <MiniDonut val={nDisp} outOf={nSob} label="Conoce disposición*" color={CHART.teal} />
           </div>
           <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, textAlign: 'center', lineHeight: 1.5 }}>
             «Med. sin consumir» y «Vencidos conf.» sobre el total ({n} hogares).
@@ -185,17 +185,19 @@ export default function DashboardPage() {
         {/* Tiempo de retención de vencidos */}
         {retention && <RetentionCard s={retention} />}
 
+        {/* Distribuciones — 2 columnas en pantallas anchas para aprovechar el espacio */}
+        <div className="chart-grid">
         {/* Hotspots geográficos: CIUDAD x CANT_MED_VTO */}
         {ciudadVenc.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Hotspots geográficos — Unidades vencidas por ciudad</SectionLabel>
             <div style={{ height: Math.max(80, ciudadVenc.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={ciudadVenc} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={85} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="value" fill={C.amber} radius={[0, 3, 3, 0]} name="Unidades vencidas" />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={85} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="value" fill={CHART.amber} radius={[0, 3, 3, 0]} name="Unidades vencidas" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -204,15 +206,15 @@ export default function DashboardPage() {
 
         {/* ESTRATO distribution */}
         {barEstrato.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por estrato socioeconómico</SectionLabel>
             <div style={{ height: Math.max(80, barEstrato.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barEstrato} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.navy} radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={75} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.navy} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -221,15 +223,15 @@ export default function DashboardPage() {
 
         {/* AS_SALUD */}
         {barAsSalud.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por régimen de salud</SectionLabel>
             <div style={{ height: Math.max(80, barAsSalud.length * 30) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barAsSalud} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.teal} radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={90} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.teal} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -238,15 +240,15 @@ export default function DashboardPage() {
 
         {/* NV_ESTU */}
         {barNvEstu.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por nivel educativo</SectionLabel>
             <div style={{ height: Math.max(80, barNvEstu.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barNvEstu} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill="#7030A0" radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={75} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.purple} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -255,15 +257,15 @@ export default function DashboardPage() {
 
         {/* NV_POSG */}
         {barNvPosg.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por nivel de posgrado</SectionLabel>
             <div style={{ height: Math.max(80, barNvPosg.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barNvPosg} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={95} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill="#9B59B6" radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={95} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.violet} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -272,20 +274,21 @@ export default function DashboardPage() {
 
         {/* Etnia */}
         {barEtnia.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por pertenencia étnica</SectionLabel>
             <div style={{ height: Math.max(80, barEtnia.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barEtnia} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.gray} radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={120} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.gray} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
         )}
+        </div>
       </div>
     </div>
   )

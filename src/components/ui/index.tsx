@@ -2,26 +2,52 @@ import React, { useEffect, useId, useRef, type ButtonHTMLAttributes } from 'reac
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
+// Tokens resolve to CSS custom properties (see global.css) so a single
+// :root / [data-theme="dark"] switch re-themes the whole app — components keep
+// referencing C.* unchanged. NOTE: these var() strings work in inline styles on
+// HTML elements; SVG chart props (Recharts `fill`/`stroke`) can't resolve var(),
+// so charts use the literal CHART palette below instead.
 export const C = {
-  navy:       '#1E3A5F',
-  navyLight:  '#EFF6FF',
-  teal:       '#0F766E',
-  tealLight:  '#CCFBF1',
-  tealMid:    '#14B8A6',
-  amber:      '#B45309',
-  amberLight: '#FEF3C7',
-  red:        '#B91C1C',
-  redLight:   '#FEE2E2',
-  green:      '#166534',
-  greenLight: '#DCFCE7',
-  gray:       '#475569',
-  grayLight:  '#F1F5F9',
-  border:     '#E2E8F0',
-  text:       '#0F172A',
-  muted:      '#64748B',
-  hint:       '#5C6B7A',
-  surface:    '#FFFFFF',
-  bg:         '#F8FAFC',
+  navy:       'var(--c-navy)',
+  navyLight:  'var(--c-navy-light)',
+  primary:    'var(--c-primary)',
+  teal:       'var(--c-teal)',
+  tealLight:  'var(--c-teal-light)',
+  tealMid:    'var(--c-teal-mid)',
+  amber:      'var(--c-amber)',
+  amberLight: 'var(--c-amber-light)',
+  red:        'var(--c-red)',
+  redLight:   'var(--c-red-light)',
+  green:      'var(--c-green)',
+  greenLight: 'var(--c-green-light)',
+  gray:       'var(--c-gray)',
+  grayLight:  'var(--c-gray-light)',
+  border:     'var(--c-border)',
+  text:       'var(--c-text)',
+  muted:      'var(--c-muted)',
+  hint:       'var(--c-hint)',
+  surface:    'var(--c-surface)',
+  surface2:   'var(--c-surface-2)',
+  bg:         'var(--c-bg)',
+  shadowSm:    'var(--shadow-sm)',
+  shadowMd:    'var(--shadow-md)',
+  shadowLg:    'var(--shadow-lg)',
+  shadowBrand: 'var(--shadow-brand)',
+  gradBrand:   'var(--grad-brand)',
+}
+
+// Literal palette for Recharts (SVG fills can't use CSS variables). Chosen to
+// read well on both light and dark card surfaces.
+export const CHART = {
+  teal:   '#14B8A6',
+  navy:   '#3B82F6',
+  amber:  '#F59E0B',
+  red:    '#EF4444',
+  gray:   '#64748B',
+  purple: '#8B5CF6',
+  violet: '#A855F7',
+  track:  'rgba(148, 163, 184, 0.22)',
+  axis:   '#94A3B8',
 }
 
 // ─── Label ────────────────────────────────────────────────────────────────────
@@ -90,10 +116,10 @@ interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const btnStyles: Record<BtnVariant, React.CSSProperties> = {
-  primary:   { background: C.teal,  color: '#fff', border: 'none' },
-  secondary: { background: '#fff',  color: C.text, border: `0.5px solid ${C.border}` },
-  ghost:     { background: 'transparent', color: C.text, border: `0.5px solid ${C.border}` },
-  danger:    { background: C.red,   color: '#fff', border: 'none' },
+  primary:   { background: C.primary, color: '#fff', border: 'none', boxShadow: C.shadowSm },
+  secondary: { background: C.surface, color: C.text, border: `1px solid ${C.border}` },
+  ghost:     { background: 'transparent', color: C.text, border: `1px solid ${C.border}` },
+  danger:    { background: 'var(--c-danger)', color: '#fff', border: 'none' },
 }
 const btnSizes: Record<'sm' | 'md' | 'lg', React.CSSProperties> = {
   sm: { padding: '7px 12px', fontSize: 13 },
@@ -259,8 +285,10 @@ export function Card({ children, style = {}, as: Tag = 'div' }: Omit<CardProps, 
   return (
     <Tag
       style={{
-        background: C.surface, border: `0.5px solid ${C.border}`,
-        borderRadius: 12, padding: '1rem 1.25rem', ...style,
+        background: C.surface, border: `1px solid ${C.border}`,
+        borderRadius: 14, padding: '1rem 1.25rem',
+        boxShadow: C.shadowSm,
+        ...style,
       }}
     >
       {children}
@@ -395,11 +423,11 @@ export function SectionHead({ icon, label }: SectionHeadProps) {
 
 type BadgeVariant = 'teal' | 'amber' | 'red' | 'green' | 'gray'
 const badgeColors: Record<BadgeVariant, { bg: string; color: string }> = {
-  teal:  { bg: '#CCFBF1', color: '#0F766E' },
-  amber: { bg: '#FEF3C7', color: '#B45309' },
-  red:   { bg: '#FEE2E2', color: '#B91C1C' },
-  green: { bg: '#DCFCE7', color: '#166534' },
-  gray:  { bg: '#F1F5F9', color: '#475569' },
+  teal:  { bg: C.tealLight,  color: C.teal },
+  amber: { bg: C.amberLight, color: C.amber },
+  red:   { bg: C.redLight,   color: C.red },
+  green: { bg: C.greenLight, color: C.green },
+  gray:  { bg: C.grayLight,  color: C.gray },
 }
 export function Badge({ label, variant = 'gray' }: { label: string; variant?: BadgeVariant }) {
   const { bg, color } = badgeColors[variant]
@@ -421,18 +449,53 @@ interface StatCardProps {
 }
 export function StatCard({ icon, label, value, sub, color = C.teal }: StatCardProps) {
   return (
-    <div style={{ background: C.bg, borderRadius: 8, padding: '14px 12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <i className={`ti ${icon}`} style={{ fontSize: 15, color }} aria-hidden />
+    <div style={{
+      background: C.surface, border: `1px solid ${C.border}`,
+      borderRadius: 12, padding: '14px 14px', boxShadow: C.shadowSm,
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          background: `color-mix(in srgb, ${color} 14%, transparent)`,
+        }}>
+          <i className={`ti ${icon}`} style={{ fontSize: 15, color }} aria-hidden />
+        </span>
         <span style={{
           fontSize: 11, color: C.muted, textTransform: 'uppercase',
-          letterSpacing: '0.5px', lineHeight: 1.2,
+          letterSpacing: '0.5px', lineHeight: 1.2, fontWeight: 600,
         }}>
           {label}
         </span>
       </div>
-      <div style={{ fontSize: 28, fontWeight: 500, color, lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{sub}</div>}
+      <div className="tnum" style={{ fontSize: 30, fontWeight: 700, color, lineHeight: 1, letterSpacing: '-0.5px' }}>{value}</div>
+      {sub && <div className="tnum" style={{ fontSize: 12, color: C.muted, marginTop: -2 }}>{sub}</div>}
+    </div>
+  )
+}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+export function Skeleton({ height = 16, width = '100%', radius = 8, style }: {
+  height?: number | string; width?: number | string; radius?: number; style?: React.CSSProperties
+}) {
+  return <div className="skeleton" style={{ height, width, borderRadius: radius, ...style }} aria-hidden />
+}
+
+// Full-page skeleton shown while surveys load (replaces the bare spinner →
+// perceived performance, Doherty threshold).
+export function PageSkeleton() {
+  return (
+    <div className="page-content" aria-busy="true" aria-label="Cargando…">
+      <Skeleton height={28} width="55%" style={{ marginBottom: 20 }} />
+      <div className="kpi-grid" style={{ marginBottom: 18 }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} height={92} radius={12} />
+        ))}
+      </div>
+      <Skeleton height={180} radius={14} style={{ marginBottom: 14 }} />
+      <Skeleton height={140} radius={14} />
     </div>
   )
 }
