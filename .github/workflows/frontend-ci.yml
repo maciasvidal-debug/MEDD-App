@@ -38,6 +38,8 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Test
+        run: npm test
       # Type-checks (tsc -b) and bundles (vite build). Vite does not execute app
       # modules at build time, so no Supabase secrets are required here.
       - name: Build
