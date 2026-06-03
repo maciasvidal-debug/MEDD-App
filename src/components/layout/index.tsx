@@ -51,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'nueva',      icon: 'ti-plus',             label: 'Nueva', fab: true },
   { id: 'buscar',     icon: 'ti-search',           label: 'CUM' },
   { id: 'exportar',   icon: 'ti-download',         label: 'Exportar' },
+  { id: 'ajustes',    icon: 'ti-settings',         label: 'Ajustes' },
 ]
 
 export function BottomNav() {
