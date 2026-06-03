@@ -52,7 +52,7 @@
   --r-pill:9999px;
 
   /* Typography */
-  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --font: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
   --fs-xs:  11px;
   --fs-sm:  13px;
   --fs-base:15px;
@@ -66,6 +66,12 @@
   --sp-md: 12px;
   --sp-lg: 16px;
   --sp-xl: 24px;
+
+  /* Density-driven spacing (overridden by [data-density="compact"]) */
+  --card-pad:    16px 20px;
+  --content-pad: 16px;
+  --content-pad-lg: 24px;
+  --grid-gap:    12px;
 
   /* Layout */
   --shell-max:   520px;   /* phone column cap */
@@ -112,6 +118,15 @@
   --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.55);
   --shadow-brand: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Compact density: tighter padding/gaps for data-dense work (e.g. an
+   investigator scanning many records). Affects spacing only, not type size. ── */
+[data-density="compact"] {
+  --card-pad:    11px 13px;
+  --content-pad: 12px;
+  --content-pad-lg: 16px;
+  --grid-gap:    9px;
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────────── */
@@ -211,7 +226,7 @@ button:not(:disabled):active { transform: scale(0.98); }
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: var(--sp-lg) var(--sp-lg) 96px;
+  padding: var(--content-pad) var(--content-pad) 96px;
 }
 
 /* Sidebar is desktop-only */
@@ -223,7 +238,7 @@ button:not(:disabled):active { transform: scale(0.98); }
     margin: 0;
   }
   .page-content {
-    padding: var(--sp-xl) var(--sp-xl) var(--sp-xl);
+    padding: var(--content-pad-lg) var(--content-pad-lg) var(--content-pad-lg);
   }
   /* Centre the actual content within the wide column for comfortable measure */
   .page-content > .content-wrap,
@@ -257,10 +272,10 @@ button:not(:disabled):active { transform: scale(0.98); }
 .records-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: var(--grid-gap);
 }
 @media (min-width: 720px) {
-  .records-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .records-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (min-width: 1100px) {
   .records-grid { grid-template-columns: repeat(3, 1fr); }
@@ -269,12 +284,12 @@ button:not(:disabled):active { transform: scale(0.98); }
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: var(--grid-gap);
 }
 .chart-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
+  gap: var(--grid-gap);
 }
 @media (min-width: 640px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }

@@ -21,6 +21,8 @@
           var t = localStorage.getItem('medd_theme');
           if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           document.documentElement.setAttribute('data-theme', t);
+          var d = localStorage.getItem('medd_density') === 'compact' ? 'compact' : 'comfortable';
+          document.documentElement.setAttribute('data-density', d);
         } catch (e) {}
       })();
     </script>

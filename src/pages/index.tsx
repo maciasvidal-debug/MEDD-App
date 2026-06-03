@@ -425,7 +425,7 @@ export function ExportarPage() {
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────
 
 export function AjustesPage() {
-  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, theme, toggleTheme } = useStore()
+  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, theme, toggleTheme, density, setDensity } = useStore()
   const [form, setForm] = useState(settings)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -498,6 +498,49 @@ export function AjustesPage() {
                 boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left 0.18s',
               }} />
             </button>
+          </div>
+        </Card>
+
+        <Card style={{ background: C.surface, marginTop: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <i className="ti ti-layout-distribute-vertical" style={{ fontSize: 19, color: C.teal }} aria-hidden />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Densidad</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Espaciado de tarjetas y listas.</div>
+            </div>
+          </div>
+          <div role="radiogroup" aria-label="Densidad de la interfaz" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {([
+              { id: 'comfortable', label: 'Cómoda', icon: 'ti-baseline-density-medium' },
+              { id: 'compact',     label: 'Compacta', icon: 'ti-baseline-density-small' },
+            ] as const).map(o => {
+              const active = density === o.id
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setDensity(o.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '11px 0', borderRadius: 8, cursor: 'pointer',
+                    border: active ? `1.5px solid ${C.teal}` : `1px solid ${C.border}`,
+                    background: active ? C.tealLight : C.surface,
+                    color: active ? C.teal : C.text,
+                    fontSize: 14, fontWeight: active ? 600 : 400,
+                  }}
+                >
+                  <i className={`ti ${o.icon}`} style={{ fontSize: 18 }} aria-hidden />
+                  {o.label}
+                </button>
+              )
+            })}
           </div>
         </Card>
 

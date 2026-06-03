@@ -15,6 +15,7 @@ import { EMPTY_DRAFT, DEFAULT_SETTINGS } from '../lib/constants'
 // ─── Toast ────────────────────────────────────────────────────────────────
 
 export type Theme = 'light' | 'dark'
+export type Density = 'comfortable' | 'compact'
 
 const THEME_KEY = 'medd_theme'
 function readTheme(): Theme {
@@ -29,6 +30,16 @@ function applyTheme(theme: Theme) {
   // Keep the mobile browser chrome in sync with the active surface.
   const meta = document.querySelector('meta[name="theme-color"]')
   if (meta) meta.setAttribute('content', theme === 'dark' ? '#0B1220' : '#0F766E')
+}
+
+const DENSITY_KEY = 'medd_density'
+function readDensity(): Density {
+  if (typeof window === 'undefined') return 'comfortable'
+  return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'comfortable'
+}
+function applyDensity(density: Density) {
+  document.documentElement.setAttribute('data-density', density)
+  localStorage.setItem(DENSITY_KEY, density)
 }
 
 export type ToastLevel = 'success' | 'error' | 'info'
@@ -87,6 +98,10 @@ interface AppStore {
   // Theme (light/dark)
   theme: Theme
   toggleTheme: () => void
+
+  // Density (comfortable/compact)
+  density: Density
+  setDensity: (d: Density) => void
 }
 
 // Track which account owns the local data so we can wipe device-local stores
@@ -376,5 +391,12 @@ export const useStore = create<AppStore>((set, get) => ({
     const next: Theme = get().theme === 'dark' ? 'light' : 'dark'
     applyTheme(next)
     set({ theme: next })
+  },
+
+  // ── Density ───────────────────────────────────────────────────────────
+  density: readDensity(),
+  setDensity(density) {
+    applyDensity(density)
+    set({ density })
   },
 }))

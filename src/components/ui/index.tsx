@@ -286,7 +286,7 @@ export function Card({ children, style = {}, as: Tag = 'div' }: Omit<CardProps, 
     <Tag
       style={{
         background: C.surface, border: `1px solid ${C.border}`,
-        borderRadius: 14, padding: '1rem 1.25rem',
+        borderRadius: 14, padding: 'var(--card-pad)',
         boxShadow: C.shadowSm,
         ...style,
       }}
