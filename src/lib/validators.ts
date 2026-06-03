@@ -15,7 +15,10 @@ export const step1Schema = z.object({
 })
 
 // ─── Step 2 — Demografía ─────────────────────────────────────────────────
-export const step2Schema = z.object({
+// Cross-field rule: NV_POSG (nivel de posgrado) sólo aplica — y es obligatorio —
+// cuando NV_ESTU = 'Posgrado'. Mantenemos el objeto base separado del esquema
+// refinado para poder reusarlo en `.merge()` (refine devuelve un ZodEffects).
+const step2Object = z.object({
   fNac:    z.string().min(1, 'La fecha de nacimiento es obligatoria')
             .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD inválido'),
   ciudad:  optStr,
@@ -26,8 +29,16 @@ export const step2Schema = z.object({
   estLab:  z.string().min(1, 'Seleccione el estado laboral'),
   ingreso: z.string().min(1, 'Seleccione el rango de ingresos'),
   nvEstu:  z.string().min(1, 'Seleccione el nivel de estudios'),
-  nvPosg:  optStr,   // Posgrado: opcional (solo aplica a quienes culminaron estudios superiores)
+  nvPosg:  optStr,
 })
+
+const nvPosgRefine = (data: { nvEstu: string; nvPosg: string }, ctx: z.RefinementCtx) => {
+  if (data.nvEstu === 'Posgrado' && !data.nvPosg) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['nvPosg'], message: 'Seleccione el nivel de posgrado' })
+  }
+}
+
+export const step2Schema = step2Object.superRefine(nvPosgRefine)
 
 // ─── Step 3 — Salud ───────────────────────────────────────────────────────
 export const step3Schema = z.object({
@@ -63,7 +74,8 @@ export type Step4Data = z.infer<typeof step4Schema>
 
 // ─── Full survey validation ───────────────────────────────────────────────
 export const surveySchema = step1Schema
-  .merge(step2Schema)
+  .merge(step2Object)
   .merge(step3Schema)
   .merge(step4Schema)
   .extend({ obs: optStr })
+  .superRefine(nvPosgRefine)

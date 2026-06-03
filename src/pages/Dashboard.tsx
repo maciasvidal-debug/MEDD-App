@@ -256,7 +256,7 @@ export default function DashboardPage() {
         {/* NV_POSG */}
         {barNvPosg.length > 0 && (
           <Card style={{ marginBottom: 14 }}>
-            <SectionLabel>Distribución por formación posgrado</SectionLabel>
+            <SectionLabel>Distribución por nivel de posgrado</SectionLabel>
             <div style={{ height: Math.max(80, barNvPosg.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barNvPosg} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>

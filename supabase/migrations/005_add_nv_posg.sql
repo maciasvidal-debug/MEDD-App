@@ -1,8 +1,8 @@
 -- =====================================================================
 -- MEDD-App — Migración incremental
--- Añade NV_POSG (nivel de formación posgrado) a las variables
--- sociodemográficas. Complementa a NV_ESTU (que llega hasta
--- 'Profesional') para discriminar la formación de posgrado.
+-- Añade NV_POSG: sub-nivel de posgrado (Especialización, Maestría,
+-- Doctorado) que detalla la opción 'Posgrado' de NV_ESTU. Sólo lleva
+-- valor cuando NV_ESTU = 'Posgrado'.
 -- Idempotente: seguro de re-ejecutar sobre despliegues existentes.
 -- =====================================================================
 
