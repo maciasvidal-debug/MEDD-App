@@ -231,6 +231,7 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
       estLab:  draft.estLab,
       ingreso: draft.ingreso,
       nvEstu:  draft.nvEstu,
+      nvPosg:  draft.nvPosg,
     },
   })
 
@@ -322,6 +323,13 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
         <Controller name="nvEstu" control={control}
           render={({ field }) => (
             <ChipGroup options={OPT.nvEstu} value={field.value} onChange={field.onChange} />
+          )} />
+      </Field>
+
+      <Field label="Nivel de formación posgrado" error={errors.nvPosg?.message}>
+        <Controller name="nvPosg" control={control}
+          render={({ field }) => (
+            <ChipGroup options={OPT.nvPosg} value={field.value ?? ''} onChange={field.onChange} />
           )} />
       </Field>
 
@@ -836,6 +844,7 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
         <Row label="Ocupación"                value={draft.estLab} />
         <Row label="Ingresos mensuales"       value={draft.ingreso} />
         <Row label="Nivel educativo"          value={draft.nvEstu} />
+        {draft.nvPosg && <Row label="Formación posgrado" value={draft.nvPosg} />}
       </Card>
 
       {/* Salud */}

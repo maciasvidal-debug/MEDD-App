@@ -313,7 +313,7 @@ export function groupSum(
 const CSV_COLUMNS: (keyof Survey)[] = [
   'id', 'fEta', 'nui', 'nuiEtr', 'fNac',
   'ciudad', 'dir', 'estrato',
-  'etnia', 'asSalud', 'estLab', 'ingreso', 'nvEstu',
+  'etnia', 'asSalud', 'estLab', 'ingreso', 'nvEstu', 'nvPosg',
   'perSalud', 'estSalud', 'prbSalud', 'conMed', 'medPrc',
   'fPrc', 'fDisp', 'indMed',
   'medSob', 'dispMedVc', 'ctoDispVc', 'vtoMedNc',

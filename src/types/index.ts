@@ -9,6 +9,7 @@ export type AsSalud   = 'Contributivo' | 'Subsidiado' | 'Especial' | 'No afiliad
 export type EstLab    = 'Empleado' | 'Independiente' | 'Hogar' | 'Pensionado' | 'Estudiante' | ''
 export type Ingreso   = '< 1 SMMLV' | '1-3 SMMLV' | '> 4 SMMLV' | 'No responde' | ''
 export type NvEstu    = 'Ninguno' | 'Primaria' | 'Secundaria' | 'Bachiller' | 'Técnico' | 'Profesional' | ''
+export type NvPosg    = 'Ninguno' | 'Especialización' | 'Maestría' | 'Doctorado' | ''
 export type PercSalud = 'Buena' | 'Regular' | 'Mala' | ''
 export type UnidadConc = 'mcg' | 'mg' | 'g' | 'UI' | '%' | ''
 
@@ -44,6 +45,7 @@ export interface Survey {
   estLab:  EstLab        // EST_LAB
   ingreso: Ingreso       // INGRESO
   nvEstu:  NvEstu        // NV_ESTU
+  nvPosg:  NvPosg        // NV_POSG  : Nivel de formación posgrado (req. opcional)
 
   // Estado de salud (cadena condicional)
   perSalud:  PercSalud  // PER_SALUD

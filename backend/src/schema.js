@@ -13,6 +13,7 @@ const ENUMS = {
     est_lab: ['Empleado', 'Independiente', 'Hogar', 'Pensionado', 'Estudiante'],
     ingreso: ['< 1 SMMLV', '1-3 SMMLV', '> 4 SMMLV', 'No responde'],
     nv_estu: ['Ninguno', 'Primaria', 'Secundaria', 'Bachiller', 'Técnico', 'Profesional'],
+    nv_posg: ['Ninguno', 'Especialización', 'Maestría', 'Doctorado'],
     per_salud: ['Buena', 'Regular', 'Mala'],
     und_conc: ['mcg', 'mg', 'g', 'UI', '%'],
 };
@@ -95,6 +96,7 @@ function validateSocioDemographic(body, v, errors) {
     v.est_lab   = enumOrNull('EST_LAB',   body.est_lab,   ENUMS.est_lab,   errors);
     v.ingreso   = enumOrNull('INGRESO',   body.ingreso,   ENUMS.ingreso,   errors);
     v.nv_estu   = enumOrNull('NV_ESTU',   body.nv_estu,   ENUMS.nv_estu,   errors);
+    v.nv_posg   = enumOrNull('NV_POSG',   body.nv_posg,   ENUMS.nv_posg,   errors);
     v.per_salud = enumOrNull('PER_SALUD', body.per_salud, ENUMS.per_salud, errors);
 }
 

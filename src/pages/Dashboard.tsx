@@ -50,13 +50,14 @@ export default function DashboardPage() {
 
   const {
     nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
-    barAsSalud, barNvEstu, barEtnia, barEstrato, ciudadVenc
+    barAsSalud, barNvEstu, barNvPosg, barEtnia, barEstrato, ciudadVenc
   } = useMemo(() => {
     let nSob = 0, nVenc = 0, nDisp = 0
     let pesoTotal = 0, unidTotal = 0, vencTotal = 0, totalMeds = 0
 
     const asSaludCounts: Record<string, number> = {}
     const nvEstuCounts: Record<string, number> = {}
+    const nvPosgCounts: Record<string, number> = {}
     const etniaCounts: Record<string, number> = {}
     const estratoCounts: Record<number, number> = {}
     const ciudadVencMap = new Map<string, number>()
@@ -74,6 +75,7 @@ export default function DashboardPage() {
 
       if (s.asSalud) asSaludCounts[s.asSalud] = (asSaludCounts[s.asSalud] || 0) + 1
       if (s.nvEstu) nvEstuCounts[s.nvEstu] = (nvEstuCounts[s.nvEstu] || 0) + 1
+      if (s.nvPosg) nvPosgCounts[s.nvPosg] = (nvPosgCounts[s.nvPosg] || 0) + 1
       if (s.etnia) etniaCounts[s.etnia] = (etniaCounts[s.etnia] || 0) + 1
       if (s.estrato !== null && s.estrato !== undefined) estratoCounts[s.estrato] = (estratoCounts[s.estrato] || 0) + 1
 
@@ -83,6 +85,7 @@ export default function DashboardPage() {
 
     const barAsSalud = OPT.asSalud.map(v => ({ name: v, n: asSaludCounts[v] || 0 })).filter(d => d.n > 0)
     const barNvEstu  = OPT.nvEstu.map(v => ({ name: v, n: nvEstuCounts[v] || 0 })).filter(d => d.n > 0)
+    const barNvPosg  = OPT.nvPosg.map(v => ({ name: v, n: nvPosgCounts[v] || 0 })).filter(d => d.n > 0)
     const barEtnia   = OPT.etnia.map(v => ({ name: v, n: etniaCounts[v] || 0 })).filter(d => d.n > 0)
     const barEstrato = OPT.estrato.map(e => ({ name: `Estrato ${e}`, n: estratoCounts[e] || 0 })).filter(d => d.n > 0)
 
@@ -94,7 +97,7 @@ export default function DashboardPage() {
 
     return {
       nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
-      barAsSalud, barNvEstu, barEtnia, barEstrato, ciudadVenc
+      barAsSalud, barNvEstu, barNvPosg, barEtnia, barEstrato, ciudadVenc
     }
   }, [surveys])
 
@@ -244,6 +247,23 @@ export default function DashboardPage() {
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
                   <Tooltip content={<CustomTip />} />
                   <Bar dataKey="n" fill="#7030A0" radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        )}
+
+        {/* NV_POSG */}
+        {barNvPosg.length > 0 && (
+          <Card style={{ marginBottom: 14 }}>
+            <SectionLabel>Distribución por formación posgrado</SectionLabel>
+            <div style={{ height: Math.max(80, barNvPosg.length * 28) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barNvPosg} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={95} />
+                  <Tooltip content={<CustomTip />} />
+                  <Bar dataKey="n" fill="#9B59B6" radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

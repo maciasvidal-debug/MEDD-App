@@ -26,6 +26,7 @@ export const step2Schema = z.object({
   estLab:  z.string().min(1, 'Seleccione el estado laboral'),
   ingreso: z.string().min(1, 'Seleccione el rango de ingresos'),
   nvEstu:  z.string().min(1, 'Seleccione el nivel de estudios'),
+  nvPosg:  optStr,   // Posgrado: opcional (solo aplica a quienes culminaron estudios superiores)
 })
 
 // ─── Step 3 — Salud ───────────────────────────────────────────────────────
