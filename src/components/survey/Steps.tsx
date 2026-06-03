@@ -219,7 +219,7 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
 // ─── Step 2 — Demografía ─────────────────────────────────────────────────
 
 export function Step2({ draft, onNext, onBack }: StepProps) {
-  const { control, register, handleSubmit, watch, formState: { errors } } = useForm<Step2Data>({
+  const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm<Step2Data>({
     resolver: zodResolver(step2Schema),
     defaultValues: {
       fNac:    draft.fNac,
@@ -231,11 +231,13 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
       estLab:  draft.estLab,
       ingreso: draft.ingreso,
       nvEstu:  draft.nvEstu,
+      nvPosg:  draft.nvPosg,
     },
   })
 
-  const fNac  = watch('fNac')
-  const edad  = calcEdad(draft.fEta, fNac)
+  const fNac   = watch('fNac')
+  const nvEstu = watch('nvEstu')
+  const edad   = calcEdad(draft.fEta, fNac)
 
   return (
     <form onSubmit={handleSubmit(data => onNext(data as Partial<SurveyDraft>))} noValidate>
@@ -321,9 +323,23 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
       <Field label="Nivel educativo" required error={errors.nvEstu?.message}>
         <Controller name="nvEstu" control={control}
           render={({ field }) => (
-            <ChipGroup options={OPT.nvEstu} value={field.value} onChange={field.onChange} />
+            <ChipGroup options={OPT.nvEstu} value={field.value}
+              onChange={val => {
+                field.onChange(val)
+                // Limpia el sub-nivel si deja de ser Posgrado (compuerta determinista).
+                if (val !== 'Posgrado') setValue('nvPosg', '')
+              }} />
           )} />
       </Field>
+
+      {nvEstu === 'Posgrado' && (
+        <Field label="Nivel de posgrado" required error={errors.nvPosg?.message}>
+          <Controller name="nvPosg" control={control}
+            render={({ field }) => (
+              <ChipGroup options={OPT.nvPosg} value={field.value ?? ''} onChange={field.onChange} />
+            )} />
+        </Field>
+      )}
 
       <WizardNavBar onBack={onBack} />
     </form>
@@ -836,6 +852,7 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
         <Row label="Ocupación"                value={draft.estLab} />
         <Row label="Ingresos mensuales"       value={draft.ingreso} />
         <Row label="Nivel educativo"          value={draft.nvEstu} />
+        {draft.nvPosg && <Row label="Nivel de posgrado" value={draft.nvPosg} />}
       </Card>
 
       {/* Salud */}
