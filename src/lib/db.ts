@@ -65,7 +65,9 @@ async function getDB(): Promise<IDBPDatabase<MEDDSchema>> {
 export async function getAllSurveys(): Promise<Survey[]> {
   const db  = await getDB()
   const all = await db.getAll('surveys')
-  return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  // Guard against rows with a missing createdAt (e.g. a malformed remote row):
+  // calling .localeCompare on undefined would throw and break the whole load.
+  return all.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
 }
 
 export async function getSurvey(id: string): Promise<Survey | undefined> {
@@ -93,6 +95,19 @@ export async function deleteSurvey(id: string): Promise<void> {
 export async function clearAllSurveys(): Promise<void> {
   const db = await getDB()
   await db.clear('surveys')
+}
+
+// Wipe every user-scoped local store. Surveys/settings/drafts are not keyed by
+// user, so when a different account signs in on the same device we must clear
+// them — otherwise an investigator's pulled global dataset (or another
+// encuestador's drafts) bleeds into the next session.
+export async function clearLocalUserData(): Promise<void> {
+  const db = await getDB()
+  await Promise.all([
+    db.clear('surveys'),
+    db.clear('settings'),
+    db.clear('drafts'),
+  ])
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────

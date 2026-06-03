@@ -5,6 +5,7 @@ import {
   getAllSurveys, saveSurvey, deleteSurvey,
   getSettings, saveSettings,
   getDraft, saveDraft, clearDraft,
+  clearLocalUserData,
 } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { pushSurvey, deleteSurveyRemote, fullSync } from '../lib/sync'
@@ -67,6 +68,18 @@ interface AppStore {
   removeToast: (id: string) => void
 }
 
+// Track which account owns the local data so we can wipe device-local stores
+// when a *different* user signs in (preventing cross-user data bleed), while
+// preserving local data when the same user signs back in.
+const LAST_UID_KEY = 'medd_last_uid'
+async function applyUserScope(uid: string): Promise<void> {
+  const last = localStorage.getItem(LAST_UID_KEY)
+  if (last && last !== uid) {
+    await clearLocalUserData()
+  }
+  localStorage.setItem(LAST_UID_KEY, uid)
+}
+
 // ─── Store implementation ─────────────────────────────────────────────────
 
 export const useStore = create<AppStore>((set, get) => ({
@@ -82,6 +95,7 @@ export const useStore = create<AppStore>((set, get) => ({
       const user = data.session?.user ?? null
       let userRole: UserRole | null = null
       if (user) {
+        await applyUserScope(user.id)
         const { data: roleRow } = await supabase
           .from('user_roles')
           .select('role')
@@ -95,6 +109,12 @@ export const useStore = create<AppStore>((set, get) => ({
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const prev = get().user
       const next = session?.user ?? null
+
+      // A different account signing in on this device → clear the previous
+      // user's local data before loading anything for the new one.
+      if (next && next.id !== prev?.id) {
+        await applyUserScope(next.id)
+      }
 
       let userRole: UserRole | null = null
       if (next) {
