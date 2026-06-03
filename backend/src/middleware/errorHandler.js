@@ -29,7 +29,8 @@ function errorHandler(err, req, res, next) {
     if (CLIENT_PG_CODES.has(err.code)) {
         return res.status(400).json({
             error: 'Restricción de integridad violada',
-            details: [err.detail || err.message],
+            // 🛡️ Sentinel: Do not leak internal database error details/messages to the client
+            details: ['Error de validación en la base de datos'],
         });
     }
 
