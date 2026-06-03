@@ -56,7 +56,7 @@ export function WizardPage() {
         }
       />
       <StepBar currentStep={step} />
-      <div className="page-content" style={{ paddingBottom: 24 }}>
+      <div className="page-content narrow" style={{ paddingBottom: 24 }}>
         {step === 1 && <Step1 {...stepProps} />}
         {step === 2 && <Step2 {...stepProps} />}
         {step === 3 && <Step3 {...stepProps} />}
@@ -121,7 +121,9 @@ export function EncuestasPage() {
             Sin resultados para "{filter}".
           </p>
         )}
-        {surveys.length > 0 && filtered.length > 0 && filtered.map(sv => {
+        {surveys.length > 0 && filtered.length > 0 && (
+          <div className="records-grid">
+          {filtered.map(sv => {
             const edad = calcEdad(sv.fEta, sv.fNac)
             const expiredMeds = sv.medications?.filter(m => {
               const mx = productMetrics(sv.fEta, sv.fDisp, m)
@@ -129,7 +131,7 @@ export function EncuestasPage() {
             }).length ?? 0
 
             return (
-              <Card key={sv.id} style={{ marginBottom: 10 }}>
+              <Card key={sv.id} style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <div>
                     <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>#{String(sv.nui).padStart(3, '0')}</span>
@@ -177,7 +179,7 @@ export function EncuestasPage() {
                 {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
                 {!isInvestigador && (
                   confirmId === sv.id ? (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 'auto', paddingTop: 4 }}>
                       <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
                       <Button size="sm" variant="danger" onClick={() => { removeSurvey(sv.id); setConfirmId(null) }}>
                         Sí, eliminar
@@ -187,7 +189,7 @@ export function EncuestasPage() {
                       </Button>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 'auto', paddingTop: 4 }}>
                       <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => openEditWizard(sv)}>
                         Editar
                       </Button>
@@ -203,8 +205,9 @@ export function EncuestasPage() {
                 )}
               </Card>
             )
-          })
-        }
+          })}
+          </div>
+        )}
       </div>
 
       {/* Medication detail modal */}
@@ -287,7 +290,7 @@ export function BuscarPage() {
   return (
     <div>
       <TopBar title="Buscador CUM-INVIMA" />
-      <div className="page-content">
+      <div className="page-content narrow">
         <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
           <input
             value={query}
@@ -369,7 +372,7 @@ export function ExportarPage() {
   return (
     <div>
       <TopBar title="Exportar datos" />
-      <div className="page-content">
+      <div className="page-content narrow">
         <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>
           {n} registro{n !== 1 ? 's' : ''} en sesión actual.
           Los datos persisten en IndexedDB del navegador y sobreviven cierres de pestaña.
@@ -422,7 +425,7 @@ export function ExportarPage() {
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────
 
 export function AjustesPage() {
-  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync } = useStore()
+  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, theme, toggleTheme, density, setDensity } = useStore()
   const [form, setForm] = useState(settings)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -432,7 +435,7 @@ export function AjustesPage() {
   return (
     <div>
       <TopBar title="Ajustes" />
-      <div className="page-content">
+      <div className="page-content narrow">
         <SectionHead icon="ti-settings" label="Configuración del proyecto" />
 
         <Field label="Nombre del proyecto">
@@ -463,6 +466,83 @@ export function AjustesPage() {
         <Button fullWidth onClick={() => persistSettings(form)} icon="ti-device-floppy">
           Guardar ajustes
         </Button>
+
+        <Divider label="apariencia" />
+
+        <Card style={{ background: C.surface }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <i className={`ti ${theme === 'dark' ? 'ti-moon' : 'ti-sun'}`} style={{ fontSize: 19, color: C.teal }} aria-hidden />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Tema {theme === 'dark' ? 'oscuro' : 'claro'}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Ajusta la app a tu entorno de trabajo.</div>
+            </div>
+            <button
+              role="switch"
+              aria-checked={theme === 'dark'}
+              aria-label="Alternar tema oscuro"
+              onClick={toggleTheme}
+              style={{
+                width: 52, height: 30, borderRadius: 999, border: 'none', cursor: 'pointer',
+                background: theme === 'dark' ? C.primary : C.border, flexShrink: 0,
+                position: 'relative', transition: 'background 0.18s',
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 3, left: theme === 'dark' ? 25 : 3,
+                width: 24, height: 24, borderRadius: '50%', background: '#fff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left 0.18s',
+              }} />
+            </button>
+          </div>
+        </Card>
+
+        <Card style={{ background: C.surface, marginTop: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <i className="ti ti-layout-distribute-vertical" style={{ fontSize: 19, color: C.teal }} aria-hidden />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Densidad</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Espaciado de tarjetas y listas.</div>
+            </div>
+          </div>
+          <div role="radiogroup" aria-label="Densidad de la interfaz" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {([
+              { id: 'comfortable', label: 'Cómoda', icon: 'ti-baseline-density-medium' },
+              { id: 'compact',     label: 'Compacta', icon: 'ti-baseline-density-small' },
+            ] as const).map(o => {
+              const active = density === o.id
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setDensity(o.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '11px 0', borderRadius: 8, cursor: 'pointer',
+                    border: active ? `1.5px solid ${C.teal}` : `1px solid ${C.border}`,
+                    background: active ? C.tealLight : C.surface,
+                    color: active ? C.teal : C.text,
+                    fontSize: 14, fontWeight: active ? 600 : 400,
+                  }}
+                >
+                  <i className={`ti ${o.icon}`} style={{ fontSize: 18 }} aria-hidden />
+                  {o.label}
+                </button>
+              )
+            })}
+          </div>
+        </Card>
 
         <Divider label="cuenta" />
 

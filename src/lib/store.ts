@@ -14,6 +14,34 @@ import { EMPTY_DRAFT, DEFAULT_SETTINGS } from '../lib/constants'
 
 // ─── Toast ────────────────────────────────────────────────────────────────
 
+export type Theme = 'light' | 'dark'
+export type Density = 'comfortable' | 'compact'
+
+const THEME_KEY = 'medd_theme'
+function readTheme(): Theme {
+  if (typeof window === 'undefined') return 'light'
+  const saved = localStorage.getItem(THEME_KEY)
+  if (saved === 'light' || saved === 'dark') return saved
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+function applyTheme(theme: Theme) {
+  document.documentElement.setAttribute('data-theme', theme)
+  localStorage.setItem(THEME_KEY, theme)
+  // Keep the mobile browser chrome in sync with the active surface.
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0B1220' : '#0F766E')
+}
+
+const DENSITY_KEY = 'medd_density'
+function readDensity(): Density {
+  if (typeof window === 'undefined') return 'comfortable'
+  return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'comfortable'
+}
+function applyDensity(density: Density) {
+  document.documentElement.setAttribute('data-density', density)
+  localStorage.setItem(DENSITY_KEY, density)
+}
+
 export type ToastLevel = 'success' | 'error' | 'info'
 export interface ToastAction { label: string; onClick: () => void }
 export interface Toast { id: string; message: string; level: ToastLevel; action?: ToastAction }
@@ -66,6 +94,14 @@ interface AppStore {
   toasts: Toast[]
   pushToast: (message: string, level?: ToastLevel, action?: ToastAction, duration?: number) => void
   removeToast: (id: string) => void
+
+  // Theme (light/dark)
+  theme: Theme
+  toggleTheme: () => void
+
+  // Density (comfortable/compact)
+  density: Density
+  setDensity: (d: Density) => void
 }
 
 // Track which account owns the local data so we can wipe device-local stores
@@ -347,5 +383,20 @@ export const useStore = create<AppStore>((set, get) => ({
   },
   removeToast(id) {
     set(s => ({ toasts: s.toasts.filter(t => t.id !== id) }))
+  },
+
+  // ── Theme ─────────────────────────────────────────────────────────────
+  theme: readTheme(),
+  toggleTheme() {
+    const next: Theme = get().theme === 'dark' ? 'light' : 'dark'
+    applyTheme(next)
+    set({ theme: next })
+  },
+
+  // ── Density ───────────────────────────────────────────────────────────
+  density: readDensity(),
+  setDensity(density) {
+    applyDensity(density)
+    set({ density })
   },
 }))

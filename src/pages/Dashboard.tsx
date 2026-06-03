@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip,
 } from 'recharts'
 import { TopBar } from '../components/layout'
-import { StatCard, Card, Button, EmptyState, C } from '../components/ui'
+import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
 import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, quantile, productMetrics, type Proportion, type RiskRatio, type ChiSquare, type TrendTest } from '../lib/utils'
 import { OPT } from '../lib/constants'
@@ -33,10 +33,10 @@ const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; l
       <PieChart width={72} height={72}>
         <Pie data={data} cx={36} cy={36} innerRadius={22} outerRadius={34} dataKey="v" stroke="none">
           <Cell fill={color} />
-          <Cell fill="#E2E8F0" />
+          <Cell fill={CHART.track} />
         </Pie>
       </PieChart>
-      <span style={{ fontSize: 16, fontWeight: 500, color }}>{pct(val, outOf)}%</span>
+      <span className="tnum" style={{ fontSize: 18, fontWeight: 700, color }}>{pct(val, outOf)}%</span>
       <span style={{ fontSize: 11, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
       <span style={{ fontSize: 11, color: C.hint }}>{val}/{outOf}</span>
     </div>
@@ -44,9 +44,32 @@ const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; l
 }
 
 export default function DashboardPage() {
-  const { surveys, openWizard, userRole } = useStore()
+  const { surveys, openWizard, userRole, setView, pendingDraft, resumeDraft } = useStore()
   const isInvestigador = userRole === 'investigador'
-  const n = surveys.length
+
+  // Investigator cockpit filters (encuestadores see only their own data, unfiltered)
+  const [fCiudad, setFCiudad]   = useState('')
+  const [fSalud, setFSalud]     = useState('')
+  const [fEstrato, setFEstrato] = useState<number | null>(null)
+  const filtersActive = isInvestigador && (!!fCiudad || !!fSalud || fEstrato !== null)
+  const clearFilters = () => { setFCiudad(''); setFSalud(''); setFEstrato(null) }
+
+  // Cities present in the data, for the filter dropdown.
+  const ciudadOptions = useMemo(
+    () => Array.from(new Set(surveys.map(s => s.ciudad).filter(Boolean))).sort() as string[],
+    [surveys],
+  )
+
+  const data = useMemo(() => {
+    if (!isInvestigador) return surveys
+    return surveys.filter(s =>
+      (!fCiudad || s.ciudad === fCiudad) &&
+      (!fSalud || s.asSalud === fSalud) &&
+      (fEstrato === null || s.estrato === fEstrato)
+    )
+  }, [surveys, isInvestigador, fCiudad, fSalud, fEstrato])
+
+  const n = data.length
 
   const {
     nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
@@ -63,8 +86,8 @@ export default function DashboardPage() {
     const ciudadVencMap = new Map<string, number>()
 
     // ⚡ Bolt: Single pass for scalar KPIs and distributions (reduces 21+ array passes to 1)
-    for (let i = 0; i < surveys.length; i++) {
-      const s = surveys[i]
+    for (let i = 0; i < data.length; i++) {
+      const s = data[i]
       if (s.medSob === 'Sí') nSob++
       if (s.vtoMedNc === 'Sí') nVenc++
       if (s.dispMedVc === 'Sí') nDisp++
@@ -99,25 +122,28 @@ export default function DashboardPage() {
       nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
       barAsSalud, barNvEstu, barNvPosg, barEtnia, barEstrato, ciudadVenc
     }
-  }, [surveys])
+  }, [data])
 
-  const assoc = useMemo(() => buildEstratoAssociation(surveys), [surveys])
-  const retention = useMemo(() => buildRetention(surveys), [surveys])
+  const assoc = useMemo(() => buildEstratoAssociation(data), [data])
+  const retention = useMemo(() => buildRetention(data), [data])
 
-  if (n === 0) {
+  // No data at all (vs. "filters returned nothing", handled further down)
+  if (surveys.length === 0) {
     return (
       <div>
         <TopBar title="MEDD · Panel analítico" />
         <div className="page-content">
           <EmptyState
             icon="ti-clipboard-data"
-            title="Sin encuestas aún"
-            description="Comience registrando la primera encuesta con el botón + de la barra inferior."
-            action={
+            title={isInvestigador ? 'Aún no hay datos' : 'Sin encuestas aún'}
+            description={isInvestigador
+              ? 'Cuando los encuestadores registren encuestas, aquí verás el análisis agregado.'
+              : 'Registra tu primera encuesta para empezar a ver indicadores.'}
+            action={isInvestigador ? undefined : (
               <Button onClick={() => openWizard(0)} icon="ti-plus">
                 Registrar primera encuesta
               </Button>
-            }
+            )}
           />
         </div>
       </div>
@@ -126,28 +152,44 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <TopBar title="MEDD · Panel analítico" />
+      <TopBar title={isInvestigador ? 'Panel analítico' : 'Mi panel'} />
       <div className="page-content">
 
-        {/* Role badge */}
+        {/* Role-adaptive hero */}
+        {isInvestigador
+          ? <InvestigadorHero n={n} nVenc={nVenc} vencTotal={vencTotal} filtersActive={filtersActive} totalSurveys={surveys.length} />
+          : <EncuestadorHero
+              n={n} pendingDraft={!!pendingDraft}
+              onNew={() => openWizard(surveys.length)}
+              onResume={resumeDraft}
+              onView={() => setView('encuestas')}
+            />}
+
+        {/* Investigator cockpit filters */}
         {isInvestigador && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: '#EFF6FF', border: '0.5px solid #BFDBFE',
-            borderRadius: 8, padding: '7px 10px', marginBottom: 12,
-          }}>
-            <i className="ti ti-shield-check" style={{ color: '#1D4ED8', fontSize: 14 }} />
-            <span style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 500 }}>
-              Vista de investigador — datos agregados de todos los encuestadores
-            </span>
-          </div>
+          <FilterBar
+            ciudadOptions={ciudadOptions}
+            fCiudad={fCiudad} setFCiudad={setFCiudad}
+            fSalud={fSalud}   setFSalud={setFSalud}
+            fEstrato={fEstrato} setFEstrato={setFEstrato}
+            filtersActive={filtersActive} onClear={clearFilters}
+          />
         )}
 
+        {/* Filtered-empty state (data exists but filters exclude everything) */}
+        {n === 0 ? (
+          <Card style={{ textAlign: 'center', padding: '32px 20px' }}>
+            <i className="ti ti-filter-off" style={{ fontSize: 28, color: C.muted, display: 'block', marginBottom: 8 }} aria-hidden />
+            <p style={{ fontSize: 13, color: C.muted, margin: '0 0 14px' }}>Ningún registro coincide con los filtros.</p>
+            <Button variant="secondary" size="sm" icon="ti-x" onClick={clearFilters}>Limpiar filtros</Button>
+          </Card>
+        ) : (
+        <>
         {/* KPIs */}
         <p style={{ fontSize: 11, color: C.hint, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
           Indicadores clave · {n} encuesta{n !== 1 ? 's' : ''}
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div className="kpi-grid" style={{ marginBottom: 16 }}>
           <StatCard icon="ti-users"          label="Total encuestados"    value={n}                                  color={C.navy} />
           <StatCard icon="ti-pill"           label="Productos registrados" value={totalMeds}                          color={C.teal} />
           <StatCard icon="ti-package"        label="Unidades sin consumir" value={unidTotal}                          color={C.teal} />
@@ -160,9 +202,9 @@ export default function DashboardPage() {
         <Card style={{ marginBottom: 14 }}>
           <SectionLabel>Variables clave de resultado</SectionLabel>
           <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-            <MiniDonut val={nSob}  outOf={n}    label="Med. sin consumir"   color={C.navy} />
-            <MiniDonut val={nVenc} outOf={n}    label="Vencidos conf."      color={C.amber} />
-            <MiniDonut val={nDisp} outOf={nSob} label="Conoce disposición*" color={C.teal} />
+            <MiniDonut val={nSob}  outOf={n}    label="Med. sin consumir"   color={CHART.navy} />
+            <MiniDonut val={nVenc} outOf={n}    label="Vencidos conf."      color={CHART.amber} />
+            <MiniDonut val={nDisp} outOf={nSob} label="Conoce disposición*" color={CHART.teal} />
           </div>
           <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, textAlign: 'center', lineHeight: 1.5 }}>
             «Med. sin consumir» y «Vencidos conf.» sobre el total ({n} hogares).
@@ -185,17 +227,19 @@ export default function DashboardPage() {
         {/* Tiempo de retención de vencidos */}
         {retention && <RetentionCard s={retention} />}
 
+        {/* Distribuciones — 2 columnas en pantallas anchas para aprovechar el espacio */}
+        <div className="chart-grid">
         {/* Hotspots geográficos: CIUDAD x CANT_MED_VTO */}
         {ciudadVenc.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Hotspots geográficos — Unidades vencidas por ciudad</SectionLabel>
             <div style={{ height: Math.max(80, ciudadVenc.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={ciudadVenc} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={85} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="value" fill={C.amber} radius={[0, 3, 3, 0]} name="Unidades vencidas" />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={85} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="value" fill={CHART.amber} radius={[0, 3, 3, 0]} name="Unidades vencidas" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -204,15 +248,15 @@ export default function DashboardPage() {
 
         {/* ESTRATO distribution */}
         {barEstrato.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por estrato socioeconómico</SectionLabel>
             <div style={{ height: Math.max(80, barEstrato.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barEstrato} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.navy} radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={75} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.navy} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -221,15 +265,15 @@ export default function DashboardPage() {
 
         {/* AS_SALUD */}
         {barAsSalud.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por régimen de salud</SectionLabel>
             <div style={{ height: Math.max(80, barAsSalud.length * 30) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barAsSalud} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.teal} radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={90} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.teal} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -238,15 +282,15 @@ export default function DashboardPage() {
 
         {/* NV_ESTU */}
         {barNvEstu.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por nivel educativo</SectionLabel>
             <div style={{ height: Math.max(80, barNvEstu.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barNvEstu} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill="#7030A0" radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={75} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.purple} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -255,15 +299,15 @@ export default function DashboardPage() {
 
         {/* NV_POSG */}
         {barNvPosg.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por nivel de posgrado</SectionLabel>
             <div style={{ height: Math.max(80, barNvPosg.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barNvPosg} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={95} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill="#9B59B6" radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={95} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.violet} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -272,22 +316,157 @@ export default function DashboardPage() {
 
         {/* Etnia */}
         {barEtnia.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por pertenencia étnica</SectionLabel>
             <div style={{ height: Math.max(80, barEtnia.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barEtnia} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.gray} radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={120} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.gray} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
         )}
+        </div>
+        </>
+        )}
       </div>
     </div>
+  )
+}
+
+// ─── Role-adaptive hero bands ───────────────────────────────────────────────
+
+// Investigator: a brand-gradient summary band framing the dataset at a glance.
+function InvestigadorHero({ n, nVenc, vencTotal, filtersActive, totalSurveys }: {
+  n: number; nVenc: number; vencTotal: number; filtersActive: boolean; totalSurveys: number
+}) {
+  return (
+    <div style={{
+      background: C.gradBrand, color: '#fff', borderRadius: 16,
+      padding: '18px 20px', marginBottom: 16, boxShadow: C.shadowBrand,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, opacity: 0.92 }}>
+        <i className="ti ti-shield-check" style={{ fontSize: 16 }} aria-hidden />
+        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.3px' }}>
+          Vista de investigador · datos agregados
+          {filtersActive && ` · ${n} de ${totalSurveys} (filtrado)`}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <HeroStat value={n} label="Encuestas" />
+        <HeroStat value={nVenc} label="Hogares con vencidos" />
+        <HeroStat value={vencTotal} label="Unidades vencidas" />
+      </div>
+    </div>
+  )
+}
+
+// Encuestador: a "field mode" band — the primary action front and centre.
+function EncuestadorHero({ n, pendingDraft, onNew, onResume, onView }: {
+  n: number; pendingDraft: boolean; onNew: () => void; onResume: () => void; onView: () => void
+}) {
+  return (
+    <div style={{
+      background: C.gradBrand, color: '#fff', borderRadius: 16,
+      padding: '20px', marginBottom: 16, boxShadow: C.shadowBrand,
+    }}>
+      <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 2 }}>Trabajo de campo</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
+        <span className="tnum" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }}>{n}</span>
+        <span style={{ fontSize: 14, opacity: 0.9 }}>encuesta{n !== 1 ? 's' : ''} registrada{n !== 1 ? 's' : ''}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          onClick={pendingDraft ? onResume : onNew}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+            background: '#fff', color: C.primary, border: 'none', borderRadius: 10,
+            padding: '11px 18px', fontSize: 15, fontWeight: 700,
+          }}
+        >
+          <i className={`ti ${pendingDraft ? 'ti-player-play' : 'ti-plus'}`} style={{ fontSize: 19 }} aria-hidden />
+          {pendingDraft ? 'Continuar encuesta' : 'Nueva encuesta'}
+        </button>
+        <button
+          onClick={onView}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+            background: 'rgba(255,255,255,0.16)', color: '#fff',
+            border: '1px solid rgba(255,255,255,0.4)', borderRadius: 10,
+            padding: '11px 16px', fontSize: 14, fontWeight: 600,
+          }}
+        >
+          <i className="ti ti-list" style={{ fontSize: 18 }} aria-hidden />
+          Ver registros
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function HeroStat({ value, label }: { value: number; label: string }) {
+  return (
+    <div>
+      <div className="tnum" style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 11, opacity: 0.85, marginTop: 3 }}>{label}</div>
+    </div>
+  )
+}
+
+// ─── Cockpit filter bar (investigator) ──────────────────────────────────────
+
+function FilterBar({
+  ciudadOptions, fCiudad, setFCiudad, fSalud, setFSalud, fEstrato, setFEstrato,
+  filtersActive, onClear,
+}: {
+  ciudadOptions: string[]
+  fCiudad: string; setFCiudad: (v: string) => void
+  fSalud: string; setFSalud: (v: string) => void
+  fEstrato: number | null; setFEstrato: (v: number | null) => void
+  filtersActive: boolean; onClear: () => void
+}) {
+  return (
+    <Card style={{ marginBottom: 16, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <i className="ti ti-adjustments-horizontal" style={{ fontSize: 15 }} aria-hidden /> Filtros
+        </span>
+        {filtersActive && (
+          <button onClick={onClear} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.teal, fontSize: 12, fontWeight: 600 }}>
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gap: 10 }}>
+        {ciudadOptions.length > 0 && (
+          <select value={fCiudad} onChange={e => setFCiudad(e.target.value)} aria-label="Filtrar por ciudad">
+            <option value="">Todas las ciudades</option>
+            {ciudadOptions.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        <div>
+          <div style={{ fontSize: 11, color: C.hint, marginBottom: 6 }}>Régimen de salud</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {OPT.asSalud.map(o => (
+              <Chip key={o} label={o} active={fSalud === o} onClick={() => setFSalud(fSalud === o ? '' : o)} />
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: C.hint, marginBottom: 6 }}>Estrato</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {OPT.estrato.map(e => (
+              <Chip key={e} label={String(e)} active={fEstrato === e} onClick={() => setFEstrato(fEstrato === e ? null : e)} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </Card>
   )
 }
 
