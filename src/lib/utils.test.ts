@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   pct, safeNum, calcEdad, dayDiff, productMetrics,
   wilsonCI, quantile, prevalenceRatio, chiSquareTest, cochranArmitage,
-  toCSV,
+  toCSV, compareSortable,
 } from './utils'
 import type { Survey } from '../types'
 
@@ -122,6 +122,23 @@ describe('cochranArmitage', () => {
   })
   it('returns null with no informative table', () => {
     expect(cochranArmitage([{ score: 1, n: 10, cases: 0 }])).toBeNull()
+  })
+})
+
+describe('compareSortable', () => {
+  it('orders numbers numerically', () => {
+    expect(compareSortable(2, 10)).toBeLessThan(0)
+    expect(compareSortable(10, 2)).toBeGreaterThan(0)
+  })
+  it('orders strings with numeric-aware locale collation', () => {
+    expect(compareSortable('Bogotá', 'Cali')).toBeLessThan(0)
+    expect(compareSortable('item2', 'item10')).toBeLessThan(0)
+  })
+  it('always sorts empty values last regardless of the other operand', () => {
+    expect(compareSortable(null, 5)).toBeGreaterThan(0)
+    expect(compareSortable('', 'a')).toBeGreaterThan(0)
+    expect(compareSortable(5, undefined)).toBeLessThan(0)
+    expect(compareSortable(null, null)).toBe(0)
   })
 })
 

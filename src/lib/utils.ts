@@ -91,6 +91,24 @@ export const pct = (n: number, total: number) =>
 export const safeNum = (v: string | number | null | undefined): number =>
   typeof v === 'number' ? v : parseFloat(String(v ?? '')) || 0
 
+/**
+ * Comparator for sortable table cells. Empty values (null/undefined/'') always
+ * sort last regardless of direction; numbers compare numerically and strings use
+ * a locale-aware, numeric-aware collation (so "10" sorts after "2").
+ */
+export function compareSortable(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined,
+): number {
+  const aEmpty = a === null || a === undefined || a === ''
+  const bEmpty = b === null || b === undefined || b === ''
+  if (aEmpty && bEmpty) return 0
+  if (aEmpty) return 1
+  if (bEmpty) return -1
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  return String(a).localeCompare(String(b), 'es', { numeric: true })
+}
+
 // ─── Inferential statistics ─────────────────────────────────────────────────
 
 export interface Proportion {

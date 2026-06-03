@@ -8,7 +8,7 @@ import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/S
 import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
 import {
-  calcEdad, fmtDate,
+  calcEdad, fmtDate, compareSortable,
   toCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
 import { TOTAL_STEPS } from '../lib/constants'
@@ -70,12 +70,17 @@ export function WizardPage() {
 
 // ─── ENCUESTAS PAGE ───────────────────────────────────────────────────────
 
+type RecordsView = 'cards' | 'table'
+
 export function EncuestasPage() {
   const { surveys, removeSurvey, openEditWizard, openWizard, userRole } = useStore()
   const isInvestigador = userRole === 'investigador'
   const [filter, setFilter]     = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [detail, setDetail]     = useState<Survey | null>(null)
+  // Investigators analyse many rows → default to the dense table; encuestadores
+  // edit their own entries → default to cards.
+  const [view, setView] = useState<RecordsView>(isInvestigador ? 'table' : 'cards')
 
   const filtered = useMemo(() => {
     if (!filter.trim()) return surveys
@@ -95,12 +100,14 @@ export function EncuestasPage() {
       <TopBar title="Registros" />
       <div className="page-content">
         {surveys.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input
               value={filter}
               onChange={e => setFilter(e.target.value)}
               placeholder="Buscar por N°, ciudad, medicamento, DCI…"
+              style={{ flex: 1 }}
             />
+            <ViewToggle view={view} onChange={setView} />
           </div>
         )}
 
@@ -121,7 +128,11 @@ export function EncuestasPage() {
             Sin resultados para "{filter}".
           </p>
         )}
-        {surveys.length > 0 && filtered.length > 0 && (
+        {surveys.length > 0 && filtered.length > 0 && view === 'table' && (
+          <RecordsTable surveys={filtered} onDetail={setDetail} />
+        )}
+
+        {surveys.length > 0 && filtered.length > 0 && view === 'cards' && (
           <div className="records-grid">
           {filtered.map(sv => {
             const edad = calcEdad(sv.fEta, sv.fNac)
@@ -215,6 +226,173 @@ export function EncuestasPage() {
         <MedDetailModal survey={detail} onClose={() => setDetail(null)} />
       )}
     </div>
+  )
+}
+
+// Compact segmented control to switch between card and table views.
+function ViewToggle({ view, onChange }: { view: RecordsView; onChange: (v: RecordsView) => void }) {
+  const opts = [
+    { id: 'table' as const, icon: 'ti-table', label: 'Tabla' },
+    { id: 'cards' as const, icon: 'ti-layout-grid', label: 'Tarjetas' },
+  ]
+  return (
+    <div role="group" aria-label="Vista de registros" style={{
+      display: 'flex', flexShrink: 0, border: `1px solid ${C.border}`,
+      borderRadius: 8, overflow: 'hidden', background: C.surface,
+    }}>
+      {opts.map(o => {
+        const active = view === o.id
+        return (
+          <button
+            key={o.id}
+            type="button"
+            aria-pressed={active}
+            aria-label={o.label}
+            title={o.label}
+            onClick={() => onChange(o.id)}
+            style={{
+              width: 42, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', cursor: 'pointer',
+              background: active ? C.tealLight : 'transparent',
+              color: active ? C.teal : C.muted,
+            }}
+          >
+            <i className={`ti ${o.icon}`} style={{ fontSize: 18 }} aria-hidden />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Dense, sortable records table (investigator analysis view) ─────────────
+
+type SortKey = 'nui' | 'fEta' | 'ciudad' | 'edad' | 'estrato' | 'asSalud' | 'meds' | 'venc'
+
+const TABLE_COLS: { key: SortKey; label: string; numeric?: boolean }[] = [
+  { key: 'nui',     label: 'N°',       numeric: true },
+  { key: 'fEta',    label: 'Fecha' },
+  { key: 'ciudad',  label: 'Ciudad' },
+  { key: 'edad',    label: 'Edad',     numeric: true },
+  { key: 'estrato', label: 'Estrato',  numeric: true },
+  { key: 'asSalud', label: 'Régimen' },
+  { key: 'meds',    label: 'Prod.',    numeric: true },
+  { key: 'venc',    label: 'Venc.',    numeric: true },
+]
+
+function sortValue(s: Survey, key: SortKey): string | number | null {
+  switch (key) {
+    case 'nui':     return s.nui
+    case 'fEta':    return s.fEta
+    case 'ciudad':  return s.ciudad
+    case 'edad':    return calcEdad(s.fEta, s.fNac)
+    case 'estrato': return s.estrato
+    case 'asSalud': return s.asSalud
+    case 'meds':    return s.medications?.length ?? 0
+    case 'venc':    return s.cantMedVto
+  }
+}
+
+function RecordsTable({ surveys, onDetail }: { surveys: Survey[]; onDetail: (s: Survey) => void }) {
+  const [sortKey, setSortKey] = useState<SortKey>('nui')
+  const [asc, setAsc] = useState(true)
+
+  const rows = useMemo(() => {
+    const copy = [...surveys]
+    copy.sort((a, b) => {
+      const r = compareSortable(sortValue(a, sortKey), sortValue(b, sortKey))
+      return asc ? r : -r
+    })
+    return copy
+  }, [surveys, sortKey, asc])
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) setAsc(a => !a)
+    else { setSortKey(key); setAsc(true) }
+  }
+
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr>
+              {TABLE_COLS.map(col => {
+                const activeSort = sortKey === col.key
+                return (
+                  <th
+                    key={col.key}
+                    aria-sort={activeSort ? (asc ? 'ascending' : 'descending') : 'none'}
+                    onClick={() => toggleSort(col.key)}
+                    style={{
+                      position: 'sticky', top: 0, zIndex: 1,
+                      textAlign: col.numeric ? 'right' : 'left',
+                      padding: '10px 12px', whiteSpace: 'nowrap', cursor: 'pointer',
+                      background: C.surface2, color: C.muted,
+                      fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px',
+                      borderBottom: `1px solid ${C.border}`, userSelect: 'none',
+                    }}
+                  >
+                    {col.label}
+                    <i
+                      className={`ti ${activeSort ? (asc ? 'ti-caret-up-filled' : 'ti-caret-down-filled') : 'ti-arrows-sort'}`}
+                      style={{ fontSize: 13, marginLeft: 4, color: activeSort ? C.teal : C.hint, verticalAlign: 'middle' }}
+                      aria-hidden
+                    />
+                  </th>
+                )
+              })}
+              <th style={{ position: 'sticky', top: 0, background: C.surface2, borderBottom: `1px solid ${C.border}` }} aria-label="Detalle" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((s, i) => {
+              const edad = calcEdad(s.fEta, s.fNac)
+              const meds = s.medications?.length ?? 0
+              const venc = s.cantMedVto ?? 0
+              return (
+                <tr
+                  key={s.id}
+                  onClick={() => onDetail(s)}
+                  style={{ cursor: 'pointer', background: i % 2 ? C.surface2 : C.surface }}
+                >
+                  <Td numeric><strong style={{ color: C.teal }}>#{String(s.nui).padStart(3, '0')}</strong></Td>
+                  <Td>{s.fEta ? fmtDate(s.fEta) : '—'}</Td>
+                  <Td>{s.ciudad || '—'}</Td>
+                  <Td numeric>{edad != null ? edad : '—'}</Td>
+                  <Td numeric>{s.estrato ?? '—'}</Td>
+                  <Td>{s.asSalud || '—'}</Td>
+                  <Td numeric>{meds}</Td>
+                  <Td numeric>
+                    {venc > 0
+                      ? <span style={{ color: C.amber, fontWeight: 600 }}>{venc}</span>
+                      : <span style={{ color: C.hint }}>0</span>}
+                  </Td>
+                  <Td>
+                    <i className="ti ti-chevron-right" style={{ fontSize: 16, color: C.hint, display: 'block' }} aria-hidden />
+                  </Td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function Td({ children, numeric }: { children: React.ReactNode; numeric?: boolean }) {
+  return (
+    <td
+      className={numeric ? 'tnum' : undefined}
+      style={{
+        padding: '9px 12px', whiteSpace: 'nowrap',
+        textAlign: numeric ? 'right' : 'left',
+        borderBottom: `1px solid ${C.border}`, color: C.text,
+      }}
+    >
+      {children}
+    </td>
   )
 }
 
