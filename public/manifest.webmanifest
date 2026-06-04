@@ -1,0 +1,21 @@
+{
+  "name": "MEDD — Medicamentos no utilizados",
+  "short_name": "MEDD",
+  "description": "Registro y análisis de medicamentos no utilizados en hogares (trabajo de campo offline).",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1220",
+  "theme_color": "#0F766E",
+  "categories": ["medical", "health", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ import {
   calcEdad, fmtDate, compareSortable,
   toCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
-import { TOTAL_STEPS, OPT } from '../lib/constants'
+import { TOTAL_STEPS, OPT, FIELD_GUIDE } from '../lib/constants'
 import type { SurveyDraft, Survey } from '../types'
 
 // DashboardPage lives in its own lazily-loaded chunk (pages/Dashboard.tsx) to
@@ -21,6 +21,7 @@ import type { SurveyDraft, Survey } from '../types'
 
 export function WizardPage() {
   const { wizard, setWizardStep, updateDraft, closeWizard, addSurvey, updateSurvey } = useStore()
+  const [guideOpen, setGuideOpen] = useState(false)
   if (!wizard) return null
   const { step, draft, editingId } = wizard
 
@@ -46,15 +47,25 @@ export function WizardPage() {
       <TopBar
         title={editingId ? 'Editar encuesta' : 'Nueva encuesta'}
         actions={
-          <button
-            aria-label="Cancelar"
-            onClick={closeWizard}
-            style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
-          >
-            <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden />
-          </button>
+          <>
+            <button
+              aria-label="Guía de campo"
+              onClick={() => setGuideOpen(true)}
+              style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
+            >
+              <i className="ti ti-help" style={{ fontSize: 18 }} aria-hidden />
+            </button>
+            <button
+              aria-label="Cancelar"
+              onClick={closeWizard}
+              style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
+            >
+              <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden />
+            </button>
+          </>
         }
       />
+      {guideOpen && <FieldGuideDialog onClose={() => setGuideOpen(false)} />}
       <StepBar currentStep={step} />
       <div className="page-content narrow" style={{ paddingBottom: 24 }}>
         {step === 1 && <Step1 {...stepProps} />}
@@ -65,6 +76,24 @@ export function WizardPage() {
         {step === 6 && <Step6 {...stepProps} />}
       </div>
     </div>
+  )
+}
+
+// Field guide: codebook definitions so every surveyor reads each field the same
+// way (standardisation → less inter-observer variability).
+function FieldGuideDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <Dialog title="Guía de campo — definiciones" onClose={onClose}>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Usa siempre estas definiciones para registrar de forma consistente entre encuestadores.
+      </p>
+      {FIELD_GUIDE.map(g => (
+        <div key={g.key} style={{ padding: '8px 0', borderBottom: `0.5px solid ${C.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 2 }}>{g.term}</div>
+          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{g.def}</div>
+        </div>
+      ))}
+    </Dialog>
   )
 }
 
