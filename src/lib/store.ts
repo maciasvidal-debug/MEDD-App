@@ -315,6 +315,11 @@ export const useStore = create<AppStore>((set, get) => ({
       fEta:   todayISO(),
       nuiEtr,
       nui:    surveyCount + 1,
+      // Stamp the surveyor profile snapshot from settings onto the survey.
+      etrPrograma:    settings.etrPrograma,
+      etrTipoInst:    settings.etrTipoInst,
+      etrSemestre:    settings.etrSemestre ? parseInt(settings.etrSemestre, 10) || null : null,
+      etrInstitucion: settings.etrInstitucion,
     }
     const wizard: WizardState = { step: 1, draft }
     set({ wizard, view: 'wizard', pendingDraft: null })

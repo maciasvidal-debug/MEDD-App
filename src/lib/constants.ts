@@ -13,6 +13,8 @@ export const OPT = {
   undConc: ['mcg', 'mg', 'g', 'UI', '%'] as const,
   sino:    ['Sí', 'No'] as const,
   estrato: [1, 2, 3, 4, 5, 6] as const,
+  etrPrograma: ['Medicina', 'Enfermería', 'Regencia en Farmacia', 'Química Farmacéutica', 'Odontología', 'Bacteriología', 'Nutrición y Dietética', 'Otra'] as const,
+  etrTipoInst: ['Pública', 'Privada'] as const,
 } as const
 
 // Main Colombian cities (CIUDAD dropdown)
@@ -42,6 +44,10 @@ export const EMPTY_DRAFT: SurveyDraft = {
   fEta:       '',
   nuiEtr:     null,
   nui:        0,
+  etrPrograma:    '',
+  etrTipoInst:    '',
+  etrSemestre:    null,
+  etrInstitucion: '',
   fNac:       '',
   ciudad:     '',
   dir:        '',
@@ -75,6 +81,10 @@ export const DEFAULT_SETTINGS: Settings = {
   nombreProyecto: 'MEDD – Medicamentos No Utilizados',
   instituciones:  '',
   nuiEncuestador: '',
+  etrPrograma:    '',
+  etrTipoInst:    '',
+  etrSemestre:    '',
+  etrInstitucion: '',
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────

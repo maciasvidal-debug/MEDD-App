@@ -329,7 +329,9 @@ export function groupSum(
 // ─── CSV export (codebook column order) ───────────────────────────────────
 
 const CSV_COLUMNS: (keyof Survey)[] = [
-  'id', 'fEta', 'nui', 'nuiEtr', 'fNac',
+  'id', 'fEta', 'nui', 'nuiEtr',
+  'etrPrograma', 'etrTipoInst', 'etrSemestre', 'etrInstitucion',
+  'fNac',
   'ciudad', 'dir', 'estrato',
   'etnia', 'asSalud', 'estLab', 'ingreso', 'nvEstu', 'nvPosg',
   'perSalud', 'estSalud', 'prbSalud', 'conMed', 'medPrc',
