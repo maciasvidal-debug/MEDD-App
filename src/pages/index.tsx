@@ -350,7 +350,10 @@ function sortValue(s: Survey, key: SortKey): string | number | null {
   }
 }
 
-function RecordsTable({ surveys, onDetail }: { surveys: Survey[]; onDetail: (s: Survey) => void }) {
+// Memoized so unrelated EncuestasPage re-renders (opening the detail modal,
+// toggling delete-confirm) don't re-sort/re-render the whole table: `filtered`
+// keeps its reference and `onDetail` is a stable setter, so React.memo bails.
+const RecordsTable = React.memo(function RecordsTable({ surveys, onDetail }: { surveys: Survey[]; onDetail: (s: Survey) => void }) {
   const [sortKey, setSortKey] = useState<SortKey>('nui')
   const [asc, setAsc] = useState(true)
 
@@ -403,40 +406,47 @@ function RecordsTable({ surveys, onDetail }: { surveys: Survey[]; onDetail: (s: 
             </tr>
           </thead>
           <tbody>
-            {rows.map((s, i) => {
-              const edad = calcEdad(s.fEta, s.fNac)
-              const meds = s.medications?.length ?? 0
-              const venc = s.cantMedVto ?? 0
-              return (
-                <tr
-                  key={s.id}
-                  onClick={() => onDetail(s)}
-                  style={{ cursor: 'pointer', background: i % 2 ? C.surface2 : C.surface }}
-                >
-                  <Td numeric><strong style={{ color: C.teal }}>#{String(s.nui).padStart(3, '0')}</strong></Td>
-                  <Td>{s.fEta ? fmtDate(s.fEta) : '—'}</Td>
-                  <Td>{s.ciudad || '—'}</Td>
-                  <Td numeric>{edad != null ? edad : '—'}</Td>
-                  <Td numeric>{s.estrato ?? '—'}</Td>
-                  <Td>{s.asSalud || '—'}</Td>
-                  <Td numeric>{meds}</Td>
-                  <Td numeric>
-                    {venc > 0
-                      ? <span style={{ color: C.amber, fontWeight: 600 }}>{venc}</span>
-                      : <span style={{ color: C.hint }}>0</span>}
-                  </Td>
-                  <Td>
-                    <i className="ti ti-chevron-right" style={{ fontSize: 16, color: C.hint, display: 'block' }} aria-hidden />
-                  </Td>
-                </tr>
-              )
-            })}
+            {rows.map((s, i) => (
+              <RecordRow key={s.id} survey={s} zebra={i % 2 === 1} onDetail={onDetail} />
+            ))}
           </tbody>
         </table>
       </div>
     </Card>
   )
-}
+})
+
+// Single table row, memoized so that filter keystrokes / parent re-renders only
+// re-render rows whose data (survey reference) or zebra position actually change,
+// skipping the per-row calcEdad otherwise. onDetail is a stable setter.
+interface RecordRowProps { survey: Survey; zebra: boolean; onDetail: (s: Survey) => void }
+const RecordRow = React.memo(function RecordRow({ survey: s, zebra, onDetail }: RecordRowProps) {
+  const edad = calcEdad(s.fEta, s.fNac)
+  const meds = s.medications?.length ?? 0
+  const venc = s.cantMedVto ?? 0
+  return (
+    <tr
+      onClick={() => onDetail(s)}
+      style={{ cursor: 'pointer', background: zebra ? C.surface2 : C.surface }}
+    >
+      <Td numeric><strong style={{ color: C.teal }}>#{String(s.nui).padStart(3, '0')}</strong></Td>
+      <Td>{s.fEta ? fmtDate(s.fEta) : '—'}</Td>
+      <Td>{s.ciudad || '—'}</Td>
+      <Td numeric>{edad != null ? edad : '—'}</Td>
+      <Td numeric>{s.estrato ?? '—'}</Td>
+      <Td>{s.asSalud || '—'}</Td>
+      <Td numeric>{meds}</Td>
+      <Td numeric>
+        {venc > 0
+          ? <span style={{ color: C.amber, fontWeight: 600 }}>{venc}</span>
+          : <span style={{ color: C.hint }}>0</span>}
+      </Td>
+      <Td>
+        <i className="ti ti-chevron-right" style={{ fontSize: 16, color: C.hint, display: 'block' }} aria-hidden />
+      </Td>
+    </tr>
+  )
+})
 
 function Td({ children, numeric }: { children: React.ReactNode; numeric?: boolean }) {
   return (
