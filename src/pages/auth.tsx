@@ -33,6 +33,9 @@ export default function AuthPage() {
       <div style={styles.card}>
         {/* Logo / título */}
         <div style={styles.header}>
+          <div style={styles.brandMark}>
+            <i className="ti ti-vaccine-bottle" style={{ fontSize: 26, color: '#fff' }} aria-hidden />
+          </div>
           <span style={styles.logo}>MEDD</span>
           <p style={styles.subtitle}>Medicamentos no utilizados — Colombia</p>
         </div>
@@ -58,8 +61,9 @@ export default function AuthPage() {
         {/* Form */}
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.field}>
-            <label style={styles.label}>Correo electrónico</label>
+            <label htmlFor="email" style={styles.label}>Correo electrónico</label>
             <input
+              id="email"
               type="email"
               required
               autoComplete="email"
@@ -70,8 +74,9 @@ export default function AuthPage() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Contraseña</label>
+            <label htmlFor="password" style={styles.label}>Contraseña</label>
             <input
+              id="password"
               type="password"
               required
               minLength={6}
@@ -82,8 +87,8 @@ export default function AuthPage() {
             />
           </div>
 
-          {error && <p style={styles.error}>{error}</p>}
-          {info  && <p style={styles.info}>{info}</p>}
+          {error && <p role="alert" aria-live="assertive" style={styles.error}>{error}</p>}
+          {info  && <p role="alert" aria-live="assertive" style={styles.info}>{info}</p>}
 
           <button type="submit" disabled={loading} style={styles.btn}>
             {loading
@@ -102,37 +107,52 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#F0FDF9',
+    background: 'var(--c-bg)',
     padding: '24px 16px',
   },
   card: {
-    background: '#FFFFFF',
-    borderRadius: 16,
-    boxShadow: '0 4px 24px rgba(15,118,110,0.10)',
+    background: 'var(--c-surface)',
+    borderRadius: 18,
+    boxShadow: 'var(--shadow-lg)',
+    border: '1px solid var(--c-border)',
     padding: '32px 28px',
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 400,
   },
   header: {
     textAlign: 'center',
     marginBottom: 24,
   },
+  brandMark: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    margin: '0 auto 14px',
+    background: 'var(--grad-brand)',
+    boxShadow: 'var(--shadow-brand)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   logo: {
     fontSize: 32,
     fontWeight: 800,
-    color: '#0F766E',
+    color: 'var(--c-text)',
     letterSpacing: '-0.5px',
   },
   subtitle: {
     fontSize: 12,
-    color: '#64748B',
+    color: 'var(--c-muted)',
     marginTop: 4,
   },
   tabs: {
     display: 'flex',
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: 'hidden',
-    border: '1px solid #E2E8F0',
+    border: '1px solid var(--c-border)',
+    background: 'var(--c-surface-2)',
+    padding: 3,
+    gap: 3,
     marginBottom: 24,
   },
   tab: {
@@ -140,13 +160,14 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '9px 0',
     background: 'transparent',
     border: 'none',
+    borderRadius: 8,
     cursor: 'pointer',
     fontSize: 13,
-    color: '#64748B',
+    color: 'var(--c-muted)',
     transition: 'background 0.15s, color 0.15s',
   },
   tabActive: {
-    background: '#0F766E',
+    background: 'var(--c-teal)',
     color: '#FFFFFF',
     fontWeight: 600,
   },
@@ -163,28 +184,28 @@ const styles: Record<string, React.CSSProperties> = {
   label: {
     fontSize: 12,
     fontWeight: 500,
-    color: '#374151',
+    color: 'var(--c-text)',
   },
   error: {
     fontSize: 12,
-    color: '#B91C1C',
-    background: '#FEE2E2',
-    borderRadius: 6,
+    color: 'var(--c-red)',
+    background: 'var(--c-red-light)',
+    borderRadius: 8,
     padding: '8px 10px',
   },
   info: {
     fontSize: 12,
-    color: '#166534',
-    background: '#DCFCE7',
-    borderRadius: 6,
+    color: 'var(--c-green)',
+    background: 'var(--c-green-light)',
+    borderRadius: 8,
     padding: '8px 10px',
   },
   btn: {
-    background: '#0F766E',
+    background: 'var(--c-primary)',
     color: '#FFFFFF',
     border: 'none',
-    borderRadius: 8,
-    padding: '11px 0',
+    borderRadius: 10,
+    padding: '12px 0',
     fontSize: 14,
     fontWeight: 600,
     cursor: 'pointer',

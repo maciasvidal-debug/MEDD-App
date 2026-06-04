@@ -15,23 +15,31 @@ router.use(requireRole('investigador'));
 // Summary KPIs
 // ---------------------------------------------------------------------
 router.get('/summary', asyncHandler(async (req, res) => {
-    const q = await pool.query(`
-        SELECT
-            (SELECT COUNT(*) FROM surveys)                                  AS total_surveys,
-            (SELECT COUNT(*) FROM medications)                             AS total_medications,
-            (SELECT COALESCE(SUM(cant_med), 0)     FROM surveys)          AS total_unused_units,
-            (SELECT COALESCE(SUM(cant_med_vto), 0) FROM surveys)          AS total_expired_units,
-            (SELECT COALESCE(SUM(peso_med_nc), 0)  FROM surveys)          AS total_weight_g,
-            (SELECT COUNT(*) FROM v_product_metrics WHERE is_expired)     AS expired_products
-    `);
-    const row = q.rows[0];
+    // ⚡ Bolt: Run independent queries concurrently and consolidate survey
+    // aggregates into a single query. This avoids PostgreSQL evaluating each
+    // scalar subquery sequentially and executing 4 separate full table scans
+    // of the 'surveys' table.
+    const [surveysAgg, medsAgg, expiredAgg] = await Promise.all([
+        pool.query(`
+            SELECT
+                COUNT(*) AS total_surveys,
+                COALESCE(SUM(cant_med), 0) AS total_unused_units,
+                COALESCE(SUM(cant_med_vto), 0) AS total_expired_units,
+                COALESCE(SUM(peso_med_nc), 0) AS total_weight_g
+            FROM surveys
+        `),
+        pool.query(`SELECT COUNT(*) AS total_medications FROM medications`),
+        pool.query(`SELECT COUNT(*) AS expired_products FROM v_product_metrics WHERE is_expired`),
+    ]);
+
+    const s = surveysAgg.rows[0];
     res.json({
-        total_surveys: Number(row.total_surveys),
-        total_medications: Number(row.total_medications),
-        total_unused_units: Number(row.total_unused_units),
-        total_expired_units: Number(row.total_expired_units),
-        total_weight_g: Number(row.total_weight_g),
-        expired_products: Number(row.expired_products),
+        total_surveys: Number(s.total_surveys),
+        total_medications: Number(medsAgg.rows[0].total_medications),
+        total_unused_units: Number(s.total_unused_units),
+        total_expired_units: Number(s.total_expired_units),
+        total_weight_g: Number(s.total_weight_g),
+        expired_products: Number(expiredAgg.rows[0].expired_products),
     });
 }));
 
@@ -87,7 +95,10 @@ router.get('/socio', asyncHandler(async (req, res) => {
     // Allowlist the grouping dimension: ?by is constrained to known columns and
     // any unknown/malicious value falls back to 'estrato'. quoteIdent is applied
     // as defense-in-depth so a raw identifier can never reach the SQL string.
-    const dimMap = { estrato: 'estrato', as_salud: 'as_salud', ciudad: 'ciudad' };
+    const dimMap = {
+        estrato: 'estrato', as_salud: 'as_salud', ciudad: 'ciudad',
+        nv_estu: 'nv_estu', nv_posg: 'nv_posg',
+    };
     const dim = dimMap[req.query.by] || 'estrato';
     const col = quoteIdent(dim);
     const result = await pool.query(`

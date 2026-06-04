@@ -2,16 +2,16 @@ import React, { useState, useMemo } from 'react'
 import { TopBar, StepBar } from '../components/layout'
 import {
   Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, Dialog, C,
+  Field, SectionHead, Dialog, ChipGroup, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
 import {
-  calcEdad, fmtDate,
-  toCSV, downloadBlob, dateTag, productMetrics,
+  calcEdad, fmtDate, compareSortable,
+  toCSV, toCodebookCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
-import { TOTAL_STEPS } from '../lib/constants'
+import { TOTAL_STEPS, OPT, FIELD_GUIDE } from '../lib/constants'
 import type { SurveyDraft, Survey } from '../types'
 
 // DashboardPage lives in its own lazily-loaded chunk (pages/Dashboard.tsx) to
@@ -21,6 +21,7 @@ import type { SurveyDraft, Survey } from '../types'
 
 export function WizardPage() {
   const { wizard, setWizardStep, updateDraft, closeWizard, addSurvey, updateSurvey } = useStore()
+  const [guideOpen, setGuideOpen] = useState(false)
   if (!wizard) return null
   const { step, draft, editingId } = wizard
 
@@ -46,17 +47,27 @@ export function WizardPage() {
       <TopBar
         title={editingId ? 'Editar encuesta' : 'Nueva encuesta'}
         actions={
-          <button
-            aria-label="Cancelar"
-            onClick={closeWizard}
-            style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
-          >
-            <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden />
-          </button>
+          <>
+            <button
+              aria-label="Guía de campo"
+              onClick={() => setGuideOpen(true)}
+              style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
+            >
+              <i className="ti ti-help" style={{ fontSize: 18 }} aria-hidden />
+            </button>
+            <button
+              aria-label="Cancelar"
+              onClick={closeWizard}
+              style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
+            >
+              <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden />
+            </button>
+          </>
         }
       />
+      {guideOpen && <FieldGuideDialog onClose={() => setGuideOpen(false)} />}
       <StepBar currentStep={step} />
-      <div className="page-content" style={{ paddingBottom: 24 }}>
+      <div className="page-content narrow" style={{ paddingBottom: 24 }}>
         {step === 1 && <Step1 {...stepProps} />}
         {step === 2 && <Step2 {...stepProps} />}
         {step === 3 && <Step3 {...stepProps} />}
@@ -68,7 +79,129 @@ export function WizardPage() {
   )
 }
 
+// Field guide: codebook definitions so every surveyor reads each field the same
+// way (standardisation → less inter-observer variability).
+function FieldGuideDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <Dialog title="Guía de campo — definiciones" onClose={onClose}>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Usa siempre estas definiciones para registrar de forma consistente entre encuestadores.
+      </p>
+      {FIELD_GUIDE.map(g => (
+        <div key={g.key} style={{ padding: '8px 0', borderBottom: `0.5px solid ${C.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 2 }}>{g.term}</div>
+          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{g.def}</div>
+        </div>
+      ))}
+    </Dialog>
+  )
+}
+
 // ─── ENCUESTAS PAGE ───────────────────────────────────────────────────────
+
+type RecordsView = 'cards' | 'table'
+
+interface SurveyCardProps {
+  sv: Survey
+  isInvestigador: boolean
+  isConfirmingDelete: boolean
+  onRemove: (id: string) => void
+  onSetConfirmId: (id: string | null) => void
+  onOpenEditWizard: (sv: Survey) => void
+  onSetDetail: (sv: Survey) => void
+}
+
+const SurveyCardItem = React.memo(function SurveyCardItem({
+  sv,
+  isInvestigador,
+  isConfirmingDelete,
+  onRemove,
+  onSetConfirmId,
+  onOpenEditWizard,
+  onSetDetail,
+}: SurveyCardProps) {
+  const edad = calcEdad(sv.fEta, sv.fNac)
+  const expiredMeds = sv.medications?.filter(m => {
+    const mx = productMetrics(sv.fEta, sv.fDisp, m)
+    return mx.isExpired
+  }).length ?? 0
+
+  return (
+    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>#{String(sv.nui).padStart(3, '0')}</span>
+          <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>{fmtDate(sv.fEta)}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {sv.ciudad && <Badge label={sv.ciudad} variant="gray" />}
+          {sv.medSob   === 'Sí' && <Badge label="Med. almac."  variant="teal" />}
+          {sv.vtoMedNc === 'Sí' && <Badge label="Vencidos"     variant="amber" />}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px', fontSize: 12, marginBottom: 8 }}>
+        {edad !== null && <span style={{ color: C.muted }}>Edad: <strong>{edad} años</strong></span>}
+        {sv.estrato   && <span style={{ color: C.muted }}>Estrato: <strong>{sv.estrato}</strong></span>}
+        {sv.asSalud   && <span style={{ color: C.muted }}>Salud: <strong>{sv.asSalud}</strong></span>}
+        {sv.cantMed != null && sv.medSob === 'Sí' && (
+          <span style={{ color: C.muted }}>Sin consumir: <strong>{sv.cantMed}</strong></span>
+        )}
+        {sv.cantMedVto != null && sv.cantMedVto > 0 && (
+          <span style={{ color: C.amber }}>Vencidos: <strong>{sv.cantMedVto}</strong></span>
+        )}
+        {sv.pesoMedNc != null && (
+          <span style={{ color: C.muted }}>Peso: <strong>{sv.pesoMedNc}g</strong></span>
+        )}
+      </div>
+
+      {sv.medications?.length > 0 && (
+        <div style={{ padding: '6px 8px', background: C.bg, borderRadius: 6, fontSize: 12, marginBottom: 10 }}>
+          <i className="ti ti-pill" style={{ fontSize: 12, marginRight: 5, color: C.teal }} aria-hidden />
+          <strong>{sv.medications.length}</strong> producto(s) registrado(s)
+          {expiredMeds > 0 && (
+            <span style={{ marginLeft: 8, color: C.amber }}>· {expiredMeds} vencido(s)</span>
+          )}
+          <button
+            type="button"
+            onClick={() => onSetDetail(sv)}
+            style={{ marginLeft: 10, background: 'none', border: 'none', color: C.teal, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Ver detalle
+          </button>
+        </div>
+      )}
+
+      {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
+      {!isInvestigador && (
+        isConfirmingDelete ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 'auto', paddingTop: 4 }}>
+            <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
+            <Button size="sm" variant="danger" onClick={() => { onRemove(sv.id); onSetConfirmId(null) }}>
+              Sí, eliminar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onSetConfirmId(null)}>
+              Cancelar
+            </Button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 'auto', paddingTop: 4 }}>
+            <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => onOpenEditWizard(sv)}>
+              Editar
+            </Button>
+            <Button
+              size="sm" variant="ghost" icon="ti-trash"
+              style={{ color: C.red, borderColor: `${C.red}50` }}
+              onClick={() => onSetConfirmId(sv.id)}
+            >
+              Eliminar
+            </Button>
+          </div>
+        )
+      )}
+    </Card>
+  )
+})
 
 export function EncuestasPage() {
   const { surveys, removeSurvey, openEditWizard, openWizard, userRole } = useStore()
@@ -76,6 +209,9 @@ export function EncuestasPage() {
   const [filter, setFilter]     = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [detail, setDetail]     = useState<Survey | null>(null)
+  // Investigators analyse many rows → default to the dense table; encuestadores
+  // edit their own entries → default to cards.
+  const [view, setView] = useState<RecordsView>(isInvestigador ? 'table' : 'cards')
 
   const filtered = useMemo(() => {
     if (!filter.trim()) return surveys
@@ -95,12 +231,14 @@ export function EncuestasPage() {
       <TopBar title="Registros" />
       <div className="page-content">
         {surveys.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input
               value={filter}
               onChange={e => setFilter(e.target.value)}
               placeholder="Buscar por N°, ciudad, medicamento, DCI…"
+              style={{ flex: 1 }}
             />
+            <ViewToggle view={view} onChange={setView} />
           </div>
         )}
 
@@ -121,90 +259,26 @@ export function EncuestasPage() {
             Sin resultados para "{filter}".
           </p>
         )}
-        {surveys.length > 0 && filtered.length > 0 && filtered.map(sv => {
-            const edad = calcEdad(sv.fEta, sv.fNac)
-            const expiredMeds = sv.medications?.filter(m => {
-              const mx = productMetrics(sv.fEta, sv.fDisp, m)
-              return mx.isExpired
-            }).length ?? 0
+        {surveys.length > 0 && filtered.length > 0 && view === 'table' && (
+          <RecordsTable surveys={filtered} onDetail={setDetail} />
+        )}
 
-            return (
-              <Card key={sv.id} style={{ marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                  <div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>#{String(sv.nui).padStart(3, '0')}</span>
-                    <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>{fmtDate(sv.fEta)}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    {sv.ciudad && <Badge label={sv.ciudad} variant="gray" />}
-                    {sv.medSob   === 'Sí' && <Badge label="Med. almac."  variant="teal" />}
-                    {sv.vtoMedNc === 'Sí' && <Badge label="Vencidos"     variant="amber" />}
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px', fontSize: 12, marginBottom: 8 }}>
-                  {edad !== null && <span style={{ color: C.muted }}>Edad: <strong>{edad} años</strong></span>}
-                  {sv.estrato   && <span style={{ color: C.muted }}>Estrato: <strong>{sv.estrato}</strong></span>}
-                  {sv.asSalud   && <span style={{ color: C.muted }}>Salud: <strong>{sv.asSalud}</strong></span>}
-                  {sv.cantMed != null && sv.medSob === 'Sí' && (
-                    <span style={{ color: C.muted }}>Sin consumir: <strong>{sv.cantMed}</strong></span>
-                  )}
-                  {sv.cantMedVto != null && sv.cantMedVto > 0 && (
-                    <span style={{ color: C.amber }}>Vencidos: <strong>{sv.cantMedVto}</strong></span>
-                  )}
-                  {sv.pesoMedNc != null && (
-                    <span style={{ color: C.muted }}>Peso: <strong>{sv.pesoMedNc}g</strong></span>
-                  )}
-                </div>
-
-                {sv.medications?.length > 0 && (
-                  <div style={{ padding: '6px 8px', background: C.bg, borderRadius: 6, fontSize: 12, marginBottom: 10 }}>
-                    <i className="ti ti-pill" style={{ fontSize: 12, marginRight: 5, color: C.teal }} aria-hidden />
-                    <strong>{sv.medications.length}</strong> producto(s) registrado(s)
-                    {expiredMeds > 0 && (
-                      <span style={{ marginLeft: 8, color: C.amber }}>· {expiredMeds} vencido(s)</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setDetail(sv)}
-                      style={{ marginLeft: 10, background: 'none', border: 'none', color: C.teal, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      Ver detalle
-                    </button>
-                  </div>
-                )}
-
-                {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
-                {!isInvestigador && (
-                  confirmId === sv.id ? (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
-                      <Button size="sm" variant="danger" onClick={() => { removeSurvey(sv.id); setConfirmId(null) }}>
-                        Sí, eliminar
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setConfirmId(null)}>
-                        Cancelar
-                      </Button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => openEditWizard(sv)}>
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm" variant="ghost" icon="ti-trash"
-                        style={{ color: C.red, borderColor: `${C.red}50` }}
-                        onClick={() => setConfirmId(sv.id)}
-                      >
-                        Eliminar
-                      </Button>
-                    </div>
-                  )
-                )}
-              </Card>
-            )
-          })
-        }
+        {surveys.length > 0 && filtered.length > 0 && view === 'cards' && (
+          <div className="records-grid">
+          {filtered.map(sv => (
+            <SurveyCardItem
+              key={sv.id}
+              sv={sv}
+              isInvestigador={isInvestigador}
+              isConfirmingDelete={confirmId === sv.id}
+              onRemove={removeSurvey}
+              onSetConfirmId={setConfirmId}
+              onOpenEditWizard={openEditWizard}
+              onSetDetail={setDetail}
+            />
+          ))}
+          </div>
+        )}
       </div>
 
       {/* Medication detail modal */}
@@ -212,6 +286,173 @@ export function EncuestasPage() {
         <MedDetailModal survey={detail} onClose={() => setDetail(null)} />
       )}
     </div>
+  )
+}
+
+// Compact segmented control to switch between card and table views.
+function ViewToggle({ view, onChange }: { view: RecordsView; onChange: (v: RecordsView) => void }) {
+  const opts = [
+    { id: 'table' as const, icon: 'ti-table', label: 'Tabla' },
+    { id: 'cards' as const, icon: 'ti-layout-grid', label: 'Tarjetas' },
+  ]
+  return (
+    <div role="group" aria-label="Vista de registros" style={{
+      display: 'flex', flexShrink: 0, border: `1px solid ${C.border}`,
+      borderRadius: 8, overflow: 'hidden', background: C.surface,
+    }}>
+      {opts.map(o => {
+        const active = view === o.id
+        return (
+          <button
+            key={o.id}
+            type="button"
+            aria-pressed={active}
+            aria-label={o.label}
+            title={o.label}
+            onClick={() => onChange(o.id)}
+            style={{
+              width: 42, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', cursor: 'pointer',
+              background: active ? C.tealLight : 'transparent',
+              color: active ? C.teal : C.muted,
+            }}
+          >
+            <i className={`ti ${o.icon}`} style={{ fontSize: 18 }} aria-hidden />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Dense, sortable records table (investigator analysis view) ─────────────
+
+type SortKey = 'nui' | 'fEta' | 'ciudad' | 'edad' | 'estrato' | 'asSalud' | 'meds' | 'venc'
+
+const TABLE_COLS: { key: SortKey; label: string; numeric?: boolean }[] = [
+  { key: 'nui',     label: 'N°',       numeric: true },
+  { key: 'fEta',    label: 'Fecha' },
+  { key: 'ciudad',  label: 'Ciudad' },
+  { key: 'edad',    label: 'Edad',     numeric: true },
+  { key: 'estrato', label: 'Estrato',  numeric: true },
+  { key: 'asSalud', label: 'Régimen' },
+  { key: 'meds',    label: 'Prod.',    numeric: true },
+  { key: 'venc',    label: 'Venc.',    numeric: true },
+]
+
+function sortValue(s: Survey, key: SortKey): string | number | null {
+  switch (key) {
+    case 'nui':     return s.nui
+    case 'fEta':    return s.fEta
+    case 'ciudad':  return s.ciudad
+    case 'edad':    return calcEdad(s.fEta, s.fNac)
+    case 'estrato': return s.estrato
+    case 'asSalud': return s.asSalud
+    case 'meds':    return s.medications?.length ?? 0
+    case 'venc':    return s.cantMedVto
+  }
+}
+
+function RecordsTable({ surveys, onDetail }: { surveys: Survey[]; onDetail: (s: Survey) => void }) {
+  const [sortKey, setSortKey] = useState<SortKey>('nui')
+  const [asc, setAsc] = useState(true)
+
+  const rows = useMemo(() => {
+    const copy = [...surveys]
+    copy.sort((a, b) => {
+      const r = compareSortable(sortValue(a, sortKey), sortValue(b, sortKey))
+      return asc ? r : -r
+    })
+    return copy
+  }, [surveys, sortKey, asc])
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) setAsc(a => !a)
+    else { setSortKey(key); setAsc(true) }
+  }
+
+  return (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr>
+              {TABLE_COLS.map(col => {
+                const activeSort = sortKey === col.key
+                return (
+                  <th
+                    key={col.key}
+                    aria-sort={activeSort ? (asc ? 'ascending' : 'descending') : 'none'}
+                    onClick={() => toggleSort(col.key)}
+                    style={{
+                      position: 'sticky', top: 0, zIndex: 1,
+                      textAlign: col.numeric ? 'right' : 'left',
+                      padding: '10px 12px', whiteSpace: 'nowrap', cursor: 'pointer',
+                      background: C.surface2, color: C.muted,
+                      fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px',
+                      borderBottom: `1px solid ${C.border}`, userSelect: 'none',
+                    }}
+                  >
+                    {col.label}
+                    <i
+                      className={`ti ${activeSort ? (asc ? 'ti-caret-up-filled' : 'ti-caret-down-filled') : 'ti-arrows-sort'}`}
+                      style={{ fontSize: 13, marginLeft: 4, color: activeSort ? C.teal : C.hint, verticalAlign: 'middle' }}
+                      aria-hidden
+                    />
+                  </th>
+                )
+              })}
+              <th style={{ position: 'sticky', top: 0, background: C.surface2, borderBottom: `1px solid ${C.border}` }} aria-label="Detalle" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((s, i) => {
+              const edad = calcEdad(s.fEta, s.fNac)
+              const meds = s.medications?.length ?? 0
+              const venc = s.cantMedVto ?? 0
+              return (
+                <tr
+                  key={s.id}
+                  onClick={() => onDetail(s)}
+                  style={{ cursor: 'pointer', background: i % 2 ? C.surface2 : C.surface }}
+                >
+                  <Td numeric><strong style={{ color: C.teal }}>#{String(s.nui).padStart(3, '0')}</strong></Td>
+                  <Td>{s.fEta ? fmtDate(s.fEta) : '—'}</Td>
+                  <Td>{s.ciudad || '—'}</Td>
+                  <Td numeric>{edad != null ? edad : '—'}</Td>
+                  <Td numeric>{s.estrato ?? '—'}</Td>
+                  <Td>{s.asSalud || '—'}</Td>
+                  <Td numeric>{meds}</Td>
+                  <Td numeric>
+                    {venc > 0
+                      ? <span style={{ color: C.amber, fontWeight: 600 }}>{venc}</span>
+                      : <span style={{ color: C.hint }}>0</span>}
+                  </Td>
+                  <Td>
+                    <i className="ti ti-chevron-right" style={{ fontSize: 16, color: C.hint, display: 'block' }} aria-hidden />
+                  </Td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function Td({ children, numeric }: { children: React.ReactNode; numeric?: boolean }) {
+  return (
+    <td
+      className={numeric ? 'tnum' : undefined}
+      style={{
+        padding: '9px 12px', whiteSpace: 'nowrap',
+        textAlign: numeric ? 'right' : 'left',
+        borderBottom: `1px solid ${C.border}`, color: C.text,
+      }}
+    >
+      {children}
+    </td>
   )
 }
 
@@ -287,7 +528,7 @@ export function BuscarPage() {
   return (
     <div>
       <TopBar title="Buscador CUM-INVIMA" />
-      <div className="page-content">
+      <div className="page-content narrow">
         <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
           <input
             value={query}
@@ -369,7 +610,7 @@ export function ExportarPage() {
   return (
     <div>
       <TopBar title="Exportar datos" />
-      <div className="page-content">
+      <div className="page-content narrow">
         <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>
           {n} registro{n !== 1 ? 's' : ''} en sesión actual.
           Los datos persisten en IndexedDB del navegador y sobreviven cierres de pestaña.
@@ -392,6 +633,14 @@ export function ExportarPage() {
             onClick={() => downloadBlob(toCSV(surveys), `MEDD_${dateTag()}.csv`, 'text/csv;charset=utf-8')}
           >
             Descargar .csv
+          </Button>
+          <Button
+            fullWidth variant="ghost"
+            style={{ marginTop: 8 }}
+            icon="ti-book-2"
+            onClick={() => downloadBlob(toCodebookCSV(), `MEDD_codebook_${dateTag()}.csv`, 'text/csv;charset=utf-8')}
+          >
+            Descargar diccionario (codebook)
           </Button>
         </Card>
 
@@ -422,7 +671,7 @@ export function ExportarPage() {
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────
 
 export function AjustesPage() {
-  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync } = useStore()
+  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, theme, toggleTheme, density, setDensity } = useStore()
   const [form, setForm] = useState(settings)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -432,7 +681,7 @@ export function AjustesPage() {
   return (
     <div>
       <TopBar title="Ajustes" />
-      <div className="page-content">
+      <div className="page-content narrow">
         <SectionHead icon="ti-settings" label="Configuración del proyecto" />
 
         <Field label="Nombre del proyecto">
@@ -460,9 +709,121 @@ export function AjustesPage() {
           />
         </Field>
 
+        <SectionHead icon="ti-user-shield" label="Perfil del encuestador" />
+        <p style={{ fontSize: 12, color: C.hint, margin: '-8px 0 16px', lineHeight: 1.5 }}>
+          Se registra una sola vez y se adjunta a cada encuesta que captures.
+          Permite analizar los datos por perfil del encuestador (control de
+          calidad y sesgo entre observadores).
+        </p>
+
+        <Field label="Programa académico">
+          <select value={form.etrPrograma} onChange={e => set('etrPrograma')(e.target.value)}>
+            <option value="">— Selecciona —</option>
+            {OPT.etrPrograma.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </Field>
+
+        <Field label="Tipo de institución">
+          <ChipGroup options={OPT.etrTipoInst} value={form.etrTipoInst} onChange={set('etrTipoInst')} />
+        </Field>
+
+        <Field label="Semestre" hint="1 a 12">
+          <input
+            type="number" min={1} max={12}
+            value={form.etrSemestre}
+            onChange={e => set('etrSemestre')(e.target.value)}
+            placeholder="Ej: 8"
+          />
+        </Field>
+
+        <Field label="Institución (nombre)">
+          <input
+            value={form.etrInstitucion}
+            onChange={e => set('etrInstitucion')(e.target.value)}
+            placeholder="Ej: Universidad Nacional de Colombia"
+          />
+        </Field>
+
         <Button fullWidth onClick={() => persistSettings(form)} icon="ti-device-floppy">
           Guardar ajustes
         </Button>
+
+        <Divider label="apariencia" />
+
+        <Card style={{ background: C.surface }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <i className={`ti ${theme === 'dark' ? 'ti-moon' : 'ti-sun'}`} style={{ fontSize: 19, color: C.teal }} aria-hidden />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Tema {theme === 'dark' ? 'oscuro' : 'claro'}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Ajusta la app a tu entorno de trabajo.</div>
+            </div>
+            <button
+              role="switch"
+              aria-checked={theme === 'dark'}
+              aria-label="Alternar tema oscuro"
+              onClick={toggleTheme}
+              style={{
+                width: 52, height: 30, borderRadius: 999, border: 'none', cursor: 'pointer',
+                background: theme === 'dark' ? C.primary : C.border, flexShrink: 0,
+                position: 'relative', transition: 'background 0.18s',
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 3, left: theme === 'dark' ? 25 : 3,
+                width: 24, height: 24, borderRadius: '50%', background: '#fff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left 0.18s',
+              }} />
+            </button>
+          </div>
+        </Card>
+
+        <Card style={{ background: C.surface, marginTop: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <i className="ti ti-layout-distribute-vertical" style={{ fontSize: 19, color: C.teal }} aria-hidden />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Densidad</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Espaciado de tarjetas y listas.</div>
+            </div>
+          </div>
+          <div role="radiogroup" aria-label="Densidad de la interfaz" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {([
+              { id: 'comfortable', label: 'Cómoda', icon: 'ti-baseline-density-medium' },
+              { id: 'compact',     label: 'Compacta', icon: 'ti-baseline-density-small' },
+            ] as const).map(o => {
+              const active = density === o.id
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setDensity(o.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '11px 0', borderRadius: 8, cursor: 'pointer',
+                    border: active ? `1.5px solid ${C.teal}` : `1px solid ${C.border}`,
+                    background: active ? C.tealLight : C.surface,
+                    color: active ? C.teal : C.text,
+                    fontSize: 14, fontWeight: active ? 600 : 400,
+                  }}
+                >
+                  <i className={`ti ${o.icon}`} style={{ fontSize: 18 }} aria-hidden />
+                  {o.label}
+                </button>
+              )
+            })}
+          </div>
+        </Card>
 
         <Divider label="cuenta" />
 

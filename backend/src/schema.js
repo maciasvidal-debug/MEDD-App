@@ -12,7 +12,8 @@ const ENUMS = {
     as_salud: ['Contributivo', 'Subsidiado', 'Especial', 'No afiliado'],
     est_lab: ['Empleado', 'Independiente', 'Hogar', 'Pensionado', 'Estudiante'],
     ingreso: ['< 1 SMMLV', '1-3 SMMLV', '> 4 SMMLV', 'No responde'],
-    nv_estu: ['Ninguno', 'Primaria', 'Secundaria', 'Bachiller', 'Técnico', 'Profesional'],
+    nv_estu: ['Ninguno', 'Primaria', 'Secundaria', 'Bachiller', 'Técnico', 'Profesional', 'Posgrado'],
+    nv_posg: ['Especialización', 'Maestría', 'Doctorado'],
     per_salud: ['Buena', 'Regular', 'Mala'],
     und_conc: ['mcg', 'mg', 'g', 'UI', '%'],
 };
@@ -95,6 +96,14 @@ function validateSocioDemographic(body, v, errors) {
     v.est_lab   = enumOrNull('EST_LAB',   body.est_lab,   ENUMS.est_lab,   errors);
     v.ingreso   = enumOrNull('INGRESO',   body.ingreso,   ENUMS.ingreso,   errors);
     v.nv_estu   = enumOrNull('NV_ESTU',   body.nv_estu,   ENUMS.nv_estu,   errors);
+    // NV_POSG es un sub-nivel de NV_ESTU: sólo aplica (y es obligatorio) cuando
+    // NV_ESTU = 'Posgrado'. En cualquier otro caso se descarta.
+    if (v.nv_estu === 'Posgrado') {
+        v.nv_posg = enumOrNull('NV_POSG', body.nv_posg, ENUMS.nv_posg, errors);
+        if (!v.nv_posg) errors.push('NV_POSG es obligatorio cuando NV_ESTU = Posgrado.');
+    } else {
+        v.nv_posg = null;
+    }
     v.per_salud = enumOrNull('PER_SALUD', body.per_salud, ENUMS.per_salud, errors);
 }
 

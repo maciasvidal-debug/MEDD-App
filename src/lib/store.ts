@@ -5,6 +5,7 @@ import {
   getAllSurveys, saveSurvey, deleteSurvey,
   getSettings, saveSettings,
   getDraft, saveDraft, clearDraft,
+  clearLocalUserData,
 } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { pushSurvey, deleteSurveyRemote, fullSync } from '../lib/sync'
@@ -12,6 +13,34 @@ import { uuid, todayISO } from '../lib/utils'
 import { EMPTY_DRAFT, DEFAULT_SETTINGS } from '../lib/constants'
 
 // ─── Toast ────────────────────────────────────────────────────────────────
+
+export type Theme = 'light' | 'dark'
+export type Density = 'comfortable' | 'compact'
+
+const THEME_KEY = 'medd_theme'
+function readTheme(): Theme {
+  if (typeof window === 'undefined') return 'light'
+  const saved = localStorage.getItem(THEME_KEY)
+  if (saved === 'light' || saved === 'dark') return saved
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+function applyTheme(theme: Theme) {
+  document.documentElement.setAttribute('data-theme', theme)
+  localStorage.setItem(THEME_KEY, theme)
+  // Keep the mobile browser chrome in sync with the active surface.
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0B1220' : '#0F766E')
+}
+
+const DENSITY_KEY = 'medd_density'
+function readDensity(): Density {
+  if (typeof window === 'undefined') return 'comfortable'
+  return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'comfortable'
+}
+function applyDensity(density: Density) {
+  document.documentElement.setAttribute('data-density', density)
+  localStorage.setItem(DENSITY_KEY, density)
+}
 
 export type ToastLevel = 'success' | 'error' | 'info'
 export interface ToastAction { label: string; onClick: () => void }
@@ -65,6 +94,26 @@ interface AppStore {
   toasts: Toast[]
   pushToast: (message: string, level?: ToastLevel, action?: ToastAction, duration?: number) => void
   removeToast: (id: string) => void
+
+  // Theme (light/dark)
+  theme: Theme
+  toggleTheme: () => void
+
+  // Density (comfortable/compact)
+  density: Density
+  setDensity: (d: Density) => void
+}
+
+// Track which account owns the local data so we can wipe device-local stores
+// when a *different* user signs in (preventing cross-user data bleed), while
+// preserving local data when the same user signs back in.
+const LAST_UID_KEY = 'medd_last_uid'
+async function applyUserScope(uid: string): Promise<void> {
+  const last = localStorage.getItem(LAST_UID_KEY)
+  if (last && last !== uid) {
+    await clearLocalUserData()
+  }
+  localStorage.setItem(LAST_UID_KEY, uid)
 }
 
 // ─── Store implementation ─────────────────────────────────────────────────
@@ -82,6 +131,7 @@ export const useStore = create<AppStore>((set, get) => ({
       const user = data.session?.user ?? null
       let userRole: UserRole | null = null
       if (user) {
+        await applyUserScope(user.id)
         const { data: roleRow } = await supabase
           .from('user_roles')
           .select('role')
@@ -95,6 +145,12 @@ export const useStore = create<AppStore>((set, get) => ({
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const prev = get().user
       const next = session?.user ?? null
+
+      // A different account signing in on this device → clear the previous
+      // user's local data before loading anything for the new one.
+      if (next && next.id !== prev?.id) {
+        await applyUserScope(next.id)
+      }
 
       let userRole: UserRole | null = null
       if (next) {
@@ -259,6 +315,11 @@ export const useStore = create<AppStore>((set, get) => ({
       fEta:   todayISO(),
       nuiEtr,
       nui:    surveyCount + 1,
+      // Stamp the surveyor profile snapshot from settings onto the survey.
+      etrPrograma:    settings.etrPrograma,
+      etrTipoInst:    settings.etrTipoInst,
+      etrSemestre:    settings.etrSemestre ? parseInt(settings.etrSemestre, 10) || null : null,
+      etrInstitucion: settings.etrInstitucion,
     }
     const wizard: WizardState = { step: 1, draft }
     set({ wizard, view: 'wizard', pendingDraft: null })
@@ -327,5 +388,20 @@ export const useStore = create<AppStore>((set, get) => ({
   },
   removeToast(id) {
     set(s => ({ toasts: s.toasts.filter(t => t.id !== id) }))
+  },
+
+  // ── Theme ─────────────────────────────────────────────────────────────
+  theme: readTheme(),
+  toggleTheme() {
+    const next: Theme = get().theme === 'dark' ? 'light' : 'dark'
+    applyTheme(next)
+    set({ theme: next })
+  },
+
+  // ── Density ───────────────────────────────────────────────────────────
+  density: readDensity(),
+  setDensity(density) {
+    applyDensity(density)
+    set({ density })
   },
 }))

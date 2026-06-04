@@ -1,12 +1,12 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip,
 } from 'recharts'
 import { TopBar } from '../components/layout'
-import { StatCard, Card, Button, EmptyState, C } from '../components/ui'
+import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
-import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, quantile, productMetrics, type Proportion, type RiskRatio, type ChiSquare, type TrendTest } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2 } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
 
@@ -33,10 +33,10 @@ const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; l
       <PieChart width={72} height={72}>
         <Pie data={data} cx={36} cy={36} innerRadius={22} outerRadius={34} dataKey="v" stroke="none">
           <Cell fill={color} />
-          <Cell fill="#E2E8F0" />
+          <Cell fill={CHART.track} />
         </Pie>
       </PieChart>
-      <span style={{ fontSize: 16, fontWeight: 500, color }}>{pct(val, outOf)}%</span>
+      <span className="tnum" style={{ fontSize: 18, fontWeight: 700, color }}>{pct(val, outOf)}%</span>
       <span style={{ fontSize: 11, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
       <span style={{ fontSize: 11, color: C.hint }}>{val}/{outOf}</span>
     </div>
@@ -44,26 +44,59 @@ const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; l
 }
 
 export default function DashboardPage() {
-  const { surveys, openWizard, userRole } = useStore()
+  const { surveys, openWizard, userRole, setView, pendingDraft, resumeDraft } = useStore()
   const isInvestigador = userRole === 'investigador'
-  const n = surveys.length
+
+  // Investigator cockpit filters (encuestadores see only their own data, unfiltered)
+  const [fCiudad, setFCiudad]   = useState('')
+  const [fSalud, setFSalud]     = useState('')
+  const [fEstrato, setFEstrato] = useState<number | null>(null)
+  const [fProg, setFProg]       = useState('')
+  const [fTipo, setFTipo]       = useState('')
+  const filtersActive = isInvestigador && (!!fCiudad || !!fSalud || fEstrato !== null || !!fProg || !!fTipo)
+  const clearFilters = () => { setFCiudad(''); setFSalud(''); setFEstrato(null); setFProg(''); setFTipo('') }
+
+  // Cities present in the data, for the filter dropdown.
+  const ciudadOptions = useMemo(
+    () => Array.from(new Set(surveys.map(s => s.ciudad).filter(Boolean))).sort() as string[],
+    [surveys],
+  )
+  // Surveyor academic programs present in the data.
+  const progOptions = useMemo(
+    () => Array.from(new Set(surveys.map(s => s.etrPrograma).filter(Boolean))).sort() as string[],
+    [surveys],
+  )
+
+  const data = useMemo(() => {
+    if (!isInvestigador) return surveys
+    return surveys.filter(s =>
+      (!fCiudad || s.ciudad === fCiudad) &&
+      (!fSalud || s.asSalud === fSalud) &&
+      (fEstrato === null || s.estrato === fEstrato) &&
+      (!fProg || s.etrPrograma === fProg) &&
+      (!fTipo || s.etrTipoInst === fTipo)
+    )
+  }, [surveys, isInvestigador, fCiudad, fSalud, fEstrato, fProg, fTipo])
+
+  const n = data.length
 
   const {
     nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
-    barAsSalud, barNvEstu, barEtnia, barEstrato, ciudadVenc
+    barAsSalud, barNvEstu, barNvPosg, barEtnia, barEstrato, ciudadVenc
   } = useMemo(() => {
     let nSob = 0, nVenc = 0, nDisp = 0
     let pesoTotal = 0, unidTotal = 0, vencTotal = 0, totalMeds = 0
 
     const asSaludCounts: Record<string, number> = {}
     const nvEstuCounts: Record<string, number> = {}
+    const nvPosgCounts: Record<string, number> = {}
     const etniaCounts: Record<string, number> = {}
     const estratoCounts: Record<number, number> = {}
     const ciudadVencMap = new Map<string, number>()
 
     // ⚡ Bolt: Single pass for scalar KPIs and distributions (reduces 21+ array passes to 1)
-    for (let i = 0; i < surveys.length; i++) {
-      const s = surveys[i]
+    for (let i = 0; i < data.length; i++) {
+      const s = data[i]
       if (s.medSob === 'Sí') nSob++
       if (s.vtoMedNc === 'Sí') nVenc++
       if (s.dispMedVc === 'Sí') nDisp++
@@ -74,6 +107,7 @@ export default function DashboardPage() {
 
       if (s.asSalud) asSaludCounts[s.asSalud] = (asSaludCounts[s.asSalud] || 0) + 1
       if (s.nvEstu) nvEstuCounts[s.nvEstu] = (nvEstuCounts[s.nvEstu] || 0) + 1
+      if (s.nvPosg) nvPosgCounts[s.nvPosg] = (nvPosgCounts[s.nvPosg] || 0) + 1
       if (s.etnia) etniaCounts[s.etnia] = (etniaCounts[s.etnia] || 0) + 1
       if (s.estrato !== null && s.estrato !== undefined) estratoCounts[s.estrato] = (estratoCounts[s.estrato] || 0) + 1
 
@@ -83,6 +117,7 @@ export default function DashboardPage() {
 
     const barAsSalud = OPT.asSalud.map(v => ({ name: v, n: asSaludCounts[v] || 0 })).filter(d => d.n > 0)
     const barNvEstu  = OPT.nvEstu.map(v => ({ name: v, n: nvEstuCounts[v] || 0 })).filter(d => d.n > 0)
+    const barNvPosg  = OPT.nvPosg.map(v => ({ name: v, n: nvPosgCounts[v] || 0 })).filter(d => d.n > 0)
     const barEtnia   = OPT.etnia.map(v => ({ name: v, n: etniaCounts[v] || 0 })).filter(d => d.n > 0)
     const barEstrato = OPT.estrato.map(e => ({ name: `Estrato ${e}`, n: estratoCounts[e] || 0 })).filter(d => d.n > 0)
 
@@ -94,27 +129,32 @@ export default function DashboardPage() {
 
     return {
       nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
-      barAsSalud, barNvEstu, barEtnia, barEstrato, ciudadVenc
+      barAsSalud, barNvEstu, barNvPosg, barEtnia, barEstrato, ciudadVenc
     }
-  }, [surveys])
+  }, [data])
 
-  const assoc = useMemo(() => buildEstratoAssociation(surveys), [surveys])
-  const retention = useMemo(() => buildRetention(surveys), [surveys])
+  const assoc = useMemo(() => buildEstratoAssociation(data), [data])
+  const retention = useMemo(() => buildRetention(data), [data])
+  const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
+  const adjusted = useMemo(() => buildEstratoAdjusted(data), [data])
 
-  if (n === 0) {
+  // No data at all (vs. "filters returned nothing", handled further down)
+  if (surveys.length === 0) {
     return (
       <div>
         <TopBar title="MEDD · Panel analítico" />
         <div className="page-content">
           <EmptyState
             icon="ti-clipboard-data"
-            title="Sin encuestas aún"
-            description="Comience registrando la primera encuesta con el botón + de la barra inferior."
-            action={
+            title={isInvestigador ? 'Aún no hay datos' : 'Sin encuestas aún'}
+            description={isInvestigador
+              ? 'Cuando los encuestadores registren encuestas, aquí verás el análisis agregado.'
+              : 'Registra tu primera encuesta para empezar a ver indicadores.'}
+            action={isInvestigador ? undefined : (
               <Button onClick={() => openWizard(0)} icon="ti-plus">
                 Registrar primera encuesta
               </Button>
-            }
+            )}
           />
         </div>
       </div>
@@ -123,28 +163,53 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <TopBar title="MEDD · Panel analítico" />
+      <TopBar title={isInvestigador ? 'Panel analítico' : 'Mi panel'} />
       <div className="page-content">
 
-        {/* Role badge */}
+        {/* Role-adaptive hero */}
+        {isInvestigador
+          ? <InvestigadorHero n={n} nVenc={nVenc} vencTotal={vencTotal} filtersActive={filtersActive} totalSurveys={surveys.length} />
+          : <EncuestadorHero
+              n={n} pendingDraft={!!pendingDraft}
+              onNew={() => openWizard(surveys.length)}
+              onResume={resumeDraft}
+              onView={() => setView('encuestas')}
+            />}
+
+        {/* Investigator cockpit filters */}
         {isInvestigador && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: '#EFF6FF', border: '0.5px solid #BFDBFE',
-            borderRadius: 8, padding: '7px 10px', marginBottom: 12,
-          }}>
-            <i className="ti ti-shield-check" style={{ color: '#1D4ED8', fontSize: 14 }} />
-            <span style={{ fontSize: 12, color: '#1D4ED8', fontWeight: 500 }}>
-              Vista de investigador — datos agregados de todos los encuestadores
-            </span>
-          </div>
+          <FilterBar
+            ciudadOptions={ciudadOptions}
+            progOptions={progOptions}
+            fCiudad={fCiudad} setFCiudad={setFCiudad}
+            fSalud={fSalud}   setFSalud={setFSalud}
+            fEstrato={fEstrato} setFEstrato={setFEstrato}
+            fProg={fProg}     setFProg={setFProg}
+            fTipo={fTipo}     setFTipo={setFTipo}
+            filtersActive={filtersActive} onClear={clearFilters}
+            exportCount={n}
+            onExport={() => downloadBlob(
+              toCSV(data),
+              `MEDD_${filtersActive ? 'filtrado_' : ''}${dateTag()}.csv`,
+              'text/csv;charset=utf-8',
+            )}
+          />
         )}
 
+        {/* Filtered-empty state (data exists but filters exclude everything) */}
+        {n === 0 ? (
+          <Card style={{ textAlign: 'center', padding: '32px 20px' }}>
+            <i className="ti ti-filter-off" style={{ fontSize: 28, color: C.muted, display: 'block', marginBottom: 8 }} aria-hidden />
+            <p style={{ fontSize: 13, color: C.muted, margin: '0 0 14px' }}>Ningún registro coincide con los filtros.</p>
+            <Button variant="secondary" size="sm" icon="ti-x" onClick={clearFilters}>Limpiar filtros</Button>
+          </Card>
+        ) : (
+        <>
         {/* KPIs */}
         <p style={{ fontSize: 11, color: C.hint, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
           Indicadores clave · {n} encuesta{n !== 1 ? 's' : ''}
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div className="kpi-grid" style={{ marginBottom: 16 }}>
           <StatCard icon="ti-users"          label="Total encuestados"    value={n}                                  color={C.navy} />
           <StatCard icon="ti-pill"           label="Productos registrados" value={totalMeds}                          color={C.teal} />
           <StatCard icon="ti-package"        label="Unidades sin consumir" value={unidTotal}                          color={C.teal} />
@@ -157,9 +222,9 @@ export default function DashboardPage() {
         <Card style={{ marginBottom: 14 }}>
           <SectionLabel>Variables clave de resultado</SectionLabel>
           <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-            <MiniDonut val={nSob}  outOf={n}    label="Med. sin consumir"   color={C.navy} />
-            <MiniDonut val={nVenc} outOf={n}    label="Vencidos conf."      color={C.amber} />
-            <MiniDonut val={nDisp} outOf={nSob} label="Conoce disposición*" color={C.teal} />
+            <MiniDonut val={nSob}  outOf={n}    label="Med. sin consumir"   color={CHART.navy} />
+            <MiniDonut val={nVenc} outOf={n}    label="Vencidos conf."      color={CHART.amber} />
+            <MiniDonut val={nDisp} outOf={nSob} label="Conoce disposición*" color={CHART.teal} />
           </div>
           <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, textAlign: 'center', lineHeight: 1.5 }}>
             «Med. sin consumir» y «Vencidos conf.» sobre el total ({n} hogares).
@@ -179,20 +244,28 @@ export default function DashboardPage() {
         {/* Asociación exposición–desenlace */}
         {assoc && <AssociationCard assoc={assoc} />}
 
+        {/* Control de calidad: efecto del encuestador */}
+        {surveyorEffect && <SurveyorEffectCard s={surveyorEffect} />}
+
+        {/* Asociación ajustada por confusión (Mantel–Haenszel) */}
+        {adjusted && <AdjustedAssociationCard a={adjusted} />}
+
         {/* Tiempo de retención de vencidos */}
         {retention && <RetentionCard s={retention} />}
 
+        {/* Distribuciones — 2 columnas en pantallas anchas para aprovechar el espacio */}
+        <div className="chart-grid">
         {/* Hotspots geográficos: CIUDAD x CANT_MED_VTO */}
         {ciudadVenc.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Hotspots geográficos — Unidades vencidas por ciudad</SectionLabel>
             <div style={{ height: Math.max(80, ciudadVenc.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={ciudadVenc} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={85} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="value" fill={C.amber} radius={[0, 3, 3, 0]} name="Unidades vencidas" />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={85} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="value" fill={CHART.amber} radius={[0, 3, 3, 0]} name="Unidades vencidas" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -201,15 +274,15 @@ export default function DashboardPage() {
 
         {/* ESTRATO distribution */}
         {barEstrato.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por estrato socioeconómico</SectionLabel>
             <div style={{ height: Math.max(80, barEstrato.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barEstrato} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.navy} radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={75} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.navy} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -218,15 +291,15 @@ export default function DashboardPage() {
 
         {/* AS_SALUD */}
         {barAsSalud.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por régimen de salud</SectionLabel>
             <div style={{ height: Math.max(80, barAsSalud.length * 30) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barAsSalud} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.teal} radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={90} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.teal} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -235,15 +308,32 @@ export default function DashboardPage() {
 
         {/* NV_ESTU */}
         {barNvEstu.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por nivel educativo</SectionLabel>
             <div style={{ height: Math.max(80, barNvEstu.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barNvEstu} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={75} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill="#7030A0" radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={75} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.purple} radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        )}
+
+        {/* NV_POSG */}
+        {barNvPosg.length > 0 && (
+          <Card>
+            <SectionLabel>Distribución por nivel de posgrado</SectionLabel>
+            <div style={{ height: Math.max(80, barNvPosg.length * 28) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barNvPosg} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={95} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.violet} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -252,22 +342,192 @@ export default function DashboardPage() {
 
         {/* Etnia */}
         {barEtnia.length > 0 && (
-          <Card style={{ marginBottom: 14 }}>
+          <Card>
             <SectionLabel>Distribución por pertenencia étnica</SectionLabel>
             <div style={{ height: Math.max(80, barEtnia.length * 28) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barEtnia} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-                  <Tooltip content={<CustomTip />} />
-                  <Bar dataKey="n" fill={C.gray} radius={[0, 3, 3, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={120} />
+                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+                  <Bar dataKey="n" fill={CHART.gray} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
         )}
+        </div>
+        </>
+        )}
       </div>
     </div>
+  )
+}
+
+// ─── Role-adaptive hero bands ───────────────────────────────────────────────
+
+// Investigator: a brand-gradient summary band framing the dataset at a glance.
+function InvestigadorHero({ n, nVenc, vencTotal, filtersActive, totalSurveys }: {
+  n: number; nVenc: number; vencTotal: number; filtersActive: boolean; totalSurveys: number
+}) {
+  return (
+    <div style={{
+      background: C.gradBrand, color: '#fff', borderRadius: 16,
+      padding: '18px 20px', marginBottom: 16, boxShadow: C.shadowBrand,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, opacity: 0.92 }}>
+        <i className="ti ti-shield-check" style={{ fontSize: 16 }} aria-hidden />
+        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.3px' }}>
+          Vista de investigador · datos agregados
+          {filtersActive && ` · ${n} de ${totalSurveys} (filtrado)`}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <HeroStat value={n} label="Encuestas" />
+        <HeroStat value={nVenc} label="Hogares con vencidos" />
+        <HeroStat value={vencTotal} label="Unidades vencidas" />
+      </div>
+    </div>
+  )
+}
+
+// Encuestador: a "field mode" band — the primary action front and centre.
+function EncuestadorHero({ n, pendingDraft, onNew, onResume, onView }: {
+  n: number; pendingDraft: boolean; onNew: () => void; onResume: () => void; onView: () => void
+}) {
+  return (
+    <div style={{
+      background: C.gradBrand, color: '#fff', borderRadius: 16,
+      padding: '20px', marginBottom: 16, boxShadow: C.shadowBrand,
+    }}>
+      <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 2 }}>Trabajo de campo</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
+        <span className="tnum" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }}>{n}</span>
+        <span style={{ fontSize: 14, opacity: 0.9 }}>encuesta{n !== 1 ? 's' : ''} registrada{n !== 1 ? 's' : ''}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          onClick={pendingDraft ? onResume : onNew}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+            background: '#fff', color: C.primary, border: 'none', borderRadius: 10,
+            padding: '11px 18px', fontSize: 15, fontWeight: 700,
+          }}
+        >
+          <i className={`ti ${pendingDraft ? 'ti-player-play' : 'ti-plus'}`} style={{ fontSize: 19 }} aria-hidden />
+          {pendingDraft ? 'Continuar encuesta' : 'Nueva encuesta'}
+        </button>
+        <button
+          onClick={onView}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+            background: 'rgba(255,255,255,0.16)', color: '#fff',
+            border: '1px solid rgba(255,255,255,0.4)', borderRadius: 10,
+            padding: '11px 16px', fontSize: 14, fontWeight: 600,
+          }}
+        >
+          <i className="ti ti-list" style={{ fontSize: 18 }} aria-hidden />
+          Ver registros
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function HeroStat({ value, label }: { value: number; label: string }) {
+  return (
+    <div>
+      <div className="tnum" style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 11, opacity: 0.85, marginTop: 3 }}>{label}</div>
+    </div>
+  )
+}
+
+// ─── Cockpit filter bar (investigator) ──────────────────────────────────────
+
+function FilterBar({
+  ciudadOptions, progOptions, fCiudad, setFCiudad, fSalud, setFSalud, fEstrato, setFEstrato,
+  fProg, setFProg, fTipo, setFTipo, filtersActive, onClear, exportCount, onExport,
+}: {
+  ciudadOptions: string[]
+  progOptions: string[]
+  fCiudad: string; setFCiudad: (v: string) => void
+  fSalud: string; setFSalud: (v: string) => void
+  fEstrato: number | null; setFEstrato: (v: number | null) => void
+  fProg: string; setFProg: (v: string) => void
+  fTipo: string; setFTipo: (v: string) => void
+  filtersActive: boolean; onClear: () => void
+  exportCount: number; onExport: () => void
+}) {
+  return (
+    <Card style={{ marginBottom: 16, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <i className="ti ti-adjustments-horizontal" style={{ fontSize: 15 }} aria-hidden /> Filtros
+        </span>
+        {filtersActive && (
+          <button onClick={onClear} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.teal, fontSize: 12, fontWeight: 600 }}>
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gap: 10 }}>
+        {ciudadOptions.length > 0 && (
+          <select value={fCiudad} onChange={e => setFCiudad(e.target.value)} aria-label="Filtrar por ciudad">
+            <option value="">Todas las ciudades</option>
+            {ciudadOptions.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        <div>
+          <div style={{ fontSize: 11, color: C.hint, marginBottom: 6 }}>Régimen de salud</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {OPT.asSalud.map(o => (
+              <Chip key={o} label={o} active={fSalud === o} onClick={() => setFSalud(fSalud === o ? '' : o)} />
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: C.hint, marginBottom: 6 }}>Estrato</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {OPT.estrato.map(e => (
+              <Chip key={e} label={String(e)} active={fEstrato === e} onClick={() => setFEstrato(fEstrato === e ? null : e)} />
+            ))}
+          </div>
+        </div>
+
+        {/* Surveyor profile — only shown once such data exists */}
+        {progOptions.length > 0 && (
+          <select value={fProg} onChange={e => setFProg(e.target.value)} aria-label="Filtrar por programa del encuestador">
+            <option value="">Todos los programas (encuestador)</option>
+            {progOptions.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        )}
+        <div>
+          <div style={{ fontSize: 11, color: C.hint, marginBottom: 6 }}>Institución del encuestador</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {OPT.etrTipoInst.map(t => (
+              <Chip key={t} label={t} active={fTipo === t} onClick={() => setFTipo(fTipo === t ? '' : t)} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Export the current (filtered) subset straight from the cockpit */}
+      <button
+        onClick={onExport}
+        disabled={exportCount === 0}
+        style={{
+          marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: '10px 14px', borderRadius: 8, cursor: exportCount === 0 ? 'not-allowed' : 'pointer',
+          border: `1px solid ${C.border}`, background: C.surface2, color: C.text,
+          fontSize: 13, fontWeight: 600, opacity: exportCount === 0 ? 0.5 : 1,
+        }}
+      >
+        <i className="ti ti-file-download" style={{ fontSize: 17 }} aria-hidden />
+        Exportar {filtersActive ? 'selección' : 'todo'} (CSV · {exportCount})
+      </button>
+    </Card>
   )
 }
 
@@ -455,6 +715,271 @@ function AssociationCard({ assoc }: { assoc: Association }) {
         </div>
       </div>
     </Card>
+  )
+}
+
+// ─── Surveyor (interviewer) effect — data-quality stratification ────────────
+
+interface SurveyorEffect {
+  programs: AssocGroup[] | null   // outcome prevalence by surveyor program
+  chi: ChiSquare | null
+  ref: string
+  trend: TrendTest | null         // outcome trend across academic semester (ordinal)
+  nSemester: number               // surveys carrying a semester value
+  icc: ICCResult | null           // clustering of the outcome by surveyor (nuiEtr)
+}
+
+// Quantifies whether the confirmed-expired outcome (vtoMedNc='Sí') varies by the
+// SURVEYOR's profile rather than the household. A real epidemiological signal
+// shouldn't depend on who collected the data, so a significant difference here is
+// read as a measurement / inter-observer quality flag, not a true effect. Program
+// is categorical (chi-square + PR vs the most-sampled program); academic semester
+// is ordinal, so it also gets a Cochran–Armitage trend test.
+function buildSurveyorEffect(surveys: Survey[]): SurveyorEffect | null {
+  const isCase = (s: Survey) => s.vtoMedNc === 'Sí'
+
+  // By program
+  const progMap = new Map<string, { total: number; cases: number }>()
+  for (const s of surveys) {
+    if (!s.etrPrograma) continue
+    const g = progMap.get(s.etrPrograma) ?? { total: 0, cases: 0 }
+    g.total++
+    if (isCase(s)) g.cases++
+    progMap.set(s.etrPrograma, g)
+  }
+  const progEntries = Array.from(progMap.entries()).filter(([, g]) => g.total > 0)
+
+  let programs: AssocGroup[] | null = null
+  let chi: ChiSquare | null = null
+  let ref = ''
+  if (progEntries.length >= 2) {
+    // Reference = most-sampled program (most stable baseline).
+    const refEntry = progEntries.reduce((a, b) => (b[1].total > a[1].total ? b : a))
+    ref = refEntry[0]
+    programs = progEntries.map(([label, g]) => ({
+      label, total: g.total, cases: g.cases,
+      prev: wilsonCI(g.cases, g.total),
+      rr: label === ref
+        ? { rr: 1, lo: 1, hi: 1, ref: true }
+        : prevalenceRatio(g.cases, g.total, refEntry[1].cases, refEntry[1].total),
+    }))
+    chi = chiSquareTest(progEntries.map(([, g]) => [g.cases, g.total - g.cases]))
+  }
+
+  // By academic semester (ordinal trend)
+  const semMap = new Map<number, { total: number; cases: number }>()
+  for (const s of surveys) {
+    if (s.etrSemestre == null) continue
+    const g = semMap.get(s.etrSemestre) ?? { total: 0, cases: 0 }
+    g.total++
+    if (isCase(s)) g.cases++
+    semMap.set(s.etrSemestre, g)
+  }
+  const nSemester = Array.from(semMap.values()).reduce((sum, g) => sum + g.total, 0)
+  const trend = semMap.size >= 2
+    ? cochranArmitage(
+        Array.from(semMap.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([score, g]) => ({ score, n: g.total, cases: g.cases })),
+      )
+    : null
+
+  // Outcome clustering by surveyor (nuiEtr) → intraclass correlation
+  const survMap = new Map<number, { n: number; cases: number }>()
+  for (const s of surveys) {
+    if (s.nuiEtr == null) continue
+    const g = survMap.get(s.nuiEtr) ?? { n: 0, cases: 0 }
+    g.n++
+    if (isCase(s)) g.cases++
+    survMap.set(s.nuiEtr, g)
+  }
+  const icc = iccBinary(Array.from(survMap.values()))
+
+  if (!programs && !trend && !icc) return null
+  return { programs, chi, ref, trend, nSemester, icc }
+}
+
+function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
+  const { programs, chi, ref, trend, nSemester, icc } = s
+  const progSig = chi !== null && chi.df > 0 && chi.p < 0.05
+  const trendSig = trend !== null && trend.p < 0.05
+  const iccHigh = icc !== null && icc.icc >= 0.05
+  const flagged = progSig || trendSig || iccHigh
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Control de calidad — efecto del encuestador</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Prevalencia de <strong>vencidos confirmados en casa</strong> según el perfil de quien
+        recolectó. El desenlace no debería depender del encuestador: una diferencia marcada es
+        señal de <strong>variabilidad de medición entre observadores</strong> (revisar criterios /
+        capacitación), no de un efecto epidemiológico real.
+      </p>
+
+      {programs && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+          {programs.map(g => <AssocRow key={g.label} g={g} />)}
+        </div>
+      )}
+
+      <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        {chi && (
+          <div>
+            <strong style={{ color: progSig ? C.amber : C.text }}>
+              Por programa · χ² = {chi.chi2.toFixed(2)} (gl {chi.df}), p = {fmtP(chi.p)}
+            </strong>
+            {' — '}
+            {progSig
+              ? 'difiere según el programa del encuestador (posible efecto del observador)'
+              : 'sin evidencia de diferencia entre programas'} (α = 0,05).
+            {chi.minExpected < 5 && (
+              <span style={{ color: C.amber }}> ⚠ Celda esperada &lt; 5: interpretar con cautela.</span>
+            )}
+          </div>
+        )}
+        {trend && (
+          <div style={{ marginTop: chi ? 6 : 0 }}>
+            <strong style={{ color: trendSig ? C.amber : C.text }}>
+              Por semestre (Cochran–Armitage) · χ² = {trend.chi2.toFixed(2)} (gl 1), p = {fmtP(trend.p)}
+            </strong>
+            {' — '}
+            {trendSig
+              ? `gradiente ${trend.direction} con el semestre académico (n = ${nSemester})`
+              : `sin gradiente con el semestre (n = ${nSemester})`}.
+          </div>
+        )}
+        {icc && (
+          <div style={{ marginTop: (chi || trend) ? 6 : 0 }}>
+            <strong style={{ color: iccHigh ? C.amber : C.text }}>
+              ICC por encuestador = {icc.icc.toFixed(3)} (deff {icc.designEffect.toFixed(2)}, {icc.clusters} encuestadores)
+            </strong>
+            {' — '}
+            {iccHigh
+              ? 'parte de la variación del desenlace se explica por el encuestador (efecto de conglomerado relevante)'
+              : 'variación entre encuestadores despreciable'}.
+          </div>
+        )}
+        {programs && (
+          <div style={{ marginTop: 4, color: C.hint }}>
+            Referencia: {ref} (programa con más registros). RP = razón de prevalencia vs. referencia (IC 95%).
+          </div>
+        )}
+        {!flagged && (
+          <div style={{ marginTop: 4, color: C.green }}>
+            ✓ Sin señal de efecto del encuestador con los datos actuales.
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+// ─── Confounding-adjusted association (Mantel–Haenszel) ─────────────────────
+
+interface AdjustedAssoc {
+  crude: RiskRatio
+  mh: MHResult
+  bd: { chi2: number; df: number; p: number } | null  // Breslow–Day OR homogeneity
+  exposedTotal: number
+  unexposedTotal: number
+  pctChange: number   // % change crude → adjusted (confounding rule of thumb: >10%)
+}
+
+// Estimates the estrato→"vencidos en casa" association adjusted for the surveyor's
+// academic program (the just-added potential confounder). Exposure is estrato
+// dichotomised high (4–6) vs low (1–3); the confounder strata are the programs.
+// Comparing the crude vs the MH-adjusted PR shows whether who collected the data
+// distorts the socioeconomic association. Needs ≥2 program strata to be meaningful.
+function buildEstratoAdjusted(surveys: Survey[]): AdjustedAssoc | null {
+  const strataMap = new Map<string, Stratum2x2>()
+  let aT = 0, bT = 0, cT = 0, dT = 0
+  for (const s of surveys) {
+    if (s.estrato == null || !s.etrPrograma) continue
+    const high = s.estrato >= 4
+    const isCase = s.vtoMedNc === 'Sí'
+    const st = strataMap.get(s.etrPrograma) ?? { a: 0, b: 0, c: 0, d: 0 }
+    if (high && isCase)       { st.a++; aT++ }
+    else if (high && !isCase) { st.b++; bT++ }
+    else if (!high && isCase) { st.c++; cT++ }
+    else                      { st.d++; dT++ }
+    strataMap.set(s.etrPrograma, st)
+  }
+
+  const mh = mantelHaenszelRR(Array.from(strataMap.values()))
+  if (!mh || mh.strata < 2) return null
+
+  const crude = prevalenceRatio(aT, aT + bT, cT, cT + dT)
+  if (!Number.isFinite(crude.rr)) return null
+
+  const bd = breslowDay(Array.from(strataMap.values()))
+  const pctChange = mh.rr > 0 ? Math.abs(crude.rr - mh.rr) / mh.rr * 100 : 0
+  return { crude, mh, bd, exposedTotal: aT + bT, unexposedTotal: cT + dT, pctChange }
+}
+
+function AdjustedAssociationCard({ a }: { a: AdjustedAssoc }) {
+  const { crude, mh, bd, exposedTotal, unexposedTotal, pctChange } = a
+  const confounded = pctChange >= 10
+  const adjSig = mh.lo > 1 || mh.hi < 1
+  const heterog = bd !== null && bd.p < 0.05
+  const fmt = (x: number) => x.toFixed(2)
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Asociación ajustada por confusión (Mantel–Haenszel)</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Exposición: <strong>estrato alto (4–6)</strong> vs bajo (1–3). Desenlace:
+        <strong> vencidos confirmados en casa</strong>. Ajustada por el <strong>programa del
+        encuestador</strong> ({mh.strata} estratos).
+      </p>
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <RRBox label="RP cruda" rr={crude.rr} lo={crude.lo} hi={crude.hi} fmt={fmt} />
+        <RRBox label="RP ajustada (MH)" rr={mh.rr} lo={mh.lo} hi={mh.hi} fmt={fmt} highlight />
+      </div>
+
+      <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        <strong style={{ color: adjSig ? C.amber : C.text }}>
+          CMH χ² = {mh.chi2.toFixed(2)} (gl 1), p = {fmtP(mh.p)}
+        </strong>
+        {' — '}
+        {adjSig ? 'asociación significativa tras ajustar' : 'sin asociación tras ajustar'} (α = 0,05).
+        <div style={{ marginTop: 4, color: confounded ? C.amber : C.green }}>
+          {confounded
+            ? `⚠ La estimación cambia ${pctChange.toFixed(0)}% al ajustar → el programa del encuestador confunde la asociación.`
+            : `✓ El ajuste apenas cambia la estimación (${pctChange.toFixed(0)}%) → sin confusión apreciable por el encuestador.`}
+        </div>
+        {bd && (
+          <div style={{ marginTop: 4, color: heterog ? C.amber : C.green }}>
+            Homogeneidad (Breslow–Day) · χ² = {bd.chi2.toFixed(2)} (gl {bd.df}), p = {fmtP(bd.p)} —{' '}
+            {heterog
+              ? '⚠ el efecto del estrato varía entre programas (modificación de efecto): la RP combinada puede no ser apropiada.'
+              : 'la asociación es homogénea entre estratos → la estimación combinada es válida.'}
+          </div>
+        )}
+        <div style={{ marginTop: 4, color: C.hint }}>
+          n: {exposedTotal} expuestos (alto) · {unexposedTotal} no expuestos (bajo).
+          Estrato dicotomizado; con celdas pequeñas, interpretar con cautela.
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function RRBox({ label, rr, lo, hi, fmt, highlight }: {
+  label: string; rr: number; lo: number; hi: number; fmt: (x: number) => string; highlight?: boolean
+}) {
+  return (
+    <div style={{
+      flex: 1, textAlign: 'center', padding: '10px 8px', borderRadius: 10,
+      background: highlight ? C.tealLight : C.bg,
+      border: `1px solid ${highlight ? C.teal : C.border}`,
+    }}>
+      <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{label}</div>
+      <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: highlight ? C.teal : C.text, lineHeight: 1 }}>
+        {fmt(rr)}
+      </div>
+      <div className="tnum" style={{ fontSize: 11, color: C.hint, marginTop: 3 }}>
+        IC95% {fmt(lo)}–{fmt(hi)}
+      </div>
+    </div>
   )
 }
 
