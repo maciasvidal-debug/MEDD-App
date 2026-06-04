@@ -25,7 +25,7 @@ export function TopBar({ title, onBack, actions }: TopBarProps) {
       {onBack && (
         <IconButton icon="ti-arrow-left" label="Regresar" onClick={onBack} />
       )}
-      <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.3px', flex: 1, color: C.text }}>
+      <span className="fd" style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', flex: 1, color: C.text }}>
         {title}
       </span>
       {actions && (
@@ -71,22 +71,36 @@ export function BottomNav() {
 
   return (
     <nav
-      className="bottom-nav"
+      className="bottom-nav nav-float"
       aria-label="Navegación principal"
       style={{
-        position: 'fixed', bottom: 0, left: '50%',
-        transform: 'translateX(-50%)',
-        width: '100%', maxWidth: 520,
+        position: 'fixed', bottom: 0,
         background: C.surface,
-        borderTop: `1px solid ${C.border}`,
-        boxShadow: '0 -2px 12px rgba(15, 23, 42, 0.06)',
         display: 'flex', alignItems: 'center',
-        padding: '6px 0 calc(6px + env(safe-area-inset-bottom))',
         zIndex: 10,
       }}
     >
       {visibleItems.map(item => {
         const active = view === item.id
+
+        if (item.fab) {
+          return (
+            <button
+              key={item.id}
+              aria-label={item.label}
+              onClick={() => handleNav(item.id)}
+              style={{
+                flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 52, height: 52, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                background: C.gradBrand, color: '#fff', margin: '0 4px',
+                boxShadow: C.shadowBrand,
+              }}
+            >
+              <i className="ti ti-plus" style={{ fontSize: 24 }} aria-hidden />
+            </button>
+          )
+        }
+
         return (
           <button
             key={item.id}
@@ -96,24 +110,14 @@ export function BottomNav() {
             style={{
               flex: 1, display: 'flex', flexDirection: 'column',
               alignItems: 'center', gap: 3,
-              border: 'none', background: 'transparent',
-              cursor: 'pointer', padding: '4px 0',
+              border: 'none', cursor: 'pointer', padding: '7px 0',
+              background: active ? C.tealLight : 'transparent',
               color: active ? C.teal : C.muted,
+              transition: 'background 0.14s, color 0.14s',
             }}
           >
-            {item.fab ? (
-              <div style={{
-                width: 46, height: 46, borderRadius: '50%',
-                background: C.primary, display: 'flex', alignItems: 'center',
-                justifyContent: 'center', marginBottom: -2, marginTop: -12,
-                boxShadow: '0 2px 8px rgba(15,118,110,0.30)',
-              }}>
-                <i className="ti ti-plus" style={{ fontSize: 22, color: '#fff' }} aria-hidden />
-              </div>
-            ) : (
-              <i className={`ti ${item.icon}`} style={{ fontSize: 22 }} aria-hidden />
-            )}
-            <span style={{ fontSize: 11, fontWeight: active ? 500 : 400 }}>
+            <i className={`ti ${item.icon}`} style={{ fontSize: 21 }} aria-hidden />
+            <span style={{ fontSize: 10.5, fontWeight: active ? 600 : 500, letterSpacing: '0.1px' }}>
               {item.label}
             </span>
           </button>

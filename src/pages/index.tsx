@@ -101,6 +101,19 @@ function FieldGuideDialog({ onClose }: { onClose: () => void }) {
 
 type RecordsView = 'cards' | 'table'
 
+// Compact label/value pair for the survey card metadata grid.
+function Meta({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+      <span style={{ fontSize: 11, color: C.hint }}>{label}</span>
+      <span style={{
+        fontSize: 13, fontWeight: 600, color: accent ?? C.text,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>{value}</span>
+    </div>
+  )
+}
+
 // Single survey card, extracted and memoized so that frequent EncuestasPage
 // re-renders (e.g. every keystroke in the filter field) don't re-render every
 // row. Each row does string date parsing (calcEdad) and array filtering
@@ -124,55 +137,59 @@ const SurveyCardItem = React.memo(function SurveyCardItem({
   const expiredMeds = sv.medications?.filter(m => productMetrics(sv.fEta, sv.fDisp, m).isExpired).length ?? 0
 
   return (
-    <Card style={{ display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-        <div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>#{String(sv.nui).padStart(3, '0')}</span>
-          <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>{fmtDate(sv.fEta)}</span>
+    <Card className="lift" style={{ display: 'flex', flexDirection: 'column', cursor: 'default' }}>
+      {/* Header: big display record number + date, status pills to the right */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="fd tnum" style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', color: C.text, lineHeight: 1 }}>
+            #{String(sv.nui).padStart(3, '0')}
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+            {sv.ciudad ? `${sv.ciudad} · ` : ''}{fmtDate(sv.fEta)}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {sv.ciudad && <Badge label={sv.ciudad} variant="gray" />}
-          {sv.medSob   === 'Sí' && <Badge label="Med. almac."  variant="teal" />}
-          {sv.vtoMedNc === 'Sí' && <Badge label="Vencidos"     variant="amber" />}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {sv.medSob   === 'Sí' && <Badge label="Almacena"  variant="teal" />}
+          {sv.vtoMedNc === 'Sí' && <Badge label="Vencidos"  variant="amber" />}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px', fontSize: 12, marginBottom: 8 }}>
-        {edad !== null && <span style={{ color: C.muted }}>Edad: <strong>{edad} años</strong></span>}
-        {sv.estrato   && <span style={{ color: C.muted }}>Estrato: <strong>{sv.estrato}</strong></span>}
-        {sv.asSalud   && <span style={{ color: C.muted }}>Salud: <strong>{sv.asSalud}</strong></span>}
-        {sv.cantMed != null && sv.medSob === 'Sí' && (
-          <span style={{ color: C.muted }}>Sin consumir: <strong>{sv.cantMed}</strong></span>
-        )}
-        {sv.cantMedVto != null && sv.cantMedVto > 0 && (
-          <span style={{ color: C.amber }}>Vencidos: <strong>{sv.cantMedVto}</strong></span>
-        )}
-        {sv.pesoMedNc != null && (
-          <span style={{ color: C.muted }}>Peso: <strong>{sv.pesoMedNc}g</strong></span>
-        )}
+      {/* Metadata: sentence-case labels, ink values — quiet, legible hierarchy */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px 16px', fontSize: 12.5, marginBottom: 12 }}>
+        {edad !== null && <Meta label="Edad" value={`${edad} años`} />}
+        {sv.estrato   && <Meta label="Estrato" value={String(sv.estrato)} />}
+        {sv.asSalud   && <Meta label="Régimen" value={sv.asSalud} />}
+        {sv.cantMed != null && sv.medSob === 'Sí' && <Meta label="Sin consumir" value={String(sv.cantMed)} />}
+        {sv.cantMedVto != null && sv.cantMedVto > 0 && <Meta label="Vencidos" value={String(sv.cantMedVto)} accent={C.amber} />}
+        {sv.pesoMedNc != null && <Meta label="Peso" value={`${sv.pesoMedNc} g`} />}
       </div>
 
       {sv.medications?.length > 0 && (
-        <div style={{ padding: '6px 8px', background: C.bg, borderRadius: 6, fontSize: 12, marginBottom: 10 }}>
-          <i className="ti ti-pill" style={{ fontSize: 12, marginRight: 5, color: C.teal }} aria-hidden />
-          <strong>{sv.medications.length}</strong> producto(s) registrado(s)
+        <button
+          type="button"
+          onClick={() => onDetail(sv)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+            padding: '9px 12px', marginBottom: 12, cursor: 'pointer', textAlign: 'left',
+            background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 10,
+            color: C.text, fontSize: 12.5,
+          }}
+        >
+          <i className="ti ti-pill" style={{ fontSize: 16, color: C.teal }} aria-hidden />
+          <span><strong className="fd">{sv.medications.length}</strong> producto(s)</span>
           {expiredMeds > 0 && (
-            <span style={{ marginLeft: 8, color: C.amber }}>· {expiredMeds} vencido(s)</span>
+            <span style={{ color: C.amber, fontWeight: 500 }}>· {expiredMeds} vencido(s)</span>
           )}
-          <button
-            type="button"
-            onClick={() => onDetail(sv)}
-            style={{ marginLeft: 10, background: 'none', border: 'none', color: C.teal, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            Ver detalle
-          </button>
-        </div>
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 2, color: C.teal, fontWeight: 600 }}>
+            Detalle <i className="ti ti-chevron-right" style={{ fontSize: 15 }} aria-hidden />
+          </span>
+        </button>
       )}
 
       {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
       {!isInvestigador && (
         confirming ? (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 'auto', paddingTop: 4 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 'auto', paddingTop: 2 }}>
             <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
             <Button size="sm" variant="danger" onClick={() => { onRemove(sv.id); onConfirm(null) }}>
               Sí, eliminar
@@ -182,7 +199,7 @@ const SurveyCardItem = React.memo(function SurveyCardItem({
             </Button>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 'auto', paddingTop: 4 }}>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 'auto', paddingTop: 2 }}>
             <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => onEdit(sv)}>
               Editar
             </Button>

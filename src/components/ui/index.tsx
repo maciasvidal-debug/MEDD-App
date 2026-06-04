@@ -330,9 +330,10 @@ interface CardProps {
   className?: string
   as?: React.ElementType
 }
-export function Card({ children, style = {}, as: Tag = 'div' }: Omit<CardProps, 'className'>) {
+export function Card({ children, style = {}, className, as: Tag = 'div' }: CardProps) {
   return (
     <Tag
+      className={className}
       style={{
         background: C.surface, border: `1px solid ${C.border}`,
         borderRadius: 14, padding: 'var(--card-pad)',
@@ -456,14 +457,10 @@ export function Divider({ label }: { label?: string }) {
 interface SectionHeadProps { icon: string; label: string }
 export function SectionHead({ icon, label }: SectionHeadProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-      <div style={{
-        width: 34, height: 34, borderRadius: 8, background: C.tealLight,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      }}>
-        <i className={`ti ${icon}`} style={{ fontSize: 18, color: C.teal }} aria-hidden />
-      </div>
-      <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: C.text }}>{label}</h2>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 18 }}>
+      <span style={{ width: 3, height: 18, borderRadius: 2, background: C.teal, flexShrink: 0 }} aria-hidden />
+      <i className={`ti ${icon}`} style={{ fontSize: 18, color: C.teal, flexShrink: 0 }} aria-hidden />
+      <h2 className="fd" style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: '-0.01em', color: C.text }}>{label}</h2>
     </div>
   )
 }
