@@ -9,7 +9,7 @@ import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
 import {
   calcEdad, fmtDate, compareSortable,
-  toCSV, downloadBlob, dateTag, productMetrics,
+  toCSV, toCodebookCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
 import { TOTAL_STEPS, OPT, FIELD_GUIDE } from '../lib/constants'
 import type { SurveyDraft, Survey } from '../types'
@@ -602,6 +602,14 @@ export function ExportarPage() {
             onClick={() => downloadBlob(toCSV(surveys), `MEDD_${dateTag()}.csv`, 'text/csv;charset=utf-8')}
           >
             Descargar .csv
+          </Button>
+          <Button
+            fullWidth variant="ghost"
+            style={{ marginTop: 8 }}
+            icon="ti-book-2"
+            onClick={() => downloadBlob(toCodebookCSV(), `MEDD_codebook_${dateTag()}.csv`, 'text/csv;charset=utf-8')}
+          >
+            Descargar diccionario (codebook)
           </Button>
         </Card>
 

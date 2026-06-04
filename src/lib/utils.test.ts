@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   pct, safeNum, calcEdad, dayDiff, productMetrics,
   wilsonCI, quantile, prevalenceRatio, chiSquareTest, cochranArmitage,
-  mantelHaenszelRR, toCSV, compareSortable,
+  mantelHaenszelRR, iccBinary, breslowDay, toCSV, compareSortable,
 } from './utils'
 import type { Survey } from '../types'
 
@@ -148,6 +148,44 @@ describe('mantelHaenszelRR', () => {
   it('ignores strata without an exposure contrast and returns null when none inform', () => {
     expect(mantelHaenszelRR([{ a: 5, b: 5, c: 0, d: 0 }])).toBeNull()
     expect(mantelHaenszelRR([])).toBeNull()
+  })
+})
+
+describe('iccBinary', () => {
+  it('≈0 when clusters share the same proportion (no interviewer effect)', () => {
+    const r = iccBinary([{ n: 10, cases: 5 }, { n: 10, cases: 5 }, { n: 10, cases: 5 }])
+    expect(r).not.toBeNull()
+    expect(r!.icc).toBeLessThan(0.05)
+  })
+  it('→1 when clusters are perfectly separated', () => {
+    const r = iccBinary([{ n: 10, cases: 10 }, { n: 10, cases: 0 }])
+    expect(r!.icc).toBeCloseTo(1, 5)
+    expect(r!.designEffect).toBeGreaterThan(1)
+  })
+  it('returns null with fewer than 2 clusters', () => {
+    expect(iccBinary([{ n: 10, cases: 5 }])).toBeNull()
+  })
+})
+
+describe('breslowDay', () => {
+  it('does not reject homogeneity when strata share the same OR', () => {
+    const r = breslowDay([
+      { a: 20, b: 10, c: 10, d: 20 },
+      { a: 20, b: 10, c: 10, d: 20 },
+    ])
+    expect(r).not.toBeNull()
+    expect(r!.df).toBe(1)
+    expect(r!.p).toBeGreaterThan(0.05)
+  })
+  it('flags heterogeneity (effect modification) across strata', () => {
+    const r = breslowDay([
+      { a: 45, b: 5, c: 5, d: 45 },   // OR ≈ 81
+      { a: 10, b: 10, c: 10, d: 10 }, // OR = 1
+    ])
+    expect(r!.p).toBeLessThan(0.05)
+  })
+  it('returns null with fewer than 2 usable strata', () => {
+    expect(breslowDay([{ a: 5, b: 5, c: 5, d: 5 }])).toBeNull()
   })
 })
 

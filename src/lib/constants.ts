@@ -113,3 +113,53 @@ export const FIELD_GUIDE = [
 
 export const FIELD_HELP: Record<string, string> =
   Object.fromEntries(FIELD_GUIDE.map(g => [g.key, g.def]))
+
+// ─── Data dictionary / codebook ───────────────────────────────────────────
+// Machine- and human-readable documentation of every exported variable, so the
+// CSV is self-describing for reproducible analysis (SPSS/R/Stata). Order mirrors
+// the CSV columns produced by toCSV().
+export interface CodebookEntry { variable: string; etiqueta: string; tipo: string; valores: string }
+export const CODEBOOK: CodebookEntry[] = [
+  { variable: 'id',            etiqueta: 'Identificador único del registro', tipo: 'texto (UUID)', valores: '—' },
+  { variable: 'fEta',          etiqueta: 'Fecha de la entrevista', tipo: 'fecha', valores: 'AAAA-MM-DD' },
+  { variable: 'nui',           etiqueta: 'Número de encuesta', tipo: 'entero', valores: 'consecutivo' },
+  { variable: 'nuiEtr',        etiqueta: 'ID del encuestador', tipo: 'entero', valores: '—' },
+  { variable: 'etrPrograma',   etiqueta: 'Programa académico del encuestador', tipo: 'categórico', valores: 'Medicina; Enfermería; Regencia en Farmacia; Química Farmacéutica; Odontología; Bacteriología; Nutrición y Dietética; Otra' },
+  { variable: 'etrTipoInst',   etiqueta: 'Tipo de institución del encuestador', tipo: 'categórico', valores: 'Pública; Privada' },
+  { variable: 'etrSemestre',   etiqueta: 'Semestre académico del encuestador', tipo: 'entero', valores: '1–12' },
+  { variable: 'etrInstitucion',etiqueta: 'Institución del encuestador', tipo: 'texto', valores: '—' },
+  { variable: 'fNac',          etiqueta: 'Fecha de nacimiento del entrevistado', tipo: 'fecha', valores: 'AAAA-MM-DD' },
+  { variable: 'ciudad',        etiqueta: 'Ciudad / municipio de residencia', tipo: 'texto', valores: 'municipio DANE' },
+  { variable: 'dir',           etiqueta: 'Dirección de residencia', tipo: 'texto', valores: '—' },
+  { variable: 'estrato',       etiqueta: 'Estrato socioeconómico de la vivienda', tipo: 'ordinal', valores: '1–6 (1 más bajo)' },
+  { variable: 'etnia',         etiqueta: 'Pertenencia étnica', tipo: 'categórico', valores: 'Indígena; Gitano/ROM; Afrodescendiente; Ninguna' },
+  { variable: 'asSalud',       etiqueta: 'Régimen de afiliación en salud', tipo: 'categórico', valores: 'Contributivo; Subsidiado; Especial; No afiliado' },
+  { variable: 'estLab',        etiqueta: 'Ocupación actual', tipo: 'categórico', valores: 'Empleado; Independiente; Hogar; Pensionado; Estudiante' },
+  { variable: 'ingreso',       etiqueta: 'Ingresos mensuales del hogar', tipo: 'ordinal', valores: '< 1 SMMLV; 1-3 SMMLV; > 4 SMMLV; No responde' },
+  { variable: 'nvEstu',        etiqueta: 'Nivel educativo', tipo: 'ordinal', valores: 'Ninguno; Primaria; Secundaria; Bachiller; Técnico; Profesional; Posgrado' },
+  { variable: 'nvPosg',        etiqueta: 'Nivel de posgrado', tipo: 'categórico', valores: 'Especialización; Maestría; Doctorado' },
+  { variable: 'perSalud',      etiqueta: 'Percepción general de salud', tipo: 'ordinal', valores: 'Buena; Regular; Mala' },
+  { variable: 'estSalud',      etiqueta: 'Enfermedad reciente', tipo: 'binario', valores: 'Sí; No' },
+  { variable: 'prbSalud',      etiqueta: 'Principal problema de salud', tipo: 'texto', valores: '—' },
+  { variable: 'conMed',        etiqueta: 'Consume medicamentos para el problema', tipo: 'binario', valores: 'Sí; No' },
+  { variable: 'medPrc',        etiqueta: 'Medicamentos prescritos por profesional', tipo: 'binario', valores: 'Sí; No' },
+  { variable: 'fPrc',          etiqueta: 'Fecha de prescripción médica', tipo: 'fecha', valores: 'AAAA-MM-DD' },
+  { variable: 'fDisp',         etiqueta: 'Fecha de dispensación en farmacia', tipo: 'fecha', valores: 'AAAA-MM-DD' },
+  { variable: 'indMed',        etiqueta: 'Sigue las indicaciones del profesional', tipo: 'binario', valores: 'Sí; No' },
+  { variable: 'medSob',        etiqueta: 'Tiene medicamentos guardados sin consumir', tipo: 'binario', valores: 'Sí; No' },
+  { variable: 'dispMedVc',     etiqueta: 'Conoce la disposición de medicamentos vencidos', tipo: 'binario', valores: 'Sí; No' },
+  { variable: 'ctoDispVc',     etiqueta: 'Práctica de disposición de vencidos', tipo: 'texto', valores: '—' },
+  { variable: 'vtoMedNc',      etiqueta: 'Unidades vencidas observadas entre lo almacenado', tipo: 'binario', valores: 'Sí; No' },
+  { variable: 'cantMed',       etiqueta: 'Cantidad de unidades sin consumir', tipo: 'entero', valores: '≥ 0' },
+  { variable: 'cantMedVto',    etiqueta: 'Cantidad de unidades vencidas', tipo: 'entero', valores: '0 ≤ x ≤ cantMed' },
+  { variable: 'pesoMedNc',     etiqueta: 'Peso de medicamentos no consumidos (gramos)', tipo: 'decimal', valores: '≥ 0' },
+  { variable: 'obs',           etiqueta: 'Observaciones', tipo: 'texto', valores: '—' },
+  { variable: 'createdAt',     etiqueta: 'Fecha de creación del registro', tipo: 'datetime ISO', valores: '—' },
+  { variable: 'updatedAt',     etiqueta: 'Fecha de última modificación', tipo: 'datetime ISO', valores: '—' },
+  { variable: 'medications',   etiqueta: 'Medicamentos almacenados (lista; productos separados por |, campos por ;)', tipo: 'compuesto', valores: 'nmMed;dci;concMed;undConc;fVto' },
+  { variable: '  nmMed',       etiqueta: '— Nombre comercial del medicamento', tipo: 'texto', valores: '—' },
+  { variable: '  dci',         etiqueta: '— Principio activo (DCI)', tipo: 'texto', valores: '—' },
+  { variable: '  concMed',     etiqueta: '— Concentración', tipo: 'decimal', valores: '≥ 0' },
+  { variable: '  undConc',     etiqueta: '— Unidad de concentración', tipo: 'categórico', valores: 'mcg; mg; g; UI; %' },
+  { variable: '  fVto',        etiqueta: '— Fecha de vencimiento', tipo: 'fecha', valores: 'AAAA-MM-DD' },
+]
