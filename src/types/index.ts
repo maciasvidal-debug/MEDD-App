@@ -114,7 +114,6 @@ export interface WizardState {
 
 export interface Settings {
   nombreProyecto: string
-  instituciones: string
   nuiEncuestador: string
   // Surveyor profile (stamped onto each new survey; semestre kept as string for
   // the form input, parsed to a number when stamped).

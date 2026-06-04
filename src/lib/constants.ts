@@ -79,7 +79,6 @@ export const EMPTY_DRAFT: SurveyDraft = {
 
 export const DEFAULT_SETTINGS: Settings = {
   nombreProyecto: 'MEDD – Medicamentos No Utilizados',
-  instituciones:  '',
   nuiEncuestador: '',
   etrPrograma:    '',
   etrTipoInst:    '',
