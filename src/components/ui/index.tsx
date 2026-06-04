@@ -454,6 +454,57 @@ export function Divider({ label }: { label?: string }) {
   )
 }
 
+// ─── Brand logo ────────────────────────────────────────────────────────────────
+// Inline SVG (no dependency on the icon webfont, so it never renders as a tofu
+// box). The mark is a tilted two-tone capsule — unmistakably "medication" — in
+// the brand gradient. `glyph` = mark on transparent (in-app, no square);
+// `tile`  = app-icon style rounded tile (splash / login), matching the favicon.
+
+export function Logo({ size = 36, variant = 'glyph' }: { size?: number; variant?: 'glyph' | 'tile' }) {
+  const uid = useId().replace(/:/g, '')
+  const g = `lg${uid}`, c = `lc${uid}`
+
+  if (variant === 'tile') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 48 48" fill="none" role="img" aria-label="MEDD">
+        <defs>
+          <linearGradient id={g} x1="6" y1="3" x2="42" y2="45" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#19C3B1" /><stop offset=".52" stopColor="#0F766E" /><stop offset="1" stopColor="#1E3A5F" />
+          </linearGradient>
+          <clipPath id={c}>
+            <rect x="11" y="18.8" width="26" height="10.4" rx="5.2" transform="rotate(-45 24 24)" />
+          </clipPath>
+        </defs>
+        <rect width="48" height="48" rx="12" fill={`url(#${g})`} />
+        <g clipPath={`url(#${c})`}>
+          <rect x="11" y="18.8" width="26" height="10.4" rx="5.2" transform="rotate(-45 24 24)" fill="#fff" />
+          <rect x="24" y="18.8" width="13" height="10.4" transform="rotate(-45 24 24)" fill="#0B2A3F" fillOpacity="0.26" />
+        </g>
+        <line x1="24" y1="18.8" x2="24" y2="29.2" transform="rotate(-45 24 24)" stroke="#0F766E" strokeWidth="1.6" strokeOpacity="0.4" strokeLinecap="round" />
+        <rect x="1" y="1" width="46" height="46" rx="11" stroke="#fff" strokeOpacity="0.1" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" role="img" aria-label="MEDD">
+      <defs>
+        <linearGradient id={g} x1="6" y1="4" x2="34" y2="36" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#19C3B1" /><stop offset="1" stopColor="#0E7C72" />
+        </linearGradient>
+        <clipPath id={c}>
+          <rect x="9" y="15.5" width="22" height="9" rx="4.5" transform="rotate(-45 20 20)" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${c})`}>
+        <rect x="9" y="15.5" width="22" height="9" rx="4.5" transform="rotate(-45 20 20)" fill={`url(#${g})`} />
+        <rect x="20" y="15.5" width="11" height="9" transform="rotate(-45 20 20)" fill="#0B2A3F" fillOpacity="0.2" />
+      </g>
+      <line x1="20" y1="15.5" x2="20" y2="24.5" transform="rotate(-45 20 20)" stroke="#fff" strokeWidth="1.5" strokeOpacity="0.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 // ─── SectionHead ─────────────────────────────────────────────────────────────
 
 interface SectionHeadProps { icon: string; label: string }

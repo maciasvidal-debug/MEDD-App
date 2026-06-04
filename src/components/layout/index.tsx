@@ -1,5 +1,5 @@
 import React from 'react'
-import { C, IconButton } from '../ui'
+import { C, IconButton, Logo } from '../ui'
 import { useStore } from '../../lib/store'
 import { STEP_LABELS, TOTAL_STEPS } from '../../lib/constants'
 import type { AppView } from '../../types'
@@ -166,13 +166,7 @@ export function SideNav() {
         padding: '20px 18px 16px', borderBottom: `1px solid ${C.border}`,
         display: 'flex', alignItems: 'center', gap: 11,
       }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-          background: C.gradBrand, boxShadow: C.shadowBrand,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <i className="ti ti-vaccine-bottle" style={{ fontSize: 20, color: '#fff' }} aria-hidden />
-        </div>
+        <Logo size={38} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.4px', color: C.text, lineHeight: 1.1 }}>MEDD</div>
           <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.2 }}>Medicamentos no utilizados</div>
