@@ -8,9 +8,15 @@ export type Etnia     = 'Indígena' | 'Gitano/ROM' | 'Afrodescendiente' | 'Ningu
 export type AsSalud   = 'Contributivo' | 'Subsidiado' | 'Especial' | 'No afiliado' | ''
 export type EstLab    = 'Empleado' | 'Independiente' | 'Hogar' | 'Pensionado' | 'Estudiante' | ''
 export type Ingreso   = '< 1 SMMLV' | '1-3 SMMLV' | '> 4 SMMLV' | 'No responde' | ''
-export type NvEstu    = 'Ninguno' | 'Primaria' | 'Secundaria' | 'Bachiller' | 'Técnico' | 'Profesional' | ''
+export type NvEstu    = 'Ninguno' | 'Primaria' | 'Secundaria' | 'Bachiller' | 'Técnico' | 'Profesional' | 'Posgrado' | ''
+export type NvPosg    = 'Especialización' | 'Maestría' | 'Doctorado' | ''
 export type PercSalud = 'Buena' | 'Regular' | 'Mala' | ''
 export type UnidadConc = 'mcg' | 'mg' | 'g' | 'UI' | '%' | ''
+
+// Surveyor (encuestador) profile — controlled vocabularies. Captured once per
+// surveyor and stamped onto each survey to support interviewer-effect analysis.
+export type EtrPrograma = 'Medicina' | 'Enfermería' | 'Regencia en Farmacia' | 'Química Farmacéutica' | 'Odontología' | 'Bacteriología' | 'Nutrición y Dietética' | 'Otra' | ''
+export type EtrTipoInst = 'Pública' | 'Privada' | ''
 
 // ─── 1:N medication sub-record ─────────────────────────────────────────────
 export interface Medication {
@@ -33,6 +39,12 @@ export interface Survey {
   nuiEtr: number | null // NUI_ETR : ID Único del Encuestador (entero positivo)
   nui:    number        // NUI     : N° de registro correlativo (auto-increment)
 
+  // Perfil del encuestador (snapshot al momento de la recolección)
+  etrPrograma:    EtrPrograma // ETR_PROGRAMA  : Programa académico del encuestador
+  etrTipoInst:    EtrTipoInst // ETR_TIPO_INST : Institución pública/privada
+  etrSemestre:    number | null // ETR_SEMESTRE : Semestre académico (1–12)
+  etrInstitucion: string      // ETR_INSTITUCION : Nombre de la institución
+
   // Datos sociodemográficos
   fNac:    string        // F_NAC   : Fecha de nacimiento YYYY-MM-DD (< F_ETA)
   // EDAD: calculada F_ETA - F_NAC, no almacenada
@@ -44,6 +56,7 @@ export interface Survey {
   estLab:  EstLab        // EST_LAB
   ingreso: Ingreso       // INGRESO
   nvEstu:  NvEstu        // NV_ESTU
+  nvPosg:  NvPosg        // NV_POSG  : Nivel de posgrado (req. si NV_ESTU = Posgrado)
 
   // Estado de salud (cadena condicional)
   perSalud:  PercSalud  // PER_SALUD
@@ -103,6 +116,12 @@ export interface Settings {
   nombreProyecto: string
   instituciones: string
   nuiEncuestador: string
+  // Surveyor profile (stamped onto each new survey; semestre kept as string for
+  // the form input, parsed to a number when stamped).
+  etrPrograma: EtrPrograma
+  etrTipoInst: EtrTipoInst
+  etrSemestre: string
+  etrInstitucion: string
 }
 
 // ─── Analytics ─────────────────────────────────────────────────────────────

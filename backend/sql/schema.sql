@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS surveys (
     est_lab        VARCHAR(40),                        -- EST_LAB: Ocupación actual
     ingreso        VARCHAR(40),                        -- INGRESO: Ingresos (SMMLV)
     nv_estu        VARCHAR(40),                        -- NV_ESTU: Nivel de estudios
+    nv_posg        VARCHAR(40),                        -- NV_POSG: Sub-nivel de posgrado (sólo si NV_ESTU = Posgrado)
     per_salud      VARCHAR(20),                        -- PER_SALUD: Percepción de salud
     est_salud      BOOLEAN,                            -- EST_SALUD: ¿Enfermedad últimas 4 semanas?
     prb_salud      TEXT,                               -- PRB_SALUD: Principal problema (req. si EST_SALUD)
@@ -59,7 +60,12 @@ CREATE TABLE IF NOT EXISTS surveys (
     CONSTRAINT chk_ingreso       CHECK (ingreso IS NULL OR ingreso IN
                                    ('< 1 SMMLV','1-3 SMMLV','> 4 SMMLV','No responde')),
     CONSTRAINT chk_nv_estu       CHECK (nv_estu IS NULL OR nv_estu IN
-                                   ('Ninguno','Primaria','Secundaria','Bachiller','Técnico','Profesional')),
+                                   ('Ninguno','Primaria','Secundaria','Bachiller','Técnico','Profesional','Posgrado')),
+    -- NV_POSG es un sub-nivel de NV_ESTU: sólo puede tener valor cuando NV_ESTU = 'Posgrado'.
+    CONSTRAINT chk_nv_posg       CHECK (
+                                     (nv_posg IS NULL)
+                                     OR (nv_estu = 'Posgrado' AND nv_posg IN
+                                         ('Especialización','Maestría','Doctorado'))),
     CONSTRAINT chk_per_salud     CHECK (per_salud IS NULL OR per_salud IN ('Buena','Regular','Mala')),
     CONSTRAINT chk_f_prc_bounds  CHECK (f_prc IS NULL OR (f_prc >= f_nac AND f_prc <= f_eta)),
     CONSTRAINT chk_f_disp_bounds CHECK (f_disp IS NULL OR (f_disp <= f_eta AND (f_prc IS NULL OR f_disp >= f_prc))),

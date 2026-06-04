@@ -1,7 +1,7 @@
 import React, { useEffect, Suspense } from 'react'
 import { useStore } from './lib/store'
-import { BottomNav, ToastContainer } from './components/layout'
-import { C, Spinner } from './components/ui'
+import { BottomNav, SideNav, ToastContainer } from './components/layout'
+import { C, Spinner, PageSkeleton } from './components/ui'
 import {
   WizardPage, EncuestasPage,
   BuscarPage, ExportarPage, AjustesPage,
@@ -45,11 +45,7 @@ export default function App() {
   if (!authReady) {
     return (
       <div className="app-shell" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <i
-          className="ti ti-loader-2"
-          aria-label="Cargando…"
-          style={{ fontSize: 32, color: '#0F766E', animation: 'spin 0.8s linear infinite' }}
-        />
+        <Spinner size={32} />
       </div>
     )
   }
@@ -57,52 +53,51 @@ export default function App() {
   // Not logged in
   if (!user) return <AuthPage />
 
-  // Surveys loading
-  if (!surveysLoaded) {
-    return (
-      <div className="app-shell" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <i
-          className="ti ti-loader-2"
-          aria-label="Cargando…"
-          style={{ fontSize: 32, color: '#0F766E', animation: 'spin 0.8s linear infinite' }}
-        />
-      </div>
-    )
-  }
-
   return (
-    <div className="app-shell">
-      <h1 className="sr-only">MEDD — Aplicación de investigación de medicamentos no utilizados</h1>
-      <NetworkBanner />
-      <ToastContainer />
+    <div className="app-root">
+      {/* Desktop/tablet left rail (hidden on phones via CSS) */}
+      <SideNav />
 
-      {/* Resume an in-progress survey saved before a reload */}
-      {view !== 'wizard' && <ResumeDraftBanner />}
+      <div className="app-shell">
+        <h1 className="sr-only">MEDD — Aplicación de investigación de medicamentos no utilizados</h1>
+        <NetworkBanner />
+        <ToastContainer />
 
-      {/* Sync indicator */}
-      {syncing && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, height: 3,
-          background: 'linear-gradient(90deg, #0F766E, #14B8A6)',
-          zIndex: 300,
-          animation: 'slideProgress 2s ease-in-out infinite',
-        }} />
-      )}
+        {/* Sync indicator */}
+        {syncing && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, height: 3,
+            background: 'linear-gradient(90deg, #0F766E, #14B8A6)',
+            zIndex: 300,
+            animation: 'slideProgress 2s ease-in-out infinite',
+          }} />
+        )}
 
-      {/* Pages */}
-      {view === 'dashboard'  && (
-        <Suspense fallback={<PageLoader />}>
-          <DashboardPage />
-        </Suspense>
-      )}
-      {view === 'encuestas'  && <EncuestasPage />}
-      {view === 'wizard'     && <WizardPage />}
-      {view === 'buscar'     && <BuscarPage />}
-      {view === 'exportar'   && <ExportarPage />}
-      {view === 'ajustes'    && <AjustesPage />}
+        {/* Surveys still loading → skeleton (perceived performance) */}
+        {!surveysLoaded ? (
+          <PageSkeleton />
+        ) : (
+          <>
+            {/* Resume an in-progress survey saved before a reload */}
+            {view !== 'wizard' && <ResumeDraftBanner />}
 
-      {/* Bottom navigation — hidden during wizard */}
-      {view !== 'wizard' && <BottomNav />}
+            {/* Pages */}
+            {view === 'dashboard'  && (
+              <Suspense fallback={<PageLoader />}>
+                <DashboardPage />
+              </Suspense>
+            )}
+            {view === 'encuestas'  && <EncuestasPage />}
+            {view === 'wizard'     && <WizardPage />}
+            {view === 'buscar'     && <BuscarPage />}
+            {view === 'exportar'   && <ExportarPage />}
+            {view === 'ajustes'    && <AjustesPage />}
+          </>
+        )}
+
+        {/* Bottom navigation — hidden during wizard (mobile only; CSS hides ≥900px) */}
+        {view !== 'wizard' && <BottomNav />}
+      </div>
     </div>
   )
 }
@@ -168,7 +163,7 @@ function ResumeDraftBanner() {
         onClick={resumeDraft}
         style={{
           flexShrink: 0, minHeight: 40, padding: '8px 14px', borderRadius: 8,
-          border: 'none', background: C.teal, color: '#fff',
+          border: 'none', background: C.primary, color: '#fff',
           fontSize: 13, fontWeight: 500, cursor: 'pointer',
         }}
       >

@@ -29,6 +29,7 @@ create table if not exists public.surveys (
   est_lab       text,
   ingreso       text,
   nv_estu       text,
+  nv_posg       text,
 
   -- Step 3: Salud (valores 'Sí'|'No'|'' almacenados como text)
   per_salud     text,

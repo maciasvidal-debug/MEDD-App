@@ -23,7 +23,7 @@ router.param('id', (req, res, next, id) => {
 // Full ordered column list shared by INSERT and SELECT mapping.
 const SURVEY_COLS = [
     'f_eta', 'nui_etr', 'f_nac', 'edad', 'ciudad', 'dir', 'estrato', 'etnia',
-    'as_salud', 'est_lab', 'ingreso', 'nv_estu', 'per_salud', 'est_salud',
+    'as_salud', 'est_lab', 'ingreso', 'nv_estu', 'nv_posg', 'per_salud', 'est_salud',
     'prb_salud', 'con_med', 'med_prc', 'f_prc', 'f_disp', 'ind_med', 'med_sob',
     'disp_med_vc', 'cto_disp_vc', 'vto_med_nc', 'cant_med', 'cant_med_vto',
     'peso_med_nc', 'obs',

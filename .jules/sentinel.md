@@ -14,3 +14,7 @@
 **Vulnerability:** The `uuid` utility used `Math.random` when `crypto.randomUUID` was unavailable. This is cryptographically insecure and could lead to predictable IDs or collisions.
 **Learning:** In frontend applications, always ensure a cryptographically secure random number generator is used for identifiers, particularly when offline sync could cause collisions if IDs are predictable.
 **Prevention:** Fallback UUID generators should use `crypto.getRandomValues()` to obtain randomness securely.
+## 2025-05-30 - Information Exposure in Database Error Messages
+**Vulnerability:** The error handler for the survey creation route (`POST /` in `backend/src/routes/surveys.js`) was directly exposing database error details (`err.detail` and `err.message`) to the client when a database constraint violation occurred (codes 23514 or 23503).
+**Learning:** Returning low-level database error strings directly can expose schema information (like column names and constraint definitions) or internal states to potential attackers, facilitating further attacks or intelligence gathering about the architecture.
+**Prevention:** Always map generic error messages on the server side when dealing with database constraint violations, instead of passing the raw SQL error details down to the client. Ensure to keep `err.message` in the general error handler to not mask validation errors that are supposed to be shown to users.

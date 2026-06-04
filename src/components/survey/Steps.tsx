@@ -7,8 +7,10 @@ import {
 } from '../ui'
 import { useCUM } from '../../hooks/useCUM'
 import { useMunicipios } from '../../hooks/useMunicipios'
-import { OPT } from '../../lib/constants'
+import { OPT, FIELD_HELP } from '../../lib/constants'
 import { calcEdad, fmtDate, productMetrics } from '../../lib/utils'
+import { validateDraft } from '../../lib/quality'
+import { useStore } from '../../lib/store'
 import {
   step1Schema, step2Schema, step3Schema, step4Schema,
   type Step1Data, type Step2Data, type Step3Data, type Step4Data,
@@ -192,7 +194,7 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
     <form onSubmit={handleSubmit(data => onNext(data as Partial<SurveyDraft>))} noValidate>
       <SectionHead icon="ti-id-badge" label="Datos de identificación" />
 
-      <Field label="Fecha de la entrevista" required error={errors.fEta?.message}>
+      <Field label="Fecha de la entrevista" required help={FIELD_HELP.fEta} error={errors.fEta?.message}>
         <input
           type="date" max={new Date().toISOString().split('T')[0]}
           {...register('fEta')}
@@ -219,7 +221,7 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
 // ─── Step 2 — Demografía ─────────────────────────────────────────────────
 
 export function Step2({ draft, onNext, onBack }: StepProps) {
-  const { control, register, handleSubmit, watch, formState: { errors } } = useForm<Step2Data>({
+  const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm<Step2Data>({
     resolver: zodResolver(step2Schema),
     defaultValues: {
       fNac:    draft.fNac,
@@ -231,11 +233,13 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
       estLab:  draft.estLab,
       ingreso: draft.ingreso,
       nvEstu:  draft.nvEstu,
+      nvPosg:  draft.nvPosg,
     },
   })
 
-  const fNac  = watch('fNac')
-  const edad  = calcEdad(draft.fEta, fNac)
+  const fNac   = watch('fNac')
+  const nvEstu = watch('nvEstu')
+  const edad   = calcEdad(draft.fEta, fNac)
 
   return (
     <form onSubmit={handleSubmit(data => onNext(data as Partial<SurveyDraft>))} noValidate>
@@ -266,7 +270,7 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
         <input placeholder="Calle, carrera, barrio…" {...register('dir')} />
       </Field>
 
-      <Field label="Estrato socioeconómico" error={errors.estrato?.message}>
+      <Field label="Estrato socioeconómico" help={FIELD_HELP.estrato} error={errors.estrato?.message}>
         <Controller name="estrato" control={control}
           render={({ field }) => (
             <div role="radiogroup" style={{ display: 'flex', gap: 6 }}>
@@ -297,14 +301,14 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
           )} />
       </Field>
 
-      <Field label="Régimen de salud" required error={errors.asSalud?.message}>
+      <Field label="Régimen de salud" required help={FIELD_HELP.asSalud} error={errors.asSalud?.message}>
         <Controller name="asSalud" control={control}
           render={({ field }) => (
             <ChipGroup options={OPT.asSalud} value={field.value} onChange={field.onChange} />
           )} />
       </Field>
 
-      <Field label="Ocupación actual" required error={errors.estLab?.message}>
+      <Field label="Ocupación actual" required help={FIELD_HELP.estLab} error={errors.estLab?.message}>
         <Controller name="estLab" control={control}
           render={({ field }) => (
             <ChipGroup options={OPT.estLab} value={field.value} onChange={field.onChange} />
@@ -321,9 +325,23 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
       <Field label="Nivel educativo" required error={errors.nvEstu?.message}>
         <Controller name="nvEstu" control={control}
           render={({ field }) => (
-            <ChipGroup options={OPT.nvEstu} value={field.value} onChange={field.onChange} />
+            <ChipGroup options={OPT.nvEstu} value={field.value}
+              onChange={val => {
+                field.onChange(val)
+                // Limpia el sub-nivel si deja de ser Posgrado (compuerta determinista).
+                if (val !== 'Posgrado') setValue('nvPosg', '')
+              }} />
           )} />
       </Field>
+
+      {nvEstu === 'Posgrado' && (
+        <Field label="Nivel de posgrado" required error={errors.nvPosg?.message}>
+          <Controller name="nvPosg" control={control}
+            render={({ field }) => (
+              <ChipGroup options={OPT.nvPosg} value={field.value ?? ''} onChange={field.onChange} />
+            )} />
+        </Field>
+      )}
 
       <WizardNavBar onBack={onBack} />
     </form>
@@ -426,7 +444,7 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
                     </p>
                   </Field>
 
-                  <Field label="Fecha de entrega en farmacia">
+                  <Field label="Fecha de entrega en farmacia" help={FIELD_HELP.fDisp}>
                     <input
                       type="date"
                       min={fPrc || draft.fNac || undefined}
@@ -485,7 +503,7 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
     <form onSubmit={handleSubmit(handleNext)} noValidate>
       <SectionHead icon="ti-package" label="Medicamentos sin consumir y disposición" />
 
-      <Field label="¿Tiene medicamentos guardados sin consumir?" required error={errors.medSob?.message}>
+      <Field label="¿Tiene medicamentos guardados sin consumir?" required help={FIELD_HELP.medSob} error={errors.medSob?.message}>
         <Controller name="medSob" control={control}
           render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
       </Field>
@@ -494,7 +512,7 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
         <div className="fade-in">
           <Divider label="Conocimiento del entrevistado" />
 
-          <Field label="¿Sabe qué hacer con los medicamentos vencidos?">
+          <Field label="¿Sabe qué hacer con los medicamentos vencidos?" help={FIELD_HELP.dispMedVc}>
             <Controller name="dispMedVc" control={control}
               render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
           </Field>
@@ -512,19 +530,19 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
 
           <Divider label="Observación directa — encuestador" />
 
-          <Field label="¿Hay unidades vencidas entre los almacenados?">
+          <Field label="¿Hay unidades vencidas entre los almacenados?" help={FIELD_HELP.vtoMedNc}>
             <Controller name="vtoMedNc" control={control}
               render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
           </Field>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="Cant. sin consumir" error={errors.cantMed?.message}>
+            <Field label="Cant. sin consumir" help={FIELD_HELP.cantMed} error={errors.cantMed?.message}>
               <input
                 type="number" inputMode="numeric" min={0} placeholder="0"
                 {...register('cantMed', { valueAsNumber: true })}
               />
             </Field>
-            <Field label="Cant. vencidos" error={errors.cantMedVto?.message}>
+            <Field label="Cant. vencidos" help={FIELD_HELP.cantMedVto} error={errors.cantMedVto?.message}>
               <input
                 type="number" inputMode="numeric" min={0}
                 max={cantMed ?? undefined} placeholder="0"
@@ -691,7 +709,7 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
           />
         </Field>
       </div>
-      <Field label="Fecha de vencimiento">
+      <Field label="Fecha de vencimiento" help={FIELD_HELP.fVto}>
         <input
           type="date"
           value={entry.fVto}
@@ -805,15 +823,27 @@ function Row({ label, value }: { label: string; value?: string | number | null }
 
 export function Step6({ draft, onNext, onBack }: StepProps) {
   const { control, handleSubmit } = useForm({ defaultValues: { obs: draft.obs } })
+  const { surveys, wizard, pushToast } = useStore()
 
   const edad = calcEdad(draft.fEta, draft.fNac)
+  const report = validateDraft(draft, surveys, wizard?.editingId)
+
+  function handleSave(obs: string) {
+    if (report.errors.length > 0) {
+      pushToast('Corrige los errores antes de guardar.', 'error')
+      return
+    }
+    onNext({ obs })
+  }
 
   return (
-    <form onSubmit={handleSubmit(({ obs }) => onNext({ obs }))} noValidate>
+    <form onSubmit={handleSubmit(({ obs }) => handleSave(obs))} noValidate>
       <SectionHead icon="ti-check" label="Revisar y confirmar" />
       <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted }}>
         Verifique los datos antes de guardar definitivamente.
       </p>
+
+      <QualityCard report={report} />
 
       {/* Identificación */}
       <Card style={{ marginBottom: 10 }}>
@@ -836,6 +866,7 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
         <Row label="Ocupación"                value={draft.estLab} />
         <Row label="Ingresos mensuales"       value={draft.ingreso} />
         <Row label="Nivel educativo"          value={draft.nvEstu} />
+        {draft.nvPosg && <Row label="Nivel de posgrado" value={draft.nvPosg} />}
       </Card>
 
       {/* Salud */}
@@ -932,6 +963,56 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
 
       <WizardNavBar onBack={onBack} isSave />
     </form>
+  )
+}
+
+// Data-quality summary shown on the Confirmar step: completeness, hard errors
+// (block save), soft plausibility warnings and a likely-duplicate notice.
+function QualityCard({ report }: { report: ReturnType<typeof validateDraft> }) {
+  const { errors, warnings, completeness, duplicate } = report
+  const clean = errors.length === 0 && warnings.length === 0 && !duplicate
+  const barColor = completeness >= 80 ? C.green : completeness >= 50 ? C.amber : C.red
+  return (
+    <Card style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+        <GroupLabel>Validación y completitud</GroupLabel>
+        <span className="tnum" style={{ fontSize: 12, fontWeight: 700, color: barColor }}>{completeness}%</span>
+      </div>
+      <div style={{ height: 6, background: C.bg, borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
+        <div style={{ width: `${completeness}%`, height: '100%', background: barColor, transition: 'width 0.3s' }} />
+      </div>
+
+      {errors.map((e, i) => (
+        <QualityLine key={`e${i}`} icon="ti-alert-circle" color={C.red} text={e} />
+      ))}
+      {duplicate && (
+        <QualityLine
+          icon="ti-copy" color={C.amber}
+          text={`Posible duplicado: ya existe la encuesta #${String(duplicate.nui).padStart(3, '0')} con la misma fecha, ciudad y nacimiento.`}
+        />
+      )}
+      {warnings.map((w, i) => (
+        <QualityLine key={`w${i}`} icon="ti-alert-triangle" color={C.amber} text={w} />
+      ))}
+
+      {clean && (
+        <QualityLine icon="ti-circle-check" color={C.green} text="Sin inconsistencias detectadas." />
+      )}
+      {errors.length > 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 11, color: C.red }}>
+          Hay errores que impiden guardar. Vuelve atrás para corregirlos.
+        </p>
+      )}
+    </Card>
+  )
+}
+
+function QualityLine({ icon, color, text }: { icon: string; color: string; text: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', padding: '3px 0' }}>
+      <i className={`ti ${icon}`} style={{ fontSize: 15, color, flexShrink: 0, marginTop: 1 }} aria-hidden />
+      <span style={{ fontSize: 12, color: C.text, lineHeight: 1.4 }}>{text}</span>
+    </div>
   )
 }
 

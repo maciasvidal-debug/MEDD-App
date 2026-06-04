@@ -1,4 +1,5 @@
 import type { Survey, Medication, ProductMetrics } from '../types'
+import { CODEBOOK } from './constants'
 
 // ─── Date helpers ─────────────────────────────────────────────────────────
 
@@ -91,6 +92,24 @@ export const pct = (n: number, total: number) =>
 export const safeNum = (v: string | number | null | undefined): number =>
   typeof v === 'number' ? v : parseFloat(String(v ?? '')) || 0
 
+/**
+ * Comparator for sortable table cells. Empty values (null/undefined/'') always
+ * sort last regardless of direction; numbers compare numerically and strings use
+ * a locale-aware, numeric-aware collation (so "10" sorts after "2").
+ */
+export function compareSortable(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined,
+): number {
+  const aEmpty = a === null || a === undefined || a === ''
+  const bEmpty = b === null || b === undefined || b === ''
+  if (aEmpty && bEmpty) return 0
+  if (aEmpty) return 1
+  if (bEmpty) return -1
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  return String(a).localeCompare(String(b), 'es', { numeric: true })
+}
+
 // ─── Inferential statistics ─────────────────────────────────────────────────
 
 export interface Proportion {
@@ -163,6 +182,149 @@ export function prevalenceRatio(a: number, n1: number, c: number, n0: number): R
   const rr = (A / N1) / (C / N0)
   const se = Math.sqrt(1 / A + 1 / C - 1 / N1 - 1 / N0)
   return { rr, lo: rr * Math.exp(-1.96 * se), hi: rr * Math.exp(1.96 * se), ref: false }
+}
+
+/** A 2×2 stratum: a=exposed&case, b=exposed&non-case, c=unexposed&case, d=unexposed&non-case. */
+export interface Stratum2x2 { a: number; b: number; c: number; d: number }
+
+export interface MHResult {
+  rr:   number  // Mantel–Haenszel adjusted prevalence/risk ratio
+  lo:   number  // 95% CI lower (Greenland–Robins)
+  hi:   number  // 95% CI upper
+  chi2: number  // Cochran–Mantel–Haenszel statistic (1 df)
+  p:    number  // CMH p-value
+  strata: number          // strata that contributed (had both exposure levels)
+  exposedCases:   number
+  unexposedCases: number
+}
+
+/**
+ * Mantel–Haenszel adjusted prevalence ratio across strata of a confounder, with
+ * the Greenland–Robins variance for its 95% CI and the Cochran–Mantel–Haenszel
+ * test of conditional association. Pooling within strata removes confounding by
+ * the stratifying variable (here: comparing a crude vs adjusted RR reveals
+ * whether e.g. the surveyor profile confounds an exposure→outcome association).
+ * Strata with no exposure contrast (all exposed or all unexposed) contribute
+ * nothing. Returns null when fewer than one informative stratum remains.
+ */
+export function mantelHaenszelRR(strata: Stratum2x2[]): MHResult | null {
+  let num = 0, den = 0, varNum = 0       // RR numerator/denominator + GR variance numerator
+  let cmhO = 0, cmhE = 0, cmhV = 0       // CMH observed/expected/variance
+  let used = 0, exposedCases = 0, unexposedCases = 0
+
+  for (const { a, b, c, d } of strata) {
+    const n1 = a + b, n0 = c + d, m1 = a + c, n = a + b + c + d
+    if (n === 0 || n1 === 0 || n0 === 0) continue
+    used++
+    exposedCases += a
+    unexposedCases += c
+    num += (a * n0) / n
+    den += (c * n1) / n
+    varNum += (n1 * n0 * m1 - a * c * n) / (n * n)
+    cmhO += a
+    cmhE += (n1 * m1) / n
+    if (n > 1) cmhV += (n1 * n0 * m1 * (n - m1)) / (n * n * (n - 1))
+  }
+
+  if (used === 0 || num === 0 || den === 0) return null
+  const rr = num / den
+  const se = Math.sqrt(varNum / (num * den))
+  const chi2 = cmhV > 0 ? ((cmhO - cmhE) ** 2) / cmhV : 0
+  return {
+    rr,
+    lo: rr * Math.exp(-1.96 * se),
+    hi: rr * Math.exp(1.96 * se),
+    chi2,
+    p: chiSquareP(chi2, 1),
+    strata: used,
+    exposedCases,
+    unexposedCases,
+  }
+}
+
+export interface ICCResult {
+  icc:          number  // intraclass correlation, 0..1
+  clusters:     number  // number of clusters (e.g. surveyors)
+  n:            number  // total observations
+  designEffect: number  // 1 + (m̄−1)·ICC — variance inflation from clustering
+}
+
+/**
+ * One-way random-effects intraclass correlation for a BINARY outcome clustered
+ * by group (e.g. by surveyor). It is the canonical measure of the interviewer
+ * effect: the share of outcome variance attributable to which surveyor collected
+ * the record. Uses ANOVA mean squares with the unequal-cluster-size correction
+ * (n₀). Returns null with fewer than 2 informative clusters; ICC is clamped to
+ * [0,1]. Each group is summarised by its size and case count.
+ */
+export function iccBinary(groups: { n: number; cases: number }[]): ICCResult | null {
+  const g = groups.filter(x => x.n > 0)
+  const k = g.length
+  const N = g.reduce((s, x) => s + x.n, 0)
+  if (k < 2 || N <= k) return null
+
+  const pbar = g.reduce((s, x) => s + x.cases, 0) / N
+  let ssb = 0, ssw = 0, sumSq = 0
+  for (const { n, cases } of g) {
+    const p = cases / n
+    ssb += n * (p - pbar) ** 2          // between-cluster
+    ssw += n * p * (1 - p)              // within-cluster (binary identity)
+    sumSq += n * n
+  }
+  const msb = ssb / (k - 1)
+  const msw = ssw / (N - k)
+  const n0 = (N - sumSq / N) / (k - 1)
+  const denom = msb + (n0 - 1) * msw
+  let icc = denom > 0 ? (msb - msw) / denom : 0
+  if (!Number.isFinite(icc) || icc < 0) icc = 0
+  if (icc > 1) icc = 1
+  return { icc, clusters: k, n: N, designEffect: 1 + (n0 - 1) * icc }
+}
+
+/**
+ * Breslow–Day test for homogeneity of the odds ratio across strata — i.e. whether
+ * a single common association is reasonable, or the effect is MODIFIED by the
+ * stratifying variable. Complements the Mantel–Haenszel pooled estimate (which
+ * assumes homogeneity). Fits each stratum's expected exposed-case count under the
+ * MH common OR and sums standardized squared residuals (χ², k−1 df). Returns null
+ * with fewer than 2 fully-informative strata.
+ */
+export function breslowDay(strata: Stratum2x2[]): { chi2: number; df: number; p: number } | null {
+  const usable = strata.filter(s =>
+    (s.a + s.b) > 0 && (s.c + s.d) > 0 && (s.a + s.c) > 0 && (s.b + s.d) > 0)
+  if (usable.length < 2) return null
+
+  let orNum = 0, orDen = 0
+  for (const { a, b, c, d } of usable) {
+    const n = a + b + c + d
+    orNum += (a * d) / n
+    orDen += (b * c) / n
+  }
+  if (orDen === 0) return null
+  const psi = orNum / orDen
+  if (!Number.isFinite(psi) || psi <= 0) return null
+
+  let bd = 0
+  for (const { a, b, c, d } of usable) {
+    const n1 = a + b, m1 = a + c, N = a + b + c + d
+    // Expected exposed-case count A under the common OR ψ (root of a quadratic).
+    let A: number
+    const alpha = psi - 1
+    if (Math.abs(alpha) < 1e-9) {
+      A = (m1 * n1) / N
+    } else {
+      const bcoef = -(psi * (m1 + n1) + (N - n1 - m1))
+      const disc = Math.sqrt(Math.max(0, bcoef * bcoef - 4 * alpha * psi * m1 * n1))
+      const lo = Math.max(0, n1 + m1 - N), hi = Math.min(n1, m1)
+      const r1 = (-bcoef - disc) / (2 * alpha)
+      const r2 = (-bcoef + disc) / (2 * alpha)
+      A = (r1 >= lo - 1e-6 && r1 <= hi + 1e-6) ? r1 : r2
+    }
+    const va = 1 / (1 / A + 1 / (n1 - A) + 1 / (m1 - A) + 1 / (N - n1 - m1 + A))
+    if (Number.isFinite(va) && va > 0) bd += (a - A) ** 2 / va
+  }
+  const df = usable.length - 1
+  return { chi2: bd, df, p: chiSquareP(bd, df) }
 }
 
 export interface ChiSquare {
@@ -311,9 +473,11 @@ export function groupSum(
 // ─── CSV export (codebook column order) ───────────────────────────────────
 
 const CSV_COLUMNS: (keyof Survey)[] = [
-  'id', 'fEta', 'nui', 'nuiEtr', 'fNac',
+  'id', 'fEta', 'nui', 'nuiEtr',
+  'etrPrograma', 'etrTipoInst', 'etrSemestre', 'etrInstitucion',
+  'fNac',
   'ciudad', 'dir', 'estrato',
-  'etnia', 'asSalud', 'estLab', 'ingreso', 'nvEstu',
+  'etnia', 'asSalud', 'estLab', 'ingreso', 'nvEstu', 'nvPosg',
   'perSalud', 'estSalud', 'prbSalud', 'conMed', 'medPrc',
   'fPrc', 'fDisp', 'indMed',
   'medSob', 'dispMedVc', 'ctoDispVc', 'vtoMedNc',
@@ -340,6 +504,15 @@ export function toCSV(surveys: Survey[]): string {
       : ''
     return `${base},${escapeCSV(meds)}`
   })
+  return '﻿' + [header, ...rows].join('\n')
+}
+
+/** Emits the data dictionary (codebook) as a self-describing CSV, so exported
+ *  datasets carry their own variable documentation for reproducible analysis. */
+export function toCodebookCSV(): string {
+  const header = ['variable', 'etiqueta', 'tipo', 'valores'].join(',')
+  const rows = CODEBOOK.map(e =>
+    [e.variable.trim(), e.etiqueta, e.tipo, e.valores].map(escapeCSV).join(','))
   return '﻿' + [header, ...rows].join('\n')
 }
 

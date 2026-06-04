@@ -2,15 +2,36 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <!-- Allow pinch-zoom for accessibility (WCAG 1.4.4) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="MEDD — Investigación sobre medicamentos no utilizados en hogares" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0F766E" />
     <title>MEDD · Medicamentos No Utilizados</title>
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <!-- PWA: installable, offline-capable field app -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="MEDD" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@latest/tabler-icons.min.css" />
     <style>
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
+    <script>
+      // Apply the saved theme before first paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var t = localStorage.getItem('medd_theme');
+          if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-theme', t);
+          var d = localStorage.getItem('medd_density') === 'compact' ? 'compact' : 'comfortable';
+          document.documentElement.setAttribute('data-density', d);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
