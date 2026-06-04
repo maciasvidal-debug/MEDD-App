@@ -7,3 +7,6 @@
 ## 2026-06-02 - Eliminate redundant sort and clone during quantile calculations
 **Learning:** Calculating multiple quantiles sequentially on the same array triggers repeated clones and `O(N log N)` sort operations. Further, using `Math.max(...array)` spreads a large array into the call stack, potentially exceeding it for large data.
 **Action:** When extracting multiple percentiles from a single dataset, sort the array once in-place and provide an `isSorted=true` flag to bypass repetitive and expensive sorting allocations. Access minimum or maximum values directly using array bounds (`arr[0]` or `arr[arr.length - 1]`) instead of mapping or spreading.
+## 2024-06-03 - Database Analytics Optimization
+**Learning:** Returning scalar subqueries from the same table (e.g. `SELECT (SELECT COUNT(*) FROM X), (SELECT SUM(col) FROM X)`) forces PostgreSQL to execute a full table scan sequentially for each subquery.
+**Action:** Consolidate multiple aggregate subqueries on the same table into a single `SELECT` pass (e.g. `SELECT COUNT(*), SUM(col) FROM X`), and use concurrent queries (`Promise.all` in Node.js) when fetching metrics from entirely different tables or views to reduce blocking and overall DB load.

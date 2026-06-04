@@ -29,16 +29,23 @@ describe('analytics authorization', () => {
     });
 
     test('investigador gets the summary with numbers coerced (200)', async () => {
-        pool.query.mockResolvedValueOnce({
-            rows: [{
-                total_surveys: '2',
-                total_medications: '3',
-                total_unused_units: '10',
-                total_expired_units: '4',
-                total_weight_g: '5.50',
-                expired_products: '1',
-            }],
-        });
+        // With Promise.all, pool.query is called 3 times concurrently
+        pool.query
+            .mockResolvedValueOnce({
+                rows: [{
+                    total_surveys: '2',
+                    total_unused_units: '10',
+                    total_expired_units: '4',
+                    total_weight_g: '5.50',
+                }],
+            })
+            .mockResolvedValueOnce({
+                rows: [{ total_medications: '3' }],
+            })
+            .mockResolvedValueOnce({
+                rows: [{ expired_products: '1' }],
+            });
+
         const token = await mintToken({ role: 'investigador' });
         const res = await request(app)
             .get('/api/analytics/summary')
