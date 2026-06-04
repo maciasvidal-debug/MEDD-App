@@ -6,7 +6,7 @@ import {
 import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
-import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, quantile, productMetrics, toCSV, downloadBlob, dateTag, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type Stratum2x2 } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2 } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
 
@@ -726,6 +726,7 @@ interface SurveyorEffect {
   ref: string
   trend: TrendTest | null         // outcome trend across academic semester (ordinal)
   nSemester: number               // surveys carrying a semester value
+  icc: ICCResult | null           // clustering of the outcome by surveyor (nuiEtr)
 }
 
 // Quantifies whether the confirmed-expired outcome (vtoMedNc='Sí') varies by the
@@ -783,15 +784,27 @@ function buildSurveyorEffect(surveys: Survey[]): SurveyorEffect | null {
       )
     : null
 
-  if (!programs && !trend) return null
-  return { programs, chi, ref, trend, nSemester }
+  // Outcome clustering by surveyor (nuiEtr) → intraclass correlation
+  const survMap = new Map<number, { n: number; cases: number }>()
+  for (const s of surveys) {
+    if (s.nuiEtr == null) continue
+    const g = survMap.get(s.nuiEtr) ?? { n: 0, cases: 0 }
+    g.n++
+    if (isCase(s)) g.cases++
+    survMap.set(s.nuiEtr, g)
+  }
+  const icc = iccBinary(Array.from(survMap.values()))
+
+  if (!programs && !trend && !icc) return null
+  return { programs, chi, ref, trend, nSemester, icc }
 }
 
 function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
-  const { programs, chi, ref, trend, nSemester } = s
+  const { programs, chi, ref, trend, nSemester, icc } = s
   const progSig = chi !== null && chi.df > 0 && chi.p < 0.05
   const trendSig = trend !== null && trend.p < 0.05
-  const flagged = progSig || trendSig
+  const iccHigh = icc !== null && icc.icc >= 0.05
+  const flagged = progSig || trendSig || iccHigh
   return (
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>Control de calidad — efecto del encuestador</SectionLabel>
@@ -834,6 +847,17 @@ function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
               : `sin gradiente con el semestre (n = ${nSemester})`}.
           </div>
         )}
+        {icc && (
+          <div style={{ marginTop: (chi || trend) ? 6 : 0 }}>
+            <strong style={{ color: iccHigh ? C.amber : C.text }}>
+              ICC por encuestador = {icc.icc.toFixed(3)} (deff {icc.designEffect.toFixed(2)}, {icc.clusters} encuestadores)
+            </strong>
+            {' — '}
+            {iccHigh
+              ? 'parte de la variación del desenlace se explica por el encuestador (efecto de conglomerado relevante)'
+              : 'variación entre encuestadores despreciable'}.
+          </div>
+        )}
         {programs && (
           <div style={{ marginTop: 4, color: C.hint }}>
             Referencia: {ref} (programa con más registros). RP = razón de prevalencia vs. referencia (IC 95%).
@@ -854,6 +878,7 @@ function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
 interface AdjustedAssoc {
   crude: RiskRatio
   mh: MHResult
+  bd: { chi2: number; df: number; p: number } | null  // Breslow–Day OR homogeneity
   exposedTotal: number
   unexposedTotal: number
   pctChange: number   // % change crude → adjusted (confounding rule of thumb: >10%)
@@ -885,14 +910,16 @@ function buildEstratoAdjusted(surveys: Survey[]): AdjustedAssoc | null {
   const crude = prevalenceRatio(aT, aT + bT, cT, cT + dT)
   if (!Number.isFinite(crude.rr)) return null
 
+  const bd = breslowDay(Array.from(strataMap.values()))
   const pctChange = mh.rr > 0 ? Math.abs(crude.rr - mh.rr) / mh.rr * 100 : 0
-  return { crude, mh, exposedTotal: aT + bT, unexposedTotal: cT + dT, pctChange }
+  return { crude, mh, bd, exposedTotal: aT + bT, unexposedTotal: cT + dT, pctChange }
 }
 
 function AdjustedAssociationCard({ a }: { a: AdjustedAssoc }) {
-  const { crude, mh, exposedTotal, unexposedTotal, pctChange } = a
+  const { crude, mh, bd, exposedTotal, unexposedTotal, pctChange } = a
   const confounded = pctChange >= 10
   const adjSig = mh.lo > 1 || mh.hi < 1
+  const heterog = bd !== null && bd.p < 0.05
   const fmt = (x: number) => x.toFixed(2)
   return (
     <Card style={{ marginBottom: 14 }}>
@@ -919,6 +946,14 @@ function AdjustedAssociationCard({ a }: { a: AdjustedAssoc }) {
             ? `⚠ La estimación cambia ${pctChange.toFixed(0)}% al ajustar → el programa del encuestador confunde la asociación.`
             : `✓ El ajuste apenas cambia la estimación (${pctChange.toFixed(0)}%) → sin confusión apreciable por el encuestador.`}
         </div>
+        {bd && (
+          <div style={{ marginTop: 4, color: heterog ? C.amber : C.green }}>
+            Homogeneidad (Breslow–Day) · χ² = {bd.chi2.toFixed(2)} (gl {bd.df}), p = {fmtP(bd.p)} —{' '}
+            {heterog
+              ? '⚠ el efecto del estrato varía entre programas (modificación de efecto): la RP combinada puede no ser apropiada.'
+              : 'la asociación es homogénea entre estratos → la estimación combinada es válida.'}
+          </div>
+        )}
         <div style={{ marginTop: 4, color: C.hint }}>
           n: {exposedTotal} expuestos (alto) · {unexposedTotal} no expuestos (bajo).
           Estrato dicotomizado; con celdas pequeñas, interpretar con cautela.
