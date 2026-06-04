@@ -101,6 +101,105 @@ function FieldGuideDialog({ onClose }: { onClose: () => void }) {
 
 type RecordsView = 'cards' | 'table'
 
+// Single survey card, extracted and memoized so that frequent EncuestasPage
+// re-renders (e.g. every keystroke in the filter field) don't re-render every
+// row. Each row does string date parsing (calcEdad) and array filtering
+// (productMetrics), which is wasteful at scale. All callback props are stable
+// (zustand actions / useState setters) and `confirming` is a per-row boolean,
+// so React.memo lets unaffected rows bail out of re-rendering.
+interface SurveyCardItemProps {
+  survey:         Survey
+  isInvestigador: boolean
+  confirming:     boolean
+  onConfirm:      (id: string | null) => void
+  onRemove:       (id: string) => void
+  onEdit:         (s: Survey) => void
+  onDetail:       (s: Survey) => void
+}
+
+const SurveyCardItem = React.memo(function SurveyCardItem({
+  survey: sv, isInvestigador, confirming, onConfirm, onRemove, onEdit, onDetail,
+}: SurveyCardItemProps) {
+  const edad = calcEdad(sv.fEta, sv.fNac)
+  const expiredMeds = sv.medications?.filter(m => productMetrics(sv.fEta, sv.fDisp, m).isExpired).length ?? 0
+
+  return (
+    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>#{String(sv.nui).padStart(3, '0')}</span>
+          <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>{fmtDate(sv.fEta)}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {sv.ciudad && <Badge label={sv.ciudad} variant="gray" />}
+          {sv.medSob   === 'Sí' && <Badge label="Med. almac."  variant="teal" />}
+          {sv.vtoMedNc === 'Sí' && <Badge label="Vencidos"     variant="amber" />}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px', fontSize: 12, marginBottom: 8 }}>
+        {edad !== null && <span style={{ color: C.muted }}>Edad: <strong>{edad} años</strong></span>}
+        {sv.estrato   && <span style={{ color: C.muted }}>Estrato: <strong>{sv.estrato}</strong></span>}
+        {sv.asSalud   && <span style={{ color: C.muted }}>Salud: <strong>{sv.asSalud}</strong></span>}
+        {sv.cantMed != null && sv.medSob === 'Sí' && (
+          <span style={{ color: C.muted }}>Sin consumir: <strong>{sv.cantMed}</strong></span>
+        )}
+        {sv.cantMedVto != null && sv.cantMedVto > 0 && (
+          <span style={{ color: C.amber }}>Vencidos: <strong>{sv.cantMedVto}</strong></span>
+        )}
+        {sv.pesoMedNc != null && (
+          <span style={{ color: C.muted }}>Peso: <strong>{sv.pesoMedNc}g</strong></span>
+        )}
+      </div>
+
+      {sv.medications?.length > 0 && (
+        <div style={{ padding: '6px 8px', background: C.bg, borderRadius: 6, fontSize: 12, marginBottom: 10 }}>
+          <i className="ti ti-pill" style={{ fontSize: 12, marginRight: 5, color: C.teal }} aria-hidden />
+          <strong>{sv.medications.length}</strong> producto(s) registrado(s)
+          {expiredMeds > 0 && (
+            <span style={{ marginLeft: 8, color: C.amber }}>· {expiredMeds} vencido(s)</span>
+          )}
+          <button
+            type="button"
+            onClick={() => onDetail(sv)}
+            style={{ marginLeft: 10, background: 'none', border: 'none', color: C.teal, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Ver detalle
+          </button>
+        </div>
+      )}
+
+      {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
+      {!isInvestigador && (
+        confirming ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 'auto', paddingTop: 4 }}>
+            <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
+            <Button size="sm" variant="danger" onClick={() => { onRemove(sv.id); onConfirm(null) }}>
+              Sí, eliminar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onConfirm(null)}>
+              Cancelar
+            </Button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 'auto', paddingTop: 4 }}>
+            <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => onEdit(sv)}>
+              Editar
+            </Button>
+            <Button
+              size="sm" variant="ghost" icon="ti-trash"
+              style={{ color: C.red, borderColor: `${C.red}50` }}
+              onClick={() => onConfirm(sv.id)}
+            >
+              Eliminar
+            </Button>
+          </div>
+        )
+      )}
+    </Card>
+  )
+})
+
 export function EncuestasPage() {
   const { surveys, removeSurvey, openEditWizard, openWizard, userRole } = useStore()
   const isInvestigador = userRole === 'investigador'
@@ -163,89 +262,18 @@ export function EncuestasPage() {
 
         {surveys.length > 0 && filtered.length > 0 && view === 'cards' && (
           <div className="records-grid">
-          {filtered.map(sv => {
-            const edad = calcEdad(sv.fEta, sv.fNac)
-            const expiredMeds = sv.medications?.filter(m => {
-              const mx = productMetrics(sv.fEta, sv.fDisp, m)
-              return mx.isExpired
-            }).length ?? 0
-
-            return (
-              <Card key={sv.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                  <div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>#{String(sv.nui).padStart(3, '0')}</span>
-                    <span style={{ fontSize: 12, color: C.muted, marginLeft: 8 }}>{fmtDate(sv.fEta)}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    {sv.ciudad && <Badge label={sv.ciudad} variant="gray" />}
-                    {sv.medSob   === 'Sí' && <Badge label="Med. almac."  variant="teal" />}
-                    {sv.vtoMedNc === 'Sí' && <Badge label="Vencidos"     variant="amber" />}
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px', fontSize: 12, marginBottom: 8 }}>
-                  {edad !== null && <span style={{ color: C.muted }}>Edad: <strong>{edad} años</strong></span>}
-                  {sv.estrato   && <span style={{ color: C.muted }}>Estrato: <strong>{sv.estrato}</strong></span>}
-                  {sv.asSalud   && <span style={{ color: C.muted }}>Salud: <strong>{sv.asSalud}</strong></span>}
-                  {sv.cantMed != null && sv.medSob === 'Sí' && (
-                    <span style={{ color: C.muted }}>Sin consumir: <strong>{sv.cantMed}</strong></span>
-                  )}
-                  {sv.cantMedVto != null && sv.cantMedVto > 0 && (
-                    <span style={{ color: C.amber }}>Vencidos: <strong>{sv.cantMedVto}</strong></span>
-                  )}
-                  {sv.pesoMedNc != null && (
-                    <span style={{ color: C.muted }}>Peso: <strong>{sv.pesoMedNc}g</strong></span>
-                  )}
-                </div>
-
-                {sv.medications?.length > 0 && (
-                  <div style={{ padding: '6px 8px', background: C.bg, borderRadius: 6, fontSize: 12, marginBottom: 10 }}>
-                    <i className="ti ti-pill" style={{ fontSize: 12, marginRight: 5, color: C.teal }} aria-hidden />
-                    <strong>{sv.medications.length}</strong> producto(s) registrado(s)
-                    {expiredMeds > 0 && (
-                      <span style={{ marginLeft: 8, color: C.amber }}>· {expiredMeds} vencido(s)</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setDetail(sv)}
-                      style={{ marginLeft: 10, background: 'none', border: 'none', color: C.teal, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      Ver detalle
-                    </button>
-                  </div>
-                )}
-
-                {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
-                {!isInvestigador && (
-                  confirmId === sv.id ? (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 'auto', paddingTop: 4 }}>
-                      <span style={{ fontSize: 12, color: C.muted, flex: 1 }}>¿Eliminar esta encuesta?</span>
-                      <Button size="sm" variant="danger" onClick={() => { removeSurvey(sv.id); setConfirmId(null) }}>
-                        Sí, eliminar
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setConfirmId(null)}>
-                        Cancelar
-                      </Button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 'auto', paddingTop: 4 }}>
-                      <Button size="sm" variant="ghost" icon="ti-edit" onClick={() => openEditWizard(sv)}>
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm" variant="ghost" icon="ti-trash"
-                        style={{ color: C.red, borderColor: `${C.red}50` }}
-                        onClick={() => setConfirmId(sv.id)}
-                      >
-                        Eliminar
-                      </Button>
-                    </div>
-                  )
-                )}
-              </Card>
-            )
-          })}
+          {filtered.map(sv => (
+            <SurveyCardItem
+              key={sv.id}
+              survey={sv}
+              isInvestigador={isInvestigador}
+              confirming={confirmId === sv.id}
+              onConfirm={setConfirmId}
+              onRemove={removeSurvey}
+              onEdit={openEditWizard}
+              onDetail={setDetail}
+            />
+          ))}
           </div>
         )}
       </div>
@@ -322,7 +350,10 @@ function sortValue(s: Survey, key: SortKey): string | number | null {
   }
 }
 
-function RecordsTable({ surveys, onDetail }: { surveys: Survey[]; onDetail: (s: Survey) => void }) {
+// Memoized so unrelated EncuestasPage re-renders (opening the detail modal,
+// toggling delete-confirm) don't re-sort/re-render the whole table: `filtered`
+// keeps its reference and `onDetail` is a stable setter, so React.memo bails.
+const RecordsTable = React.memo(function RecordsTable({ surveys, onDetail }: { surveys: Survey[]; onDetail: (s: Survey) => void }) {
   const [sortKey, setSortKey] = useState<SortKey>('nui')
   const [asc, setAsc] = useState(true)
 
@@ -375,40 +406,47 @@ function RecordsTable({ surveys, onDetail }: { surveys: Survey[]; onDetail: (s: 
             </tr>
           </thead>
           <tbody>
-            {rows.map((s, i) => {
-              const edad = calcEdad(s.fEta, s.fNac)
-              const meds = s.medications?.length ?? 0
-              const venc = s.cantMedVto ?? 0
-              return (
-                <tr
-                  key={s.id}
-                  onClick={() => onDetail(s)}
-                  style={{ cursor: 'pointer', background: i % 2 ? C.surface2 : C.surface }}
-                >
-                  <Td numeric><strong style={{ color: C.teal }}>#{String(s.nui).padStart(3, '0')}</strong></Td>
-                  <Td>{s.fEta ? fmtDate(s.fEta) : '—'}</Td>
-                  <Td>{s.ciudad || '—'}</Td>
-                  <Td numeric>{edad != null ? edad : '—'}</Td>
-                  <Td numeric>{s.estrato ?? '—'}</Td>
-                  <Td>{s.asSalud || '—'}</Td>
-                  <Td numeric>{meds}</Td>
-                  <Td numeric>
-                    {venc > 0
-                      ? <span style={{ color: C.amber, fontWeight: 600 }}>{venc}</span>
-                      : <span style={{ color: C.hint }}>0</span>}
-                  </Td>
-                  <Td>
-                    <i className="ti ti-chevron-right" style={{ fontSize: 16, color: C.hint, display: 'block' }} aria-hidden />
-                  </Td>
-                </tr>
-              )
-            })}
+            {rows.map((s, i) => (
+              <RecordRow key={s.id} survey={s} zebra={i % 2 === 1} onDetail={onDetail} />
+            ))}
           </tbody>
         </table>
       </div>
     </Card>
   )
-}
+})
+
+// Single table row, memoized so that filter keystrokes / parent re-renders only
+// re-render rows whose data (survey reference) or zebra position actually change,
+// skipping the per-row calcEdad otherwise. onDetail is a stable setter.
+interface RecordRowProps { survey: Survey; zebra: boolean; onDetail: (s: Survey) => void }
+const RecordRow = React.memo(function RecordRow({ survey: s, zebra, onDetail }: RecordRowProps) {
+  const edad = calcEdad(s.fEta, s.fNac)
+  const meds = s.medications?.length ?? 0
+  const venc = s.cantMedVto ?? 0
+  return (
+    <tr
+      onClick={() => onDetail(s)}
+      style={{ cursor: 'pointer', background: zebra ? C.surface2 : C.surface }}
+    >
+      <Td numeric><strong style={{ color: C.teal }}>#{String(s.nui).padStart(3, '0')}</strong></Td>
+      <Td>{s.fEta ? fmtDate(s.fEta) : '—'}</Td>
+      <Td>{s.ciudad || '—'}</Td>
+      <Td numeric>{edad != null ? edad : '—'}</Td>
+      <Td numeric>{s.estrato ?? '—'}</Td>
+      <Td>{s.asSalud || '—'}</Td>
+      <Td numeric>{meds}</Td>
+      <Td numeric>
+        {venc > 0
+          ? <span style={{ color: C.amber, fontWeight: 600 }}>{venc}</span>
+          : <span style={{ color: C.hint }}>0</span>}
+      </Td>
+      <Td>
+        <i className="ti ti-chevron-right" style={{ fontSize: 16, color: C.hint, display: 'block' }} aria-hidden />
+      </Td>
+    </tr>
+  )
+})
 
 function Td({ children, numeric }: { children: React.ReactNode; numeric?: boolean }) {
   return (
