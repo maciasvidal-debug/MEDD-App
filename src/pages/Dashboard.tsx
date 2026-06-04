@@ -17,8 +17,9 @@ import type { Survey } from '../types'
 // Chart helpers declared at module scope (not inside DashboardPage's render)
 // so they keep a stable identity across renders — see react-hooks/static-components.
 const tipStyle = {
-  background: C.surface, border: `0.5px solid ${C.border}`,
-  borderRadius: 6, padding: '5px 9px', fontSize: 12,
+  background: C.surface, border: `1px solid ${C.border}`,
+  borderRadius: 9, padding: '7px 11px', fontSize: 12,
+  boxShadow: '0 8px 24px -8px rgba(14, 23, 38, 0.22)',
 }
 
 const CustomTip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: { name: string } }> }) =>
@@ -31,14 +32,45 @@ const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; l
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
       <PieChart width={72} height={72}>
-        <Pie data={data} cx={36} cy={36} innerRadius={22} outerRadius={34} dataKey="v" stroke="none">
+        <Pie data={data} cx={36} cy={36} innerRadius={22} outerRadius={34} dataKey="v" stroke="none" cornerRadius={4} paddingAngle={data[0].v > 0 && data[1].v > 0 ? 2 : 0}>
           <Cell fill={color} />
           <Cell fill={CHART.track} />
         </Pie>
       </PieChart>
-      <span className="tnum" style={{ fontSize: 18, fontWeight: 700, color }}>{pct(val, outOf)}%</span>
+      <span className="fd tnum" style={{ fontSize: 18, fontWeight: 600, color }}>{pct(val, outOf)}%</span>
       <span style={{ fontSize: 11, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
       <span style={{ fontSize: 11, color: C.hint }}>{val}/{outOf}</span>
+    </div>
+  )
+}
+
+// Horizontal distribution bars — one component for the six near-identical
+// category charts. Premium touches applied once: gradient bar fill, rounded
+// caps, clean axes (no spines/ticks), capped bar thickness.
+function DistBar({ data, dataKey = 'n', color, yWidth = 80, barName }: {
+  data: Array<Record<string, string | number>>
+  dataKey?: string
+  color: string
+  yWidth?: number
+  barName?: string
+}) {
+  const gid = `bar-${color.replace('#', '')}`
+  return (
+    <div style={{ height: Math.max(80, data.length * 30) }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }} barCategoryGap="22%">
+          <defs>
+            <linearGradient id={gid} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor={color} stopOpacity={0.95} />
+              <stop offset="100%" stopColor={color} stopOpacity={0.6} />
+            </linearGradient>
+          </defs>
+          <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} axisLine={false} tickLine={false} />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={yWidth} axisLine={false} tickLine={false} />
+          <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
+          <Bar dataKey={dataKey} fill={`url(#${gid})`} radius={[0, 5, 5, 0]} maxBarSize={26} name={barName} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   )
 }
@@ -142,7 +174,7 @@ export default function DashboardPage() {
   if (surveys.length === 0) {
     return (
       <div>
-        <TopBar title="MEDD · Panel analítico" />
+        <TopBar title="Panel analítico" icon="ti-layout-dashboard" accent={C.navy} />
         <div className="page-content">
           <EmptyState
             icon="ti-clipboard-data"
@@ -163,7 +195,12 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <TopBar title={isInvestigador ? 'Panel analítico' : 'Mi panel'} />
+      <TopBar
+        title={isInvestigador ? 'Panel analítico' : 'Mi panel'}
+        subtitle={isInvestigador ? `${n} encuesta${n !== 1 ? 's' : ''} en análisis` : undefined}
+        icon="ti-layout-dashboard"
+        accent={C.navy}
+      />
       <div className="page-content">
 
         {/* Role-adaptive hero */}
@@ -259,16 +296,7 @@ export default function DashboardPage() {
         {ciudadVenc.length > 0 && (
           <Card>
             <SectionLabel>Hotspots geográficos — Unidades vencidas por ciudad</SectionLabel>
-            <div style={{ height: Math.max(80, ciudadVenc.length * 28) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ciudadVenc} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={85} />
-                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
-                  <Bar dataKey="value" fill={CHART.amber} radius={[0, 3, 3, 0]} name="Unidades vencidas" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <DistBar data={ciudadVenc} dataKey="value" color={CHART.amber} yWidth={85} barName="Unidades vencidas" />
           </Card>
         )}
 
@@ -276,16 +304,7 @@ export default function DashboardPage() {
         {barEstrato.length > 0 && (
           <Card>
             <SectionLabel>Distribución por estrato socioeconómico</SectionLabel>
-            <div style={{ height: Math.max(80, barEstrato.length * 28) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barEstrato} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={75} />
-                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
-                  <Bar dataKey="n" fill={CHART.navy} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <DistBar data={barEstrato} color={CHART.navy} yWidth={75} />
           </Card>
         )}
 
@@ -293,16 +312,7 @@ export default function DashboardPage() {
         {barAsSalud.length > 0 && (
           <Card>
             <SectionLabel>Distribución por régimen de salud</SectionLabel>
-            <div style={{ height: Math.max(80, barAsSalud.length * 30) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barAsSalud} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={90} />
-                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
-                  <Bar dataKey="n" fill={CHART.teal} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <DistBar data={barAsSalud} color={CHART.teal} yWidth={90} />
           </Card>
         )}
 
@@ -310,16 +320,7 @@ export default function DashboardPage() {
         {barNvEstu.length > 0 && (
           <Card>
             <SectionLabel>Distribución por nivel educativo</SectionLabel>
-            <div style={{ height: Math.max(80, barNvEstu.length * 28) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barNvEstu} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={75} />
-                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
-                  <Bar dataKey="n" fill={CHART.purple} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <DistBar data={barNvEstu} color={CHART.purple} yWidth={75} />
           </Card>
         )}
 
@@ -327,16 +328,7 @@ export default function DashboardPage() {
         {barNvPosg.length > 0 && (
           <Card>
             <SectionLabel>Distribución por nivel de posgrado</SectionLabel>
-            <div style={{ height: Math.max(80, barNvPosg.length * 28) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barNvPosg} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={95} />
-                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
-                  <Bar dataKey="n" fill={CHART.violet} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <DistBar data={barNvPosg} color={CHART.violet} yWidth={95} />
           </Card>
         )}
 
@@ -344,16 +336,7 @@ export default function DashboardPage() {
         {barEtnia.length > 0 && (
           <Card>
             <SectionLabel>Distribución por pertenencia étnica</SectionLabel>
-            <div style={{ height: Math.max(80, barEtnia.length * 28) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barEtnia} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={120} />
-                  <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
-                  <Bar dataKey="n" fill={CHART.gray} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <DistBar data={barEtnia} color={CHART.gray} yWidth={120} />
           </Card>
         )}
         </div>
@@ -402,7 +385,7 @@ function EncuestadorHero({ n, pendingDraft, onNew, onResume, onView }: {
     }}>
       <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 2 }}>Trabajo de campo</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
-        <span className="tnum" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }}>{n}</span>
+        <span className="fd tnum" style={{ fontSize: 32, fontWeight: 600, lineHeight: 1 }}>{n}</span>
         <span style={{ fontSize: 14, opacity: 0.9 }}>encuesta{n !== 1 ? 's' : ''} registrada{n !== 1 ? 's' : ''}</span>
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -437,7 +420,7 @@ function EncuestadorHero({ n, pendingDraft, onNew, onResume, onView }: {
 function HeroStat({ value, label }: { value: number; label: string }) {
   return (
     <div>
-      <div className="tnum" style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{value}</div>
+      <div className="fd tnum" style={{ fontSize: 28, fontWeight: 600, lineHeight: 1 }}>{value}</div>
       <div style={{ fontSize: 11, opacity: 0.85, marginTop: 3 }}>{label}</div>
     </div>
   )
@@ -533,8 +516,11 @@ function FilterBar({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-      {children}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <span style={{ width: 3, height: 14, borderRadius: 2, background: C.teal, flexShrink: 0 }} aria-hidden />
+      <span style={{ fontSize: 13, fontWeight: 600, color: C.text, letterSpacing: '-0.005em' }}>
+        {children}
+      </span>
     </div>
   )
 }
@@ -596,7 +582,7 @@ function RetentionCard({ s }: { s: DaysSummary }) {
       <SectionLabel>Tiempo de retención de medicamentos vencidos</SectionLabel>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
         <span style={{ fontSize: 13, color: C.muted }}>Mediana de días vencido</span>
-        <span style={{ fontSize: 22, fontWeight: 600, color: C.amber }}>{Math.round(s.median)} d</span>
+        <span className="fd tnum" style={{ fontSize: 24, fontWeight: 600, color: C.amber }}>{Math.round(s.median)} d</span>
       </div>
       {/* IQR box (Q1–Q3) with the median marker, scaled 0..max */}
       <div style={{ position: 'relative', height: 10, background: C.bg, borderRadius: 5, margin: '6px 0' }}>
@@ -973,7 +959,7 @@ function RRBox({ label, rr, lo, hi, fmt, highlight }: {
       border: `1px solid ${highlight ? C.teal : C.border}`,
     }}>
       <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{label}</div>
-      <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: highlight ? C.teal : C.text, lineHeight: 1 }}>
+      <div className="fd tnum" style={{ fontSize: 24, fontWeight: 600, color: highlight ? C.teal : C.text, lineHeight: 1 }}>
         {fmt(rr)}
       </div>
       <div className="tnum" style={{ fontSize: 11, color: C.hint, marginTop: 3 }}>

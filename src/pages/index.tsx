@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { TopBar, StepBar } from '../components/layout'
 import {
   Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, Dialog, ChipGroup, C,
+  Field, SectionHead, Dialog, ConfirmDialog, ChipGroup, IconChip, IconButton, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
@@ -48,20 +48,8 @@ export function WizardPage() {
         title={editingId ? 'Editar encuesta' : 'Nueva encuesta'}
         actions={
           <>
-            <button
-              aria-label="Guía de campo"
-              onClick={() => setGuideOpen(true)}
-              style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
-            >
-              <i className="ti ti-help" style={{ fontSize: 18 }} aria-hidden />
-            </button>
-            <button
-              aria-label="Cancelar"
-              onClick={closeWizard}
-              style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
-            >
-              <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden />
-            </button>
+            <IconButton icon="ti-help" label="Guía de campo" onClick={() => setGuideOpen(true)} />
+            <IconButton icon="ti-x" label="Cancelar" onClick={closeWizard} />
           </>
         }
       />
@@ -242,7 +230,12 @@ export function EncuestasPage() {
 
   return (
     <div>
-      <TopBar title="Registros" />
+      <TopBar
+        title="Registros"
+        subtitle={`${surveys.length} encuesta${surveys.length !== 1 ? 's' : ''}`}
+        icon="ti-clipboard-list"
+        accent={C.teal}
+      />
       <div className="page-content">
         {surveys.length > 0 && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -551,7 +544,7 @@ export function BuscarPage() {
 
   return (
     <div>
-      <TopBar title="Buscador CUM-INVIMA" />
+      <TopBar title="Buscador CUM-INVIMA" subtitle="Catálogo de medicamentos" icon="ti-search" accent={C.navy} />
       <div className="page-content narrow">
         <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
           <input
@@ -587,8 +580,8 @@ export function BuscarPage() {
         )}
 
         {results.map((r, i) => (
-          <Card key={i} style={{ marginBottom: 10 }}>
-            <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>{r.producto || '—'}</div>
+          <Card key={i} className="lift" style={{ marginBottom: 10 }}>
+            <div className="fd" style={{ fontWeight: 600, fontSize: 14.5, marginBottom: 4, letterSpacing: '-0.01em' }}>{r.producto || '—'}</div>
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.6 }}>
               DCI: {r.principioactivo || '—'} · {r.concentracion || ''}{r.unidadmedida || ''} · {r.formafarmaceutica || '—'}
               {r.viaadministracion && ` · ${r.viaadministracion}`}
@@ -633,20 +626,18 @@ export function ExportarPage() {
 
   return (
     <div>
-      <TopBar title="Exportar datos" />
+      <TopBar title="Exportar datos" subtitle="CSV · JSON · codebook" icon="ti-download" accent={C.green} />
       <div className="page-content narrow">
         <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>
           {n} registro{n !== 1 ? 's' : ''} en sesión actual.
           Los datos persisten en IndexedDB del navegador y sobreviven cierres de pestaña.
         </p>
 
-        <Card style={{ marginBottom: 12 }}>
+        <Card className="lift" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 8, background: '#EAF3DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="ti ti-file-spreadsheet" style={{ fontSize: 20, color: '#3B6D11' }} aria-hidden />
-            </div>
+            <IconChip icon="ti-file-spreadsheet" accent={C.green} />
             <div>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>Exportar CSV</div>
+              <div className="fd" style={{ fontWeight: 600, fontSize: 14.5 }}>Exportar CSV</div>
               <div style={{ fontSize: 12, color: C.muted }}>Columnas del codebook · Compatible con Excel, SPSS, R, Stata · UTF-8 BOM</div>
             </div>
           </div>
@@ -668,13 +659,11 @@ export function ExportarPage() {
           </Button>
         </Card>
 
-        <Card>
+        <Card className="lift">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 8, background: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="ti ti-braces" style={{ fontSize: 20, color: '#1D4ED8' }} aria-hidden />
-            </div>
+            <IconChip icon="ti-braces" accent={C.navy} />
             <div>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>Exportar JSON</div>
+              <div className="fd" style={{ fontWeight: 600, fontSize: 14.5 }}>Exportar JSON</div>
               <div style={{ fontSize: 12, color: C.muted }}>Estructura completa con array de medicamentos · Para procesamiento programático</div>
             </div>
           </div>
@@ -697,6 +686,7 @@ export function ExportarPage() {
 export function AjustesPage() {
   const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, theme, toggleTheme, density, setDensity } = useStore()
   const [form, setForm] = useState(settings)
+  const [confirmSignOut, setConfirmSignOut] = useState(false)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const isInvestigador = userRole === 'investigador'
@@ -704,7 +694,7 @@ export function AjustesPage() {
 
   return (
     <div>
-      <TopBar title="Ajustes" />
+      <TopBar title="Ajustes" subtitle="Proyecto y perfil" icon="ti-settings" accent={C.gray} />
       <div className="page-content narrow">
         <SectionHead icon="ti-settings" label="Configuración del proyecto" />
 
@@ -768,12 +758,7 @@ export function AjustesPage() {
 
         <Card style={{ background: C.surface }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <i className={`ti ${theme === 'dark' ? 'ti-moon' : 'ti-sun'}`} style={{ fontSize: 19, color: C.teal }} aria-hidden />
-            </div>
+            <IconChip icon={theme === 'dark' ? 'ti-moon' : 'ti-sun'} accent={C.teal} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>Tema {theme === 'dark' ? 'oscuro' : 'claro'}</div>
               <div style={{ fontSize: 12, color: C.muted }}>Ajusta la app a tu entorno de trabajo.</div>
@@ -800,12 +785,7 @@ export function AjustesPage() {
 
         <Card style={{ background: C.surface, marginTop: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <i className="ti ti-layout-distribute-vertical" style={{ fontSize: 19, color: C.teal }} aria-hidden />
-            </div>
+            <IconChip icon="ti-layout-distribute-vertical" accent={C.teal} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>Densidad</div>
               <div style={{ fontSize: 12, color: C.muted }}>Espaciado de tarjetas y listas.</div>
@@ -873,14 +853,30 @@ export function AjustesPage() {
               {syncing ? 'Sincronizando…' : 'Sincronizar ahora'}
             </Button>
             <Button
-              onClick={() => signOut()}
+              onClick={() => setConfirmSignOut(true)}
               icon="ti-logout"
-              style={{ flex: 1, background: '#FEE2E2', color: '#B91C1C' }}
+              style={{ flex: 1, background: C.redLight, color: C.red }}
             >
               Cerrar sesión
             </Button>
           </div>
         </Card>
+
+        {confirmSignOut && (
+          <ConfirmDialog
+            title="Cerrar sesión"
+            icon="ti-logout"
+            danger
+            confirmLabel="Cerrar sesión"
+            message={
+              pendingCount > 0
+                ? `Tienes ${pendingCount} encuesta(s) sin sincronizar. Si cierras sesión podrías perder esos datos locales. ¿Quieres cerrar sesión de todas formas?`
+                : '¿Seguro que quieres cerrar sesión?'
+            }
+            onConfirm={() => signOut()}
+            onClose={() => setConfirmSignOut(false)}
+          />
+        )}
 
         <Divider label="información" />
 

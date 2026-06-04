@@ -215,8 +215,8 @@ export function IconButton({ icon, label, size = 40, style, ...rest }: IconBtnPr
     <button
       aria-label={label}
       style={{
-        width: size, height: size, borderRadius: 8,
-        border: `0.5px solid ${C.border}`, background: 'transparent',
+        width: size, height: size, borderRadius: 10,
+        border: `1px solid ${C.border}`, background: 'transparent',
         cursor: 'pointer', display: 'flex', alignItems: 'center',
         justifyContent: 'center', color: C.text, flexShrink: 0,
         transition: 'background 0.12s',
@@ -336,8 +336,10 @@ export function Card({ children, style = {}, className, as: Tag = 'div' }: CardP
       className={className}
       style={{
         background: C.surface, border: `1px solid ${C.border}`,
-        borderRadius: 14, padding: 'var(--card-pad)',
-        boxShadow: C.shadowSm,
+        borderRadius: 'var(--r-card)', padding: 'var(--card-pad)',
+        // Flatter, more architectural rest state — hairline only. Floating
+        // elements (dialog/toast/nav) carry the shadows; cards lift on hover.
+        boxShadow: 'none',
         ...style,
       }}
     >
@@ -414,7 +416,7 @@ export function Dialog({ title, onClose, children }: DialogProps) {
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <h2 id={titleId} style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{title}</h2>
+          <h2 id={titleId} className="fd" style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}>{title}</h2>
           <button
             aria-label="Cerrar"
             onClick={onClose}
@@ -430,6 +432,47 @@ export function Dialog({ title, onClose, children }: DialogProps) {
         {children}
       </div>
     </div>
+  )
+}
+
+// ─── ConfirmDialog ───────────────────────────────────────────────────────────
+// Reusable confirmation for destructive / irreversible actions. Built on Dialog,
+// so it inherits the full WAI-ARIA modal behaviour (focus trap, Escape, scroll
+// lock, focus restore). The cancel button is focused first so an accidental
+// Enter does not trigger the destructive action.
+
+export function ConfirmDialog({
+  title, message, confirmLabel = 'Confirmar', cancelLabel = 'Cancelar',
+  danger = false, icon, accent, onConfirm, onClose,
+}: {
+  title: string
+  message: React.ReactNode
+  confirmLabel?: string
+  cancelLabel?: string
+  danger?: boolean
+  icon?: string
+  accent?: string
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  const tint = accent ?? (danger ? C.red : C.teal)
+  return (
+    <Dialog title={title} onClose={onClose}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 18 }}>
+        {icon && <IconChip icon={icon} accent={tint} size={40} />}
+        <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55, flex: 1 }}>{message}</div>
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <Button variant="ghost" onClick={onClose} fullWidth>{cancelLabel}</Button>
+        <Button
+          variant={danger ? 'danger' : 'primary'}
+          onClick={() => { onConfirm(); onClose() }}
+          fullWidth
+        >
+          {confirmLabel}
+        </Button>
+      </div>
+    </Dialog>
   )
 }
 
@@ -449,6 +492,79 @@ export function Divider({ label }: { label?: string }) {
       )}
       <div style={{ flex: 1, height: '0.5px', background: C.border }} />
     </div>
+  )
+}
+
+// ─── Brand logo ────────────────────────────────────────────────────────────────
+// Inline SVG (no dependency on the icon webfont, so it never renders as a tofu
+// box). The mark is a tilted two-tone capsule — unmistakably "medication" — in
+// the brand gradient. `glyph` = mark on transparent (in-app, no square);
+// `tile`  = app-icon style rounded tile (splash / login), matching the favicon.
+
+export function Logo({ size = 36, variant = 'glyph' }: { size?: number; variant?: 'glyph' | 'tile' }) {
+  const uid = useId().replace(/:/g, '')
+  const g = `lg${uid}`, c = `lc${uid}`
+
+  if (variant === 'tile') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 48 48" fill="none" role="img" aria-label="MEDD">
+        <defs>
+          <linearGradient id={g} x1="6" y1="3" x2="42" y2="45" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#19C3B1" /><stop offset=".52" stopColor="#0F766E" /><stop offset="1" stopColor="#1E3A5F" />
+          </linearGradient>
+          <clipPath id={c}>
+            <rect x="11" y="18.8" width="26" height="10.4" rx="5.2" transform="rotate(-45 24 24)" />
+          </clipPath>
+        </defs>
+        <rect width="48" height="48" rx="12" fill={`url(#${g})`} />
+        <g clipPath={`url(#${c})`}>
+          <rect x="11" y="18.8" width="26" height="10.4" rx="5.2" transform="rotate(-45 24 24)" fill="#fff" />
+          <rect x="24" y="18.8" width="13" height="10.4" transform="rotate(-45 24 24)" fill="#0B2A3F" fillOpacity="0.26" />
+        </g>
+        <line x1="24" y1="18.8" x2="24" y2="29.2" transform="rotate(-45 24 24)" stroke="#0F766E" strokeWidth="1.6" strokeOpacity="0.4" strokeLinecap="round" />
+        <rect x="1" y="1" width="46" height="46" rx="11" stroke="#fff" strokeOpacity="0.1" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" role="img" aria-label="MEDD">
+      <defs>
+        <linearGradient id={g} x1="6" y1="4" x2="34" y2="36" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#19C3B1" /><stop offset="1" stopColor="#0E7C72" />
+        </linearGradient>
+        <clipPath id={c}>
+          <rect x="9" y="15.5" width="22" height="9" rx="4.5" transform="rotate(-45 20 20)" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${c})`}>
+        <rect x="9" y="15.5" width="22" height="9" rx="4.5" transform="rotate(-45 20 20)" fill={`url(#${g})`} />
+        <rect x="20" y="15.5" width="11" height="9" transform="rotate(-45 20 20)" fill="#0B2A3F" fillOpacity="0.2" />
+      </g>
+      <line x1="20" y1="15.5" x2="20" y2="24.5" transform="rotate(-45 20 20)" stroke="#fff" strokeWidth="1.5" strokeOpacity="0.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// ─── IconChip ────────────────────────────────────────────────────────────────
+// Refined gradient-tinted icon chip (accent-driven), replacing the flat
+// "icon in a coloured square" pattern. Tints use color-mix so a single accent
+// drives the fill/border and adapts to light/dark.
+
+export function IconChip({ icon, accent = C.teal, size = 38 }: { icon: string; accent?: string; size?: number }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: size, height: size, borderRadius: Math.round(size * 0.3), flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: `linear-gradient(135deg, color-mix(in srgb, ${accent} 18%, transparent), color-mix(in srgb, ${accent} 6%, transparent))`,
+        border: `1px solid color-mix(in srgb, ${accent} 24%, transparent)`,
+        color: accent,
+      }}
+    >
+      <i className={`ti ${icon}`} style={{ fontSize: Math.round(size * 0.5) }} />
+    </span>
   )
 }
 

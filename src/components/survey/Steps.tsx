@@ -161,7 +161,8 @@ function WizardNavBar({
   return (
     <div style={{
       position: 'sticky', bottom: 0, zIndex: 5,
-      background: C.surface, borderTop: `0.5px solid ${C.border}`,
+      background: C.surface, borderTop: `1px solid ${C.border}`,
+      boxShadow: '0 -6px 16px -10px rgba(14, 23, 38, 0.18)',
       padding: '12px 0 0', marginTop: 24,
       display: 'flex', gap: 10,
     }}>
@@ -622,9 +623,9 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
       </p>
 
       {/* CUM Search */}
-      <Card style={{ marginBottom: 16, background: C.tealLight, border: `0.5px solid ${C.teal}30` }}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: C.teal, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
-          Buscar en CUM-INVIMA
+      <Card style={{ marginBottom: 16, background: C.tealLight, border: `1px solid color-mix(in srgb, ${C.teal} 22%, transparent)` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: C.teal, marginBottom: 9 }}>
+          <i className="ti ti-search" style={{ fontSize: 14 }} aria-hidden /> Buscar en CUM-INVIMA
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <input
@@ -730,9 +731,7 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
       {/* Current list */}
       {meds.length > 0 && (
         <Card style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-            Medicamentos registrados ({meds.length})
-          </div>
+          <GroupLabel>Medicamentos registrados ({meds.length})</GroupLabel>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {meds.map((m, i) => {
               const metrics = productMetrics(draft.fEta, draft.fDisp, m)
@@ -740,9 +739,9 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
                 <div
                   key={i}
                   style={{
-                    padding: '8px 10px',
-                    background: metrics.isExpired ? '#FEF3C7' : C.bg,
-                    borderRadius: 8, border: `0.5px solid ${metrics.isExpired ? C.amber : C.border}`,
+                    padding: '10px 12px',
+                    background: metrics.isExpired ? C.amberLight : C.bg,
+                    borderRadius: 10, border: `1px solid ${metrics.isExpired ? `color-mix(in srgb, ${C.amber} 40%, transparent)` : C.border}`,
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -974,12 +973,16 @@ function QualityCard({ report }: { report: ReturnType<typeof validateDraft> }) {
   const barColor = completeness >= 80 ? C.green : completeness >= 50 ? C.amber : C.red
   return (
     <Card style={{ marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <GroupLabel>Validación y completitud</GroupLabel>
-        <span className="tnum" style={{ fontSize: 12, fontWeight: 700, color: barColor }}>{completeness}%</span>
+        <span className="fd tnum" style={{ fontSize: 16, fontWeight: 600, color: barColor, lineHeight: 1 }}>{completeness}%</span>
       </div>
-      <div style={{ height: 6, background: C.bg, borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
-        <div style={{ width: `${completeness}%`, height: '100%', background: barColor, transition: 'width 0.3s' }} />
+      <div style={{ height: 8, background: C.surface2, borderRadius: 999, overflow: 'hidden', marginBottom: 12 }}>
+        <div style={{
+          width: `${completeness}%`, height: '100%', borderRadius: 999,
+          background: `linear-gradient(90deg, color-mix(in srgb, ${barColor} 72%, #fff), ${barColor})`,
+          transition: 'width 0.4s ease',
+        }} />
       </div>
 
       {errors.map((e, i) => (
@@ -1018,11 +1021,11 @@ function QualityLine({ icon, color, text }: { icon: string; color: string; text:
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
-      fontSize: 10, fontWeight: 500, color: C.muted,
-      textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8,
-    }}>
-      {children}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      <span style={{ width: 3, height: 13, borderRadius: 2, background: C.teal, flexShrink: 0 }} aria-hidden />
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text, letterSpacing: '-0.005em' }}>
+        {children}
+      </span>
     </div>
   )
 }

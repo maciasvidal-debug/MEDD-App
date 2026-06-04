@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { Logo } from '../components/ui'
 
 type AuthMode = 'login' | 'register'
 
@@ -33,8 +34,8 @@ export default function AuthPage() {
       <div style={styles.card}>
         {/* Logo / título */}
         <div style={styles.header}>
-          <div style={styles.brandMark}>
-            <i className="ti ti-vaccine-bottle" style={{ fontSize: 26, color: '#fff' }} aria-hidden />
+          <div style={{ width: 60, height: 60, margin: '0 auto 14px' }}>
+            <Logo variant="tile" size={60} />
           </div>
           <span style={styles.logo}>MEDD</span>
           <p style={styles.subtitle}>Medicamentos no utilizados — Colombia</p>

@@ -6,6 +6,9 @@ import '@fontsource-variable/inter'
 // Space Grotesk (variable) — display face for titles and large figures; gives
 // the UI a distinct, modern identity instead of the default-Inter template look.
 import '@fontsource-variable/space-grotesk'
+// Tabler icon webfont, self-hosted/bundled (NOT a CDN) so glyphs always render —
+// offline and behind restrictive networks — instead of showing tofu boxes.
+import '@tabler/icons-webfont/dist/tabler-icons.min.css'
 import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import './styles/global.css'

@@ -1,5 +1,5 @@
 import React from 'react'
-import { C, IconButton } from '../ui'
+import { C, IconButton, Logo } from '../ui'
 import { useStore } from '../../lib/store'
 import { STEP_LABELS, TOTAL_STEPS } from '../../lib/constants'
 import type { AppView } from '../../types'
@@ -8,26 +8,48 @@ import type { AppView } from '../../types'
 
 interface TopBarProps {
   title: string
+  subtitle?: string
+  icon?: string
+  accent?: string
   onBack?: () => void
   actions?: React.ReactNode
 }
-export function TopBar({ title, onBack, actions }: TopBarProps) {
+export function TopBar({ title, subtitle, icon, accent = C.teal, onBack, actions }: TopBarProps) {
   return (
     <header
       role="banner"
       style={{
         position: 'sticky', top: 0, zIndex: 10,
         background: C.surface, borderBottom: `1px solid ${C.border}`,
-        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-        display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 10,
+        boxShadow: '0 1px 2px rgba(14, 23, 38, 0.03)',
+        display: 'flex', alignItems: 'center', padding: '11px 16px', gap: 11,
       }}
     >
       {onBack && (
         <IconButton icon="ti-arrow-left" label="Regresar" onClick={onBack} />
       )}
-      <span className="fd" style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', flex: 1, color: C.text }}>
-        {title}
-      </span>
+      {icon && !onBack && (
+        <span
+          aria-hidden
+          style={{
+            width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `linear-gradient(135deg, color-mix(in srgb, ${accent} 18%, transparent), color-mix(in srgb, ${accent} 6%, transparent))`,
+            border: `1px solid color-mix(in srgb, ${accent} 24%, transparent)`,
+            color: accent,
+          }}
+        >
+          <i className={`ti ${icon}`} style={{ fontSize: 19 }} />
+        </span>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="fd" style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', color: C.text, lineHeight: 1.15 }}>
+          {title}
+        </div>
+        {subtitle && (
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.2, marginTop: 1 }}>{subtitle}</div>
+        )}
+      </div>
       {actions && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {actions}
@@ -144,13 +166,7 @@ export function SideNav() {
         padding: '20px 18px 16px', borderBottom: `1px solid ${C.border}`,
         display: 'flex', alignItems: 'center', gap: 11,
       }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-          background: C.gradBrand, boxShadow: C.shadowBrand,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <i className="ti ti-vaccine-bottle" style={{ fontSize: 20, color: '#fff' }} aria-hidden />
-        </div>
+        <Logo size={38} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.4px', color: C.text, lineHeight: 1.1 }}>MEDD</div>
           <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.2 }}>Medicamentos no utilizados</div>
@@ -288,7 +304,7 @@ export function StepBar({ currentStep }: StepBarProps) {
         })}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 9 }}>
-        <span style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{label}</span>
+        <span className="fd" style={{ fontSize: 14.5, color: C.text, fontWeight: 600, letterSpacing: '-0.01em' }}>{label}</span>
         <span style={{ fontSize: 12, color: C.muted }}>
           Paso {currentStep} de {TOTAL_STEPS}
         </span>
