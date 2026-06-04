@@ -61,8 +61,9 @@ export default function AuthPage() {
         {/* Form */}
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.field}>
-            <label style={styles.label}>Correo electrónico</label>
+            <label htmlFor="email" style={styles.label}>Correo electrónico</label>
             <input
+              id="email"
               type="email"
               required
               autoComplete="email"
@@ -73,8 +74,9 @@ export default function AuthPage() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Contraseña</label>
+            <label htmlFor="password" style={styles.label}>Contraseña</label>
             <input
+              id="password"
               type="password"
               required
               minLength={6}
@@ -85,8 +87,8 @@ export default function AuthPage() {
             />
           </div>
 
-          {error && <p style={styles.error}>{error}</p>}
-          {info  && <p style={styles.info}>{info}</p>}
+          {error && <p role="alert" aria-live="assertive" style={styles.error}>{error}</p>}
+          {info  && <p role="alert" aria-live="assertive" style={styles.info}>{info}</p>}
 
           <button type="submit" disabled={loading} style={styles.btn}>
             {loading
