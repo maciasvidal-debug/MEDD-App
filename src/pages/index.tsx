@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { TopBar, StepBar } from '../components/layout'
 import {
   Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, Dialog, ChipGroup, C,
+  Field, SectionHead, Dialog, ChipGroup, IconChip, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
@@ -592,8 +592,8 @@ export function BuscarPage() {
         )}
 
         {results.map((r, i) => (
-          <Card key={i} style={{ marginBottom: 10 }}>
-            <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>{r.producto || '—'}</div>
+          <Card key={i} className="lift" style={{ marginBottom: 10 }}>
+            <div className="fd" style={{ fontWeight: 600, fontSize: 14.5, marginBottom: 4, letterSpacing: '-0.01em' }}>{r.producto || '—'}</div>
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.6 }}>
               DCI: {r.principioactivo || '—'} · {r.concentracion || ''}{r.unidadmedida || ''} · {r.formafarmaceutica || '—'}
               {r.viaadministracion && ` · ${r.viaadministracion}`}
@@ -645,13 +645,11 @@ export function ExportarPage() {
           Los datos persisten en IndexedDB del navegador y sobreviven cierres de pestaña.
         </p>
 
-        <Card style={{ marginBottom: 12 }}>
+        <Card className="lift" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 8, background: '#EAF3DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="ti ti-file-spreadsheet" style={{ fontSize: 20, color: '#3B6D11' }} aria-hidden />
-            </div>
+            <IconChip icon="ti-file-spreadsheet" accent={C.green} />
             <div>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>Exportar CSV</div>
+              <div className="fd" style={{ fontWeight: 600, fontSize: 14.5 }}>Exportar CSV</div>
               <div style={{ fontSize: 12, color: C.muted }}>Columnas del codebook · Compatible con Excel, SPSS, R, Stata · UTF-8 BOM</div>
             </div>
           </div>
@@ -673,13 +671,11 @@ export function ExportarPage() {
           </Button>
         </Card>
 
-        <Card>
+        <Card className="lift">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 8, background: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="ti ti-braces" style={{ fontSize: 20, color: '#1D4ED8' }} aria-hidden />
-            </div>
+            <IconChip icon="ti-braces" accent={C.navy} />
             <div>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>Exportar JSON</div>
+              <div className="fd" style={{ fontWeight: 600, fontSize: 14.5 }}>Exportar JSON</div>
               <div style={{ fontSize: 12, color: C.muted }}>Estructura completa con array de medicamentos · Para procesamiento programático</div>
             </div>
           </div>
@@ -773,12 +769,7 @@ export function AjustesPage() {
 
         <Card style={{ background: C.surface }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <i className={`ti ${theme === 'dark' ? 'ti-moon' : 'ti-sun'}`} style={{ fontSize: 19, color: C.teal }} aria-hidden />
-            </div>
+            <IconChip icon={theme === 'dark' ? 'ti-moon' : 'ti-sun'} accent={C.teal} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>Tema {theme === 'dark' ? 'oscuro' : 'claro'}</div>
               <div style={{ fontSize: 12, color: C.muted }}>Ajusta la app a tu entorno de trabajo.</div>
@@ -805,12 +796,7 @@ export function AjustesPage() {
 
         <Card style={{ background: C.surface, marginTop: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-              background: C.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <i className="ti ti-layout-distribute-vertical" style={{ fontSize: 19, color: C.teal }} aria-hidden />
-            </div>
+            <IconChip icon="ti-layout-distribute-vertical" accent={C.teal} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>Densidad</div>
               <div style={{ fontSize: 12, color: C.muted }}>Espaciado de tarjetas y listas.</div>

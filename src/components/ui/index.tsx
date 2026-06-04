@@ -505,6 +505,28 @@ export function Logo({ size = 36, variant = 'glyph' }: { size?: number; variant?
   )
 }
 
+// ─── IconChip ────────────────────────────────────────────────────────────────
+// Refined gradient-tinted icon chip (accent-driven), replacing the flat
+// "icon in a coloured square" pattern. Tints use color-mix so a single accent
+// drives the fill/border and adapts to light/dark.
+
+export function IconChip({ icon, accent = C.teal, size = 38 }: { icon: string; accent?: string; size?: number }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: size, height: size, borderRadius: Math.round(size * 0.3), flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: `linear-gradient(135deg, color-mix(in srgb, ${accent} 18%, transparent), color-mix(in srgb, ${accent} 6%, transparent))`,
+        border: `1px solid color-mix(in srgb, ${accent} 24%, transparent)`,
+        color: accent,
+      }}
+    >
+      <i className={`ti ${icon}`} style={{ fontSize: Math.round(size * 0.5) }} />
+    </span>
+  )
+}
+
 // ─── SectionHead ─────────────────────────────────────────────────────────────
 
 interface SectionHeadProps { icon: string; label: string }

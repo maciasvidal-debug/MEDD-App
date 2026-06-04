@@ -304,7 +304,7 @@ export function StepBar({ currentStep }: StepBarProps) {
         })}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 9 }}>
-        <span style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{label}</span>
+        <span className="fd" style={{ fontSize: 14.5, color: C.text, fontWeight: 600, letterSpacing: '-0.01em' }}>{label}</span>
         <span style={{ fontSize: 12, color: C.muted }}>
           Paso {currentStep} de {TOTAL_STEPS}
         </span>

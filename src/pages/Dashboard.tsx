@@ -538,8 +538,11 @@ function FilterBar({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-      {children}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <span style={{ width: 3, height: 14, borderRadius: 2, background: C.teal, flexShrink: 0 }} aria-hidden />
+      <span style={{ fontSize: 13, fontWeight: 600, color: C.text, letterSpacing: '-0.005em' }}>
+        {children}
+      </span>
     </div>
   )
 }
