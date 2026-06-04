@@ -699,14 +699,6 @@ export function AjustesPage() {
           />
         </Field>
 
-        <Field label="Institución(es) participantes">
-          <input
-            value={form.instituciones}
-            onChange={e => set('instituciones')(e.target.value)}
-            placeholder="Ej: Universidad X — Programa Regencia en Farmacia"
-          />
-        </Field>
-
         <Field label="ID del encuestador" hint="Se prellena en cada nueva encuesta">
           <input
             type="number" min={1}
@@ -743,7 +735,7 @@ export function AjustesPage() {
           />
         </Field>
 
-        <Field label="Institución (nombre)">
+        <Field label="Institución educativa">
           <input
             value={form.etrInstitucion}
             onChange={e => set('etrInstitucion')(e.target.value)}
