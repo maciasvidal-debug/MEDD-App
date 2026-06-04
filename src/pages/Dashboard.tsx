@@ -6,7 +6,7 @@ import {
 import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
-import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, quantile, productMetrics, type Proportion, type RiskRatio, type ChiSquare, type TrendTest } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, quantile, productMetrics, toCSV, downloadBlob, dateTag, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type Stratum2x2 } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
 
@@ -135,6 +135,8 @@ export default function DashboardPage() {
 
   const assoc = useMemo(() => buildEstratoAssociation(data), [data])
   const retention = useMemo(() => buildRetention(data), [data])
+  const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
+  const adjusted = useMemo(() => buildEstratoAdjusted(data), [data])
 
   // No data at all (vs. "filters returned nothing", handled further down)
   if (surveys.length === 0) {
@@ -185,6 +187,12 @@ export default function DashboardPage() {
             fProg={fProg}     setFProg={setFProg}
             fTipo={fTipo}     setFTipo={setFTipo}
             filtersActive={filtersActive} onClear={clearFilters}
+            exportCount={n}
+            onExport={() => downloadBlob(
+              toCSV(data),
+              `MEDD_${filtersActive ? 'filtrado_' : ''}${dateTag()}.csv`,
+              'text/csv;charset=utf-8',
+            )}
           />
         )}
 
@@ -235,6 +243,12 @@ export default function DashboardPage() {
 
         {/* Asociación exposición–desenlace */}
         {assoc && <AssociationCard assoc={assoc} />}
+
+        {/* Control de calidad: efecto del encuestador */}
+        {surveyorEffect && <SurveyorEffectCard s={surveyorEffect} />}
+
+        {/* Asociación ajustada por confusión (Mantel–Haenszel) */}
+        {adjusted && <AdjustedAssociationCard a={adjusted} />}
 
         {/* Tiempo de retención de vencidos */}
         {retention && <RetentionCard s={retention} />}
@@ -433,7 +447,7 @@ function HeroStat({ value, label }: { value: number; label: string }) {
 
 function FilterBar({
   ciudadOptions, progOptions, fCiudad, setFCiudad, fSalud, setFSalud, fEstrato, setFEstrato,
-  fProg, setFProg, fTipo, setFTipo, filtersActive, onClear,
+  fProg, setFProg, fTipo, setFTipo, filtersActive, onClear, exportCount, onExport,
 }: {
   ciudadOptions: string[]
   progOptions: string[]
@@ -443,6 +457,7 @@ function FilterBar({
   fProg: string; setFProg: (v: string) => void
   fTipo: string; setFTipo: (v: string) => void
   filtersActive: boolean; onClear: () => void
+  exportCount: number; onExport: () => void
 }) {
   return (
     <Card style={{ marginBottom: 16, padding: '12px 14px' }}>
@@ -497,6 +512,21 @@ function FilterBar({
           </div>
         </div>
       </div>
+
+      {/* Export the current (filtered) subset straight from the cockpit */}
+      <button
+        onClick={onExport}
+        disabled={exportCount === 0}
+        style={{
+          marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: '10px 14px', borderRadius: 8, cursor: exportCount === 0 ? 'not-allowed' : 'pointer',
+          border: `1px solid ${C.border}`, background: C.surface2, color: C.text,
+          fontSize: 13, fontWeight: 600, opacity: exportCount === 0 ? 0.5 : 1,
+        }}
+      >
+        <i className="ti ti-file-download" style={{ fontSize: 17 }} aria-hidden />
+        Exportar {filtersActive ? 'selección' : 'todo'} (CSV · {exportCount})
+      </button>
     </Card>
   )
 }
@@ -685,6 +715,236 @@ function AssociationCard({ assoc }: { assoc: Association }) {
         </div>
       </div>
     </Card>
+  )
+}
+
+// ─── Surveyor (interviewer) effect — data-quality stratification ────────────
+
+interface SurveyorEffect {
+  programs: AssocGroup[] | null   // outcome prevalence by surveyor program
+  chi: ChiSquare | null
+  ref: string
+  trend: TrendTest | null         // outcome trend across academic semester (ordinal)
+  nSemester: number               // surveys carrying a semester value
+}
+
+// Quantifies whether the confirmed-expired outcome (vtoMedNc='Sí') varies by the
+// SURVEYOR's profile rather than the household. A real epidemiological signal
+// shouldn't depend on who collected the data, so a significant difference here is
+// read as a measurement / inter-observer quality flag, not a true effect. Program
+// is categorical (chi-square + PR vs the most-sampled program); academic semester
+// is ordinal, so it also gets a Cochran–Armitage trend test.
+function buildSurveyorEffect(surveys: Survey[]): SurveyorEffect | null {
+  const isCase = (s: Survey) => s.vtoMedNc === 'Sí'
+
+  // By program
+  const progMap = new Map<string, { total: number; cases: number }>()
+  for (const s of surveys) {
+    if (!s.etrPrograma) continue
+    const g = progMap.get(s.etrPrograma) ?? { total: 0, cases: 0 }
+    g.total++
+    if (isCase(s)) g.cases++
+    progMap.set(s.etrPrograma, g)
+  }
+  const progEntries = Array.from(progMap.entries()).filter(([, g]) => g.total > 0)
+
+  let programs: AssocGroup[] | null = null
+  let chi: ChiSquare | null = null
+  let ref = ''
+  if (progEntries.length >= 2) {
+    // Reference = most-sampled program (most stable baseline).
+    const refEntry = progEntries.reduce((a, b) => (b[1].total > a[1].total ? b : a))
+    ref = refEntry[0]
+    programs = progEntries.map(([label, g]) => ({
+      label, total: g.total, cases: g.cases,
+      prev: wilsonCI(g.cases, g.total),
+      rr: label === ref
+        ? { rr: 1, lo: 1, hi: 1, ref: true }
+        : prevalenceRatio(g.cases, g.total, refEntry[1].cases, refEntry[1].total),
+    }))
+    chi = chiSquareTest(progEntries.map(([, g]) => [g.cases, g.total - g.cases]))
+  }
+
+  // By academic semester (ordinal trend)
+  const semMap = new Map<number, { total: number; cases: number }>()
+  for (const s of surveys) {
+    if (s.etrSemestre == null) continue
+    const g = semMap.get(s.etrSemestre) ?? { total: 0, cases: 0 }
+    g.total++
+    if (isCase(s)) g.cases++
+    semMap.set(s.etrSemestre, g)
+  }
+  const nSemester = Array.from(semMap.values()).reduce((sum, g) => sum + g.total, 0)
+  const trend = semMap.size >= 2
+    ? cochranArmitage(
+        Array.from(semMap.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([score, g]) => ({ score, n: g.total, cases: g.cases })),
+      )
+    : null
+
+  if (!programs && !trend) return null
+  return { programs, chi, ref, trend, nSemester }
+}
+
+function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
+  const { programs, chi, ref, trend, nSemester } = s
+  const progSig = chi !== null && chi.df > 0 && chi.p < 0.05
+  const trendSig = trend !== null && trend.p < 0.05
+  const flagged = progSig || trendSig
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Control de calidad — efecto del encuestador</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Prevalencia de <strong>vencidos confirmados en casa</strong> según el perfil de quien
+        recolectó. El desenlace no debería depender del encuestador: una diferencia marcada es
+        señal de <strong>variabilidad de medición entre observadores</strong> (revisar criterios /
+        capacitación), no de un efecto epidemiológico real.
+      </p>
+
+      {programs && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+          {programs.map(g => <AssocRow key={g.label} g={g} />)}
+        </div>
+      )}
+
+      <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        {chi && (
+          <div>
+            <strong style={{ color: progSig ? C.amber : C.text }}>
+              Por programa · χ² = {chi.chi2.toFixed(2)} (gl {chi.df}), p = {fmtP(chi.p)}
+            </strong>
+            {' — '}
+            {progSig
+              ? 'difiere según el programa del encuestador (posible efecto del observador)'
+              : 'sin evidencia de diferencia entre programas'} (α = 0,05).
+            {chi.minExpected < 5 && (
+              <span style={{ color: C.amber }}> ⚠ Celda esperada &lt; 5: interpretar con cautela.</span>
+            )}
+          </div>
+        )}
+        {trend && (
+          <div style={{ marginTop: chi ? 6 : 0 }}>
+            <strong style={{ color: trendSig ? C.amber : C.text }}>
+              Por semestre (Cochran–Armitage) · χ² = {trend.chi2.toFixed(2)} (gl 1), p = {fmtP(trend.p)}
+            </strong>
+            {' — '}
+            {trendSig
+              ? `gradiente ${trend.direction} con el semestre académico (n = ${nSemester})`
+              : `sin gradiente con el semestre (n = ${nSemester})`}.
+          </div>
+        )}
+        {programs && (
+          <div style={{ marginTop: 4, color: C.hint }}>
+            Referencia: {ref} (programa con más registros). RP = razón de prevalencia vs. referencia (IC 95%).
+          </div>
+        )}
+        {!flagged && (
+          <div style={{ marginTop: 4, color: C.green }}>
+            ✓ Sin señal de efecto del encuestador con los datos actuales.
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+// ─── Confounding-adjusted association (Mantel–Haenszel) ─────────────────────
+
+interface AdjustedAssoc {
+  crude: RiskRatio
+  mh: MHResult
+  exposedTotal: number
+  unexposedTotal: number
+  pctChange: number   // % change crude → adjusted (confounding rule of thumb: >10%)
+}
+
+// Estimates the estrato→"vencidos en casa" association adjusted for the surveyor's
+// academic program (the just-added potential confounder). Exposure is estrato
+// dichotomised high (4–6) vs low (1–3); the confounder strata are the programs.
+// Comparing the crude vs the MH-adjusted PR shows whether who collected the data
+// distorts the socioeconomic association. Needs ≥2 program strata to be meaningful.
+function buildEstratoAdjusted(surveys: Survey[]): AdjustedAssoc | null {
+  const strataMap = new Map<string, Stratum2x2>()
+  let aT = 0, bT = 0, cT = 0, dT = 0
+  for (const s of surveys) {
+    if (s.estrato == null || !s.etrPrograma) continue
+    const high = s.estrato >= 4
+    const isCase = s.vtoMedNc === 'Sí'
+    const st = strataMap.get(s.etrPrograma) ?? { a: 0, b: 0, c: 0, d: 0 }
+    if (high && isCase)       { st.a++; aT++ }
+    else if (high && !isCase) { st.b++; bT++ }
+    else if (!high && isCase) { st.c++; cT++ }
+    else                      { st.d++; dT++ }
+    strataMap.set(s.etrPrograma, st)
+  }
+
+  const mh = mantelHaenszelRR(Array.from(strataMap.values()))
+  if (!mh || mh.strata < 2) return null
+
+  const crude = prevalenceRatio(aT, aT + bT, cT, cT + dT)
+  if (!Number.isFinite(crude.rr)) return null
+
+  const pctChange = mh.rr > 0 ? Math.abs(crude.rr - mh.rr) / mh.rr * 100 : 0
+  return { crude, mh, exposedTotal: aT + bT, unexposedTotal: cT + dT, pctChange }
+}
+
+function AdjustedAssociationCard({ a }: { a: AdjustedAssoc }) {
+  const { crude, mh, exposedTotal, unexposedTotal, pctChange } = a
+  const confounded = pctChange >= 10
+  const adjSig = mh.lo > 1 || mh.hi < 1
+  const fmt = (x: number) => x.toFixed(2)
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Asociación ajustada por confusión (Mantel–Haenszel)</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Exposición: <strong>estrato alto (4–6)</strong> vs bajo (1–3). Desenlace:
+        <strong> vencidos confirmados en casa</strong>. Ajustada por el <strong>programa del
+        encuestador</strong> ({mh.strata} estratos).
+      </p>
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <RRBox label="RP cruda" rr={crude.rr} lo={crude.lo} hi={crude.hi} fmt={fmt} />
+        <RRBox label="RP ajustada (MH)" rr={mh.rr} lo={mh.lo} hi={mh.hi} fmt={fmt} highlight />
+      </div>
+
+      <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        <strong style={{ color: adjSig ? C.amber : C.text }}>
+          CMH χ² = {mh.chi2.toFixed(2)} (gl 1), p = {fmtP(mh.p)}
+        </strong>
+        {' — '}
+        {adjSig ? 'asociación significativa tras ajustar' : 'sin asociación tras ajustar'} (α = 0,05).
+        <div style={{ marginTop: 4, color: confounded ? C.amber : C.green }}>
+          {confounded
+            ? `⚠ La estimación cambia ${pctChange.toFixed(0)}% al ajustar → el programa del encuestador confunde la asociación.`
+            : `✓ El ajuste apenas cambia la estimación (${pctChange.toFixed(0)}%) → sin confusión apreciable por el encuestador.`}
+        </div>
+        <div style={{ marginTop: 4, color: C.hint }}>
+          n: {exposedTotal} expuestos (alto) · {unexposedTotal} no expuestos (bajo).
+          Estrato dicotomizado; con celdas pequeñas, interpretar con cautela.
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function RRBox({ label, rr, lo, hi, fmt, highlight }: {
+  label: string; rr: number; lo: number; hi: number; fmt: (x: number) => string; highlight?: boolean
+}) {
+  return (
+    <div style={{
+      flex: 1, textAlign: 'center', padding: '10px 8px', borderRadius: 10,
+      background: highlight ? C.tealLight : C.bg,
+      border: `1px solid ${highlight ? C.teal : C.border}`,
+    }}>
+      <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{label}</div>
+      <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: highlight ? C.teal : C.text, lineHeight: 1 }}>
+        {fmt(rr)}
+      </div>
+      <div className="tnum" style={{ fontSize: 11, color: C.hint, marginTop: 3 }}>
+        IC95% {fmt(lo)}–{fmt(hi)}
+      </div>
+    </div>
   )
 }
 
