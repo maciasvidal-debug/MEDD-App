@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { TopBar, StepBar } from '../components/layout'
 import {
   Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, Dialog, ChipGroup, IconChip, IconButton, C,
+  Field, SectionHead, Dialog, ConfirmDialog, ChipGroup, IconChip, IconButton, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
@@ -686,6 +686,7 @@ export function ExportarPage() {
 export function AjustesPage() {
   const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, theme, toggleTheme, density, setDensity } = useStore()
   const [form, setForm] = useState(settings)
+  const [confirmSignOut, setConfirmSignOut] = useState(false)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const isInvestigador = userRole === 'investigador'
@@ -852,14 +853,30 @@ export function AjustesPage() {
               {syncing ? 'Sincronizando…' : 'Sincronizar ahora'}
             </Button>
             <Button
-              onClick={() => signOut()}
+              onClick={() => setConfirmSignOut(true)}
               icon="ti-logout"
-              style={{ flex: 1, background: '#FEE2E2', color: '#B91C1C' }}
+              style={{ flex: 1, background: C.redLight, color: C.red }}
             >
               Cerrar sesión
             </Button>
           </div>
         </Card>
+
+        {confirmSignOut && (
+          <ConfirmDialog
+            title="Cerrar sesión"
+            icon="ti-logout"
+            danger
+            confirmLabel="Cerrar sesión"
+            message={
+              pendingCount > 0
+                ? `Tienes ${pendingCount} encuesta(s) sin sincronizar. Si cierras sesión podrías perder esos datos locales. ¿Quieres cerrar sesión de todas formas?`
+                : '¿Seguro que quieres cerrar sesión?'
+            }
+            onConfirm={() => signOut()}
+            onClose={() => setConfirmSignOut(false)}
+          />
+        )}
 
         <Divider label="información" />
 

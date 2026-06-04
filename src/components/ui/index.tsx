@@ -416,7 +416,7 @@ export function Dialog({ title, onClose, children }: DialogProps) {
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <h2 id={titleId} style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{title}</h2>
+          <h2 id={titleId} className="fd" style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}>{title}</h2>
           <button
             aria-label="Cerrar"
             onClick={onClose}
@@ -432,6 +432,47 @@ export function Dialog({ title, onClose, children }: DialogProps) {
         {children}
       </div>
     </div>
+  )
+}
+
+// ─── ConfirmDialog ───────────────────────────────────────────────────────────
+// Reusable confirmation for destructive / irreversible actions. Built on Dialog,
+// so it inherits the full WAI-ARIA modal behaviour (focus trap, Escape, scroll
+// lock, focus restore). The cancel button is focused first so an accidental
+// Enter does not trigger the destructive action.
+
+export function ConfirmDialog({
+  title, message, confirmLabel = 'Confirmar', cancelLabel = 'Cancelar',
+  danger = false, icon, accent, onConfirm, onClose,
+}: {
+  title: string
+  message: React.ReactNode
+  confirmLabel?: string
+  cancelLabel?: string
+  danger?: boolean
+  icon?: string
+  accent?: string
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  const tint = accent ?? (danger ? C.red : C.teal)
+  return (
+    <Dialog title={title} onClose={onClose}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 18 }}>
+        {icon && <IconChip icon={icon} accent={tint} size={40} />}
+        <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55, flex: 1 }}>{message}</div>
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <Button variant="ghost" onClick={onClose} fullWidth>{cancelLabel}</Button>
+        <Button
+          variant={danger ? 'danger' : 'primary'}
+          onClick={() => { onConfirm(); onClose() }}
+          fullWidth
+        >
+          {confirmLabel}
+        </Button>
+      </div>
+    </Dialog>
   )
 }
 
