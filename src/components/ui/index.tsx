@@ -336,8 +336,10 @@ export function Card({ children, style = {}, className, as: Tag = 'div' }: CardP
       className={className}
       style={{
         background: C.surface, border: `1px solid ${C.border}`,
-        borderRadius: 14, padding: 'var(--card-pad)',
-        boxShadow: C.shadowSm,
+        borderRadius: 'var(--r-card)', padding: 'var(--card-pad)',
+        // Flatter, more architectural rest state — hairline only. Floating
+        // elements (dialog/toast/nav) carry the shadows; cards lift on hover.
+        boxShadow: 'none',
         ...style,
       }}
     >

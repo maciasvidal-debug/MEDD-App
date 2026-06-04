@@ -242,7 +242,12 @@ export function EncuestasPage() {
 
   return (
     <div>
-      <TopBar title="Registros" />
+      <TopBar
+        title="Registros"
+        subtitle={`${surveys.length} encuesta${surveys.length !== 1 ? 's' : ''}`}
+        icon="ti-clipboard-list"
+        accent={C.teal}
+      />
       <div className="page-content">
         {surveys.length > 0 && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -551,7 +556,7 @@ export function BuscarPage() {
 
   return (
     <div>
-      <TopBar title="Buscador CUM-INVIMA" />
+      <TopBar title="Buscador CUM-INVIMA" subtitle="Catálogo de medicamentos" icon="ti-search" accent={C.navy} />
       <div className="page-content narrow">
         <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
           <input
@@ -633,7 +638,7 @@ export function ExportarPage() {
 
   return (
     <div>
-      <TopBar title="Exportar datos" />
+      <TopBar title="Exportar datos" subtitle="CSV · JSON · codebook" icon="ti-download" accent={C.green} />
       <div className="page-content narrow">
         <p style={{ fontSize: 13, color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>
           {n} registro{n !== 1 ? 's' : ''} en sesión actual.
@@ -704,7 +709,7 @@ export function AjustesPage() {
 
   return (
     <div>
-      <TopBar title="Ajustes" />
+      <TopBar title="Ajustes" subtitle="Proyecto y perfil" icon="ti-settings" accent={C.gray} />
       <div className="page-content narrow">
         <SectionHead icon="ti-settings" label="Configuración del proyecto" />
 

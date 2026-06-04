@@ -36,7 +36,7 @@ const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; l
           <Cell fill={CHART.track} />
         </Pie>
       </PieChart>
-      <span className="tnum" style={{ fontSize: 18, fontWeight: 700, color }}>{pct(val, outOf)}%</span>
+      <span className="fd tnum" style={{ fontSize: 18, fontWeight: 600, color }}>{pct(val, outOf)}%</span>
       <span style={{ fontSize: 11, color: C.muted, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
       <span style={{ fontSize: 11, color: C.hint }}>{val}/{outOf}</span>
     </div>
@@ -142,7 +142,7 @@ export default function DashboardPage() {
   if (surveys.length === 0) {
     return (
       <div>
-        <TopBar title="MEDD · Panel analítico" />
+        <TopBar title="Panel analítico" icon="ti-layout-dashboard" accent={C.navy} />
         <div className="page-content">
           <EmptyState
             icon="ti-clipboard-data"
@@ -163,7 +163,12 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <TopBar title={isInvestigador ? 'Panel analítico' : 'Mi panel'} />
+      <TopBar
+        title={isInvestigador ? 'Panel analítico' : 'Mi panel'}
+        subtitle={isInvestigador ? `${n} encuesta${n !== 1 ? 's' : ''} en análisis` : undefined}
+        icon="ti-layout-dashboard"
+        accent={C.navy}
+      />
       <div className="page-content">
 
         {/* Role-adaptive hero */}
@@ -402,7 +407,7 @@ function EncuestadorHero({ n, pendingDraft, onNew, onResume, onView }: {
     }}>
       <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 2 }}>Trabajo de campo</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
-        <span className="tnum" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }}>{n}</span>
+        <span className="fd tnum" style={{ fontSize: 32, fontWeight: 600, lineHeight: 1 }}>{n}</span>
         <span style={{ fontSize: 14, opacity: 0.9 }}>encuesta{n !== 1 ? 's' : ''} registrada{n !== 1 ? 's' : ''}</span>
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -437,7 +442,7 @@ function EncuestadorHero({ n, pendingDraft, onNew, onResume, onView }: {
 function HeroStat({ value, label }: { value: number; label: string }) {
   return (
     <div>
-      <div className="tnum" style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{value}</div>
+      <div className="fd tnum" style={{ fontSize: 28, fontWeight: 600, lineHeight: 1 }}>{value}</div>
       <div style={{ fontSize: 11, opacity: 0.85, marginTop: 3 }}>{label}</div>
     </div>
   )
@@ -596,7 +601,7 @@ function RetentionCard({ s }: { s: DaysSummary }) {
       <SectionLabel>Tiempo de retención de medicamentos vencidos</SectionLabel>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
         <span style={{ fontSize: 13, color: C.muted }}>Mediana de días vencido</span>
-        <span style={{ fontSize: 22, fontWeight: 600, color: C.amber }}>{Math.round(s.median)} d</span>
+        <span className="fd tnum" style={{ fontSize: 24, fontWeight: 600, color: C.amber }}>{Math.round(s.median)} d</span>
       </div>
       {/* IQR box (Q1–Q3) with the median marker, scaled 0..max */}
       <div style={{ position: 'relative', height: 10, background: C.bg, borderRadius: 5, margin: '6px 0' }}>
@@ -973,7 +978,7 @@ function RRBox({ label, rr, lo, hi, fmt, highlight }: {
       border: `1px solid ${highlight ? C.teal : C.border}`,
     }}>
       <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{label}</div>
-      <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: highlight ? C.teal : C.text, lineHeight: 1 }}>
+      <div className="fd tnum" style={{ fontSize: 24, fontWeight: 600, color: highlight ? C.teal : C.text, lineHeight: 1 }}>
         {fmt(rr)}
       </div>
       <div className="tnum" style={{ fontSize: 11, color: C.hint, marginTop: 3 }}>

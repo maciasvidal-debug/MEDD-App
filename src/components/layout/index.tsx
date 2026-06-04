@@ -8,26 +8,48 @@ import type { AppView } from '../../types'
 
 interface TopBarProps {
   title: string
+  subtitle?: string
+  icon?: string
+  accent?: string
   onBack?: () => void
   actions?: React.ReactNode
 }
-export function TopBar({ title, onBack, actions }: TopBarProps) {
+export function TopBar({ title, subtitle, icon, accent = C.teal, onBack, actions }: TopBarProps) {
   return (
     <header
       role="banner"
       style={{
         position: 'sticky', top: 0, zIndex: 10,
         background: C.surface, borderBottom: `1px solid ${C.border}`,
-        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-        display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 10,
+        boxShadow: '0 1px 2px rgba(14, 23, 38, 0.03)',
+        display: 'flex', alignItems: 'center', padding: '11px 16px', gap: 11,
       }}
     >
       {onBack && (
         <IconButton icon="ti-arrow-left" label="Regresar" onClick={onBack} />
       )}
-      <span className="fd" style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', flex: 1, color: C.text }}>
-        {title}
-      </span>
+      {icon && !onBack && (
+        <span
+          aria-hidden
+          style={{
+            width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `linear-gradient(135deg, color-mix(in srgb, ${accent} 18%, transparent), color-mix(in srgb, ${accent} 6%, transparent))`,
+            border: `1px solid color-mix(in srgb, ${accent} 24%, transparent)`,
+            color: accent,
+          }}
+        >
+          <i className={`ti ${icon}`} style={{ fontSize: 19 }} />
+        </span>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="fd" style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', color: C.text, lineHeight: 1.15 }}>
+          {title}
+        </div>
+        {subtitle && (
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.2, marginTop: 1 }}>{subtitle}</div>
+        )}
+      </div>
       {actions && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {actions}
