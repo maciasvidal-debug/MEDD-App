@@ -5,3 +5,7 @@
 ## 2024-05-18 - Missing ID associations on generic fields
 **Learning:** Reusable UI components like `<Field>` wrappers often lack `id` and `htmlFor` defaults, leading to disconnected labels on implementation unless explicitly provided.
 **Action:** Always verify `htmlFor` and `id` mapping exists in forms, and add `role="alert"` with `aria-live` to dynamic feedback elements like error messages.
+
+## 2024-06-03 - Missing role="progressbar" for custom icons acting as loading states
+**Learning:** Screen readers won't announce custom `<i>` tag icons that visually serve as a spinner.
+**Action:** Always add `role="progressbar"` to icons used for loading states so screen readers interpret them properly, and use reusable components instead of duplicating `<i>` implementations.

@@ -580,6 +580,7 @@ export function Spinner({ size = 20, color = C.teal }: { size?: number; color?: 
   return (
     <i
       className="ti ti-loader-2"
+      role="progressbar"
       aria-label="Cargando…"
       style={{
         fontSize: size, color,
