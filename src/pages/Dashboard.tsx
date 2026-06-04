@@ -135,6 +135,7 @@ export default function DashboardPage() {
 
   const assoc = useMemo(() => buildEstratoAssociation(data), [data])
   const retention = useMemo(() => buildRetention(data), [data])
+  const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
 
   // No data at all (vs. "filters returned nothing", handled further down)
   if (surveys.length === 0) {
@@ -235,6 +236,9 @@ export default function DashboardPage() {
 
         {/* Asociación exposición–desenlace */}
         {assoc && <AssociationCard assoc={assoc} />}
+
+        {/* Control de calidad: efecto del encuestador */}
+        {surveyorEffect && <SurveyorEffectCard s={surveyorEffect} />}
 
         {/* Tiempo de retención de vencidos */}
         {retention && <RetentionCard s={retention} />}
@@ -683,6 +687,137 @@ function AssociationCard({ assoc }: { assoc: Association }) {
         <div style={{ marginTop: 4, color: C.hint }}>
           Referencia: estrato {ref}. RP = razón de prevalencia vs. referencia (IC 95%).
         </div>
+      </div>
+    </Card>
+  )
+}
+
+// ─── Surveyor (interviewer) effect — data-quality stratification ────────────
+
+interface SurveyorEffect {
+  programs: AssocGroup[] | null   // outcome prevalence by surveyor program
+  chi: ChiSquare | null
+  ref: string
+  trend: TrendTest | null         // outcome trend across academic semester (ordinal)
+  nSemester: number               // surveys carrying a semester value
+}
+
+// Quantifies whether the confirmed-expired outcome (vtoMedNc='Sí') varies by the
+// SURVEYOR's profile rather than the household. A real epidemiological signal
+// shouldn't depend on who collected the data, so a significant difference here is
+// read as a measurement / inter-observer quality flag, not a true effect. Program
+// is categorical (chi-square + PR vs the most-sampled program); academic semester
+// is ordinal, so it also gets a Cochran–Armitage trend test.
+function buildSurveyorEffect(surveys: Survey[]): SurveyorEffect | null {
+  const isCase = (s: Survey) => s.vtoMedNc === 'Sí'
+
+  // By program
+  const progMap = new Map<string, { total: number; cases: number }>()
+  for (const s of surveys) {
+    if (!s.etrPrograma) continue
+    const g = progMap.get(s.etrPrograma) ?? { total: 0, cases: 0 }
+    g.total++
+    if (isCase(s)) g.cases++
+    progMap.set(s.etrPrograma, g)
+  }
+  const progEntries = Array.from(progMap.entries()).filter(([, g]) => g.total > 0)
+
+  let programs: AssocGroup[] | null = null
+  let chi: ChiSquare | null = null
+  let ref = ''
+  if (progEntries.length >= 2) {
+    // Reference = most-sampled program (most stable baseline).
+    const refEntry = progEntries.reduce((a, b) => (b[1].total > a[1].total ? b : a))
+    ref = refEntry[0]
+    programs = progEntries.map(([label, g]) => ({
+      label, total: g.total, cases: g.cases,
+      prev: wilsonCI(g.cases, g.total),
+      rr: label === ref
+        ? { rr: 1, lo: 1, hi: 1, ref: true }
+        : prevalenceRatio(g.cases, g.total, refEntry[1].cases, refEntry[1].total),
+    }))
+    chi = chiSquareTest(progEntries.map(([, g]) => [g.cases, g.total - g.cases]))
+  }
+
+  // By academic semester (ordinal trend)
+  const semMap = new Map<number, { total: number; cases: number }>()
+  for (const s of surveys) {
+    if (s.etrSemestre == null) continue
+    const g = semMap.get(s.etrSemestre) ?? { total: 0, cases: 0 }
+    g.total++
+    if (isCase(s)) g.cases++
+    semMap.set(s.etrSemestre, g)
+  }
+  const nSemester = Array.from(semMap.values()).reduce((sum, g) => sum + g.total, 0)
+  const trend = semMap.size >= 2
+    ? cochranArmitage(
+        Array.from(semMap.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([score, g]) => ({ score, n: g.total, cases: g.cases })),
+      )
+    : null
+
+  if (!programs && !trend) return null
+  return { programs, chi, ref, trend, nSemester }
+}
+
+function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
+  const { programs, chi, ref, trend, nSemester } = s
+  const progSig = chi !== null && chi.df > 0 && chi.p < 0.05
+  const trendSig = trend !== null && trend.p < 0.05
+  const flagged = progSig || trendSig
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Control de calidad — efecto del encuestador</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Prevalencia de <strong>vencidos confirmados en casa</strong> según el perfil de quien
+        recolectó. El desenlace no debería depender del encuestador: una diferencia marcada es
+        señal de <strong>variabilidad de medición entre observadores</strong> (revisar criterios /
+        capacitación), no de un efecto epidemiológico real.
+      </p>
+
+      {programs && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+          {programs.map(g => <AssocRow key={g.label} g={g} />)}
+        </div>
+      )}
+
+      <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        {chi && (
+          <div>
+            <strong style={{ color: progSig ? C.amber : C.text }}>
+              Por programa · χ² = {chi.chi2.toFixed(2)} (gl {chi.df}), p = {fmtP(chi.p)}
+            </strong>
+            {' — '}
+            {progSig
+              ? 'difiere según el programa del encuestador (posible efecto del observador)'
+              : 'sin evidencia de diferencia entre programas'} (α = 0,05).
+            {chi.minExpected < 5 && (
+              <span style={{ color: C.amber }}> ⚠ Celda esperada &lt; 5: interpretar con cautela.</span>
+            )}
+          </div>
+        )}
+        {trend && (
+          <div style={{ marginTop: chi ? 6 : 0 }}>
+            <strong style={{ color: trendSig ? C.amber : C.text }}>
+              Por semestre (Cochran–Armitage) · χ² = {trend.chi2.toFixed(2)} (gl 1), p = {fmtP(trend.p)}
+            </strong>
+            {' — '}
+            {trendSig
+              ? `gradiente ${trend.direction} con el semestre académico (n = ${nSemester})`
+              : `sin gradiente con el semestre (n = ${nSemester})`}.
+          </div>
+        )}
+        {programs && (
+          <div style={{ marginTop: 4, color: C.hint }}>
+            Referencia: {ref} (programa con más registros). RP = razón de prevalencia vs. referencia (IC 95%).
+          </div>
+        )}
+        {!flagged && (
+          <div style={{ marginTop: 4, color: C.green }}>
+            ✓ Sin señal de efecto del encuestador con los datos actuales.
+          </div>
+        )}
       </div>
     </Card>
   )
