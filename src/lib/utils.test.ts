@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   pct, safeNum, calcEdad, dayDiff, productMetrics,
   wilsonCI, quantile, prevalenceRatio, chiSquareTest, cochranArmitage,
-  toCSV, compareSortable,
+  mantelHaenszelRR, toCSV, compareSortable,
 } from './utils'
 import type { Survey } from '../types'
 
@@ -122,6 +122,32 @@ describe('cochranArmitage', () => {
   })
   it('returns null with no informative table', () => {
     expect(cochranArmitage([{ score: 1, n: 10, cases: 0 }])).toBeNull()
+  })
+})
+
+describe('mantelHaenszelRR', () => {
+  it('pools to RR ≈ 1 with no association in either stratum', () => {
+    const res = mantelHaenszelRR([
+      { a: 10, b: 10, c: 10, d: 10 },
+      { a: 20, b: 20, c: 20, d: 20 },
+    ])
+    expect(res).not.toBeNull()
+    expect(res!.rr).toBeCloseTo(1, 5)
+    expect(res!.p).toBeGreaterThan(0.05)
+    expect(res!.strata).toBe(2)
+  })
+  it('recovers a strong common RR ≈ 4 across strata', () => {
+    // Each stratum: exposed risk 0.8, unexposed risk 0.2 → RR 4
+    const res = mantelHaenszelRR([
+      { a: 40, b: 10, c: 10, d: 40 },
+      { a: 80, b: 20, c: 20, d: 80 },
+    ])
+    expect(res!.rr).toBeCloseTo(4, 1)
+    expect(res!.p).toBeLessThan(0.001)
+  })
+  it('ignores strata without an exposure contrast and returns null when none inform', () => {
+    expect(mantelHaenszelRR([{ a: 5, b: 5, c: 0, d: 0 }])).toBeNull()
+    expect(mantelHaenszelRR([])).toBeNull()
   })
 })
 

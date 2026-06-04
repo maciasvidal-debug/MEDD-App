@@ -6,7 +6,7 @@ import {
 import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
-import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, quantile, productMetrics, type Proportion, type RiskRatio, type ChiSquare, type TrendTest } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, quantile, productMetrics, toCSV, downloadBlob, dateTag, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type Stratum2x2 } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
 
@@ -136,6 +136,7 @@ export default function DashboardPage() {
   const assoc = useMemo(() => buildEstratoAssociation(data), [data])
   const retention = useMemo(() => buildRetention(data), [data])
   const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
+  const adjusted = useMemo(() => buildEstratoAdjusted(data), [data])
 
   // No data at all (vs. "filters returned nothing", handled further down)
   if (surveys.length === 0) {
@@ -186,6 +187,12 @@ export default function DashboardPage() {
             fProg={fProg}     setFProg={setFProg}
             fTipo={fTipo}     setFTipo={setFTipo}
             filtersActive={filtersActive} onClear={clearFilters}
+            exportCount={n}
+            onExport={() => downloadBlob(
+              toCSV(data),
+              `MEDD_${filtersActive ? 'filtrado_' : ''}${dateTag()}.csv`,
+              'text/csv;charset=utf-8',
+            )}
           />
         )}
 
@@ -239,6 +246,9 @@ export default function DashboardPage() {
 
         {/* Control de calidad: efecto del encuestador */}
         {surveyorEffect && <SurveyorEffectCard s={surveyorEffect} />}
+
+        {/* Asociación ajustada por confusión (Mantel–Haenszel) */}
+        {adjusted && <AdjustedAssociationCard a={adjusted} />}
 
         {/* Tiempo de retención de vencidos */}
         {retention && <RetentionCard s={retention} />}
@@ -437,7 +447,7 @@ function HeroStat({ value, label }: { value: number; label: string }) {
 
 function FilterBar({
   ciudadOptions, progOptions, fCiudad, setFCiudad, fSalud, setFSalud, fEstrato, setFEstrato,
-  fProg, setFProg, fTipo, setFTipo, filtersActive, onClear,
+  fProg, setFProg, fTipo, setFTipo, filtersActive, onClear, exportCount, onExport,
 }: {
   ciudadOptions: string[]
   progOptions: string[]
@@ -447,6 +457,7 @@ function FilterBar({
   fProg: string; setFProg: (v: string) => void
   fTipo: string; setFTipo: (v: string) => void
   filtersActive: boolean; onClear: () => void
+  exportCount: number; onExport: () => void
 }) {
   return (
     <Card style={{ marginBottom: 16, padding: '12px 14px' }}>
@@ -501,6 +512,21 @@ function FilterBar({
           </div>
         </div>
       </div>
+
+      {/* Export the current (filtered) subset straight from the cockpit */}
+      <button
+        onClick={onExport}
+        disabled={exportCount === 0}
+        style={{
+          marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: '10px 14px', borderRadius: 8, cursor: exportCount === 0 ? 'not-allowed' : 'pointer',
+          border: `1px solid ${C.border}`, background: C.surface2, color: C.text,
+          fontSize: 13, fontWeight: 600, opacity: exportCount === 0 ? 0.5 : 1,
+        }}
+      >
+        <i className="ti ti-file-download" style={{ fontSize: 17 }} aria-hidden />
+        Exportar {filtersActive ? 'selección' : 'todo'} (CSV · {exportCount})
+      </button>
     </Card>
   )
 }
@@ -820,6 +846,105 @@ function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
         )}
       </div>
     </Card>
+  )
+}
+
+// ─── Confounding-adjusted association (Mantel–Haenszel) ─────────────────────
+
+interface AdjustedAssoc {
+  crude: RiskRatio
+  mh: MHResult
+  exposedTotal: number
+  unexposedTotal: number
+  pctChange: number   // % change crude → adjusted (confounding rule of thumb: >10%)
+}
+
+// Estimates the estrato→"vencidos en casa" association adjusted for the surveyor's
+// academic program (the just-added potential confounder). Exposure is estrato
+// dichotomised high (4–6) vs low (1–3); the confounder strata are the programs.
+// Comparing the crude vs the MH-adjusted PR shows whether who collected the data
+// distorts the socioeconomic association. Needs ≥2 program strata to be meaningful.
+function buildEstratoAdjusted(surveys: Survey[]): AdjustedAssoc | null {
+  const strataMap = new Map<string, Stratum2x2>()
+  let aT = 0, bT = 0, cT = 0, dT = 0
+  for (const s of surveys) {
+    if (s.estrato == null || !s.etrPrograma) continue
+    const high = s.estrato >= 4
+    const isCase = s.vtoMedNc === 'Sí'
+    const st = strataMap.get(s.etrPrograma) ?? { a: 0, b: 0, c: 0, d: 0 }
+    if (high && isCase)       { st.a++; aT++ }
+    else if (high && !isCase) { st.b++; bT++ }
+    else if (!high && isCase) { st.c++; cT++ }
+    else                      { st.d++; dT++ }
+    strataMap.set(s.etrPrograma, st)
+  }
+
+  const mh = mantelHaenszelRR(Array.from(strataMap.values()))
+  if (!mh || mh.strata < 2) return null
+
+  const crude = prevalenceRatio(aT, aT + bT, cT, cT + dT)
+  if (!Number.isFinite(crude.rr)) return null
+
+  const pctChange = mh.rr > 0 ? Math.abs(crude.rr - mh.rr) / mh.rr * 100 : 0
+  return { crude, mh, exposedTotal: aT + bT, unexposedTotal: cT + dT, pctChange }
+}
+
+function AdjustedAssociationCard({ a }: { a: AdjustedAssoc }) {
+  const { crude, mh, exposedTotal, unexposedTotal, pctChange } = a
+  const confounded = pctChange >= 10
+  const adjSig = mh.lo > 1 || mh.hi < 1
+  const fmt = (x: number) => x.toFixed(2)
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Asociación ajustada por confusión (Mantel–Haenszel)</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Exposición: <strong>estrato alto (4–6)</strong> vs bajo (1–3). Desenlace:
+        <strong> vencidos confirmados en casa</strong>. Ajustada por el <strong>programa del
+        encuestador</strong> ({mh.strata} estratos).
+      </p>
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <RRBox label="RP cruda" rr={crude.rr} lo={crude.lo} hi={crude.hi} fmt={fmt} />
+        <RRBox label="RP ajustada (MH)" rr={mh.rr} lo={mh.lo} hi={mh.hi} fmt={fmt} highlight />
+      </div>
+
+      <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        <strong style={{ color: adjSig ? C.amber : C.text }}>
+          CMH χ² = {mh.chi2.toFixed(2)} (gl 1), p = {fmtP(mh.p)}
+        </strong>
+        {' — '}
+        {adjSig ? 'asociación significativa tras ajustar' : 'sin asociación tras ajustar'} (α = 0,05).
+        <div style={{ marginTop: 4, color: confounded ? C.amber : C.green }}>
+          {confounded
+            ? `⚠ La estimación cambia ${pctChange.toFixed(0)}% al ajustar → el programa del encuestador confunde la asociación.`
+            : `✓ El ajuste apenas cambia la estimación (${pctChange.toFixed(0)}%) → sin confusión apreciable por el encuestador.`}
+        </div>
+        <div style={{ marginTop: 4, color: C.hint }}>
+          n: {exposedTotal} expuestos (alto) · {unexposedTotal} no expuestos (bajo).
+          Estrato dicotomizado; con celdas pequeñas, interpretar con cautela.
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function RRBox({ label, rr, lo, hi, fmt, highlight }: {
+  label: string; rr: number; lo: number; hi: number; fmt: (x: number) => string; highlight?: boolean
+}) {
+  return (
+    <div style={{
+      flex: 1, textAlign: 'center', padding: '10px 8px', borderRadius: 10,
+      background: highlight ? C.tealLight : C.bg,
+      border: `1px solid ${highlight ? C.teal : C.border}`,
+    }}>
+      <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{label}</div>
+      <div className="tnum" style={{ fontSize: 22, fontWeight: 700, color: highlight ? C.teal : C.text, lineHeight: 1 }}>
+        {fmt(rr)}
+      </div>
+      <div className="tnum" style={{ fontSize: 11, color: C.hint, marginTop: 3 }}>
+        IC95% {fmt(lo)}–{fmt(hi)}
+      </div>
+    </div>
   )
 }
 

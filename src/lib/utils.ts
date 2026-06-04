@@ -183,6 +183,64 @@ export function prevalenceRatio(a: number, n1: number, c: number, n0: number): R
   return { rr, lo: rr * Math.exp(-1.96 * se), hi: rr * Math.exp(1.96 * se), ref: false }
 }
 
+/** A 2×2 stratum: a=exposed&case, b=exposed&non-case, c=unexposed&case, d=unexposed&non-case. */
+export interface Stratum2x2 { a: number; b: number; c: number; d: number }
+
+export interface MHResult {
+  rr:   number  // Mantel–Haenszel adjusted prevalence/risk ratio
+  lo:   number  // 95% CI lower (Greenland–Robins)
+  hi:   number  // 95% CI upper
+  chi2: number  // Cochran–Mantel–Haenszel statistic (1 df)
+  p:    number  // CMH p-value
+  strata: number          // strata that contributed (had both exposure levels)
+  exposedCases:   number
+  unexposedCases: number
+}
+
+/**
+ * Mantel–Haenszel adjusted prevalence ratio across strata of a confounder, with
+ * the Greenland–Robins variance for its 95% CI and the Cochran–Mantel–Haenszel
+ * test of conditional association. Pooling within strata removes confounding by
+ * the stratifying variable (here: comparing a crude vs adjusted RR reveals
+ * whether e.g. the surveyor profile confounds an exposure→outcome association).
+ * Strata with no exposure contrast (all exposed or all unexposed) contribute
+ * nothing. Returns null when fewer than one informative stratum remains.
+ */
+export function mantelHaenszelRR(strata: Stratum2x2[]): MHResult | null {
+  let num = 0, den = 0, varNum = 0       // RR numerator/denominator + GR variance numerator
+  let cmhO = 0, cmhE = 0, cmhV = 0       // CMH observed/expected/variance
+  let used = 0, exposedCases = 0, unexposedCases = 0
+
+  for (const { a, b, c, d } of strata) {
+    const n1 = a + b, n0 = c + d, m1 = a + c, n = a + b + c + d
+    if (n === 0 || n1 === 0 || n0 === 0) continue
+    used++
+    exposedCases += a
+    unexposedCases += c
+    num += (a * n0) / n
+    den += (c * n1) / n
+    varNum += (n1 * n0 * m1 - a * c * n) / (n * n)
+    cmhO += a
+    cmhE += (n1 * m1) / n
+    if (n > 1) cmhV += (n1 * n0 * m1 * (n - m1)) / (n * n * (n - 1))
+  }
+
+  if (used === 0 || num === 0 || den === 0) return null
+  const rr = num / den
+  const se = Math.sqrt(varNum / (num * den))
+  const chi2 = cmhV > 0 ? ((cmhO - cmhE) ** 2) / cmhV : 0
+  return {
+    rr,
+    lo: rr * Math.exp(-1.96 * se),
+    hi: rr * Math.exp(1.96 * se),
+    chi2,
+    p: chiSquareP(chi2, 1),
+    strata: used,
+    exposedCases,
+    unexposedCases,
+  }
+}
+
 export interface ChiSquare {
   chi2:        number  // Pearson statistic
   df:          number  // degrees of freedom
