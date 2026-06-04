@@ -51,12 +51,19 @@ export default function DashboardPage() {
   const [fCiudad, setFCiudad]   = useState('')
   const [fSalud, setFSalud]     = useState('')
   const [fEstrato, setFEstrato] = useState<number | null>(null)
-  const filtersActive = isInvestigador && (!!fCiudad || !!fSalud || fEstrato !== null)
-  const clearFilters = () => { setFCiudad(''); setFSalud(''); setFEstrato(null) }
+  const [fProg, setFProg]       = useState('')
+  const [fTipo, setFTipo]       = useState('')
+  const filtersActive = isInvestigador && (!!fCiudad || !!fSalud || fEstrato !== null || !!fProg || !!fTipo)
+  const clearFilters = () => { setFCiudad(''); setFSalud(''); setFEstrato(null); setFProg(''); setFTipo('') }
 
   // Cities present in the data, for the filter dropdown.
   const ciudadOptions = useMemo(
     () => Array.from(new Set(surveys.map(s => s.ciudad).filter(Boolean))).sort() as string[],
+    [surveys],
+  )
+  // Surveyor academic programs present in the data.
+  const progOptions = useMemo(
+    () => Array.from(new Set(surveys.map(s => s.etrPrograma).filter(Boolean))).sort() as string[],
     [surveys],
   )
 
@@ -65,9 +72,11 @@ export default function DashboardPage() {
     return surveys.filter(s =>
       (!fCiudad || s.ciudad === fCiudad) &&
       (!fSalud || s.asSalud === fSalud) &&
-      (fEstrato === null || s.estrato === fEstrato)
+      (fEstrato === null || s.estrato === fEstrato) &&
+      (!fProg || s.etrPrograma === fProg) &&
+      (!fTipo || s.etrTipoInst === fTipo)
     )
-  }, [surveys, isInvestigador, fCiudad, fSalud, fEstrato])
+  }, [surveys, isInvestigador, fCiudad, fSalud, fEstrato, fProg, fTipo])
 
   const n = data.length
 
@@ -169,9 +178,12 @@ export default function DashboardPage() {
         {isInvestigador && (
           <FilterBar
             ciudadOptions={ciudadOptions}
+            progOptions={progOptions}
             fCiudad={fCiudad} setFCiudad={setFCiudad}
             fSalud={fSalud}   setFSalud={setFSalud}
             fEstrato={fEstrato} setFEstrato={setFEstrato}
+            fProg={fProg}     setFProg={setFProg}
+            fTipo={fTipo}     setFTipo={setFTipo}
             filtersActive={filtersActive} onClear={clearFilters}
           />
         )}
@@ -420,13 +432,16 @@ function HeroStat({ value, label }: { value: number; label: string }) {
 // ─── Cockpit filter bar (investigator) ──────────────────────────────────────
 
 function FilterBar({
-  ciudadOptions, fCiudad, setFCiudad, fSalud, setFSalud, fEstrato, setFEstrato,
-  filtersActive, onClear,
+  ciudadOptions, progOptions, fCiudad, setFCiudad, fSalud, setFSalud, fEstrato, setFEstrato,
+  fProg, setFProg, fTipo, setFTipo, filtersActive, onClear,
 }: {
   ciudadOptions: string[]
+  progOptions: string[]
   fCiudad: string; setFCiudad: (v: string) => void
   fSalud: string; setFSalud: (v: string) => void
   fEstrato: number | null; setFEstrato: (v: number | null) => void
+  fProg: string; setFProg: (v: string) => void
+  fTipo: string; setFTipo: (v: string) => void
   filtersActive: boolean; onClear: () => void
 }) {
   return (
@@ -462,6 +477,22 @@ function FilterBar({
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {OPT.estrato.map(e => (
               <Chip key={e} label={String(e)} active={fEstrato === e} onClick={() => setFEstrato(fEstrato === e ? null : e)} />
+            ))}
+          </div>
+        </div>
+
+        {/* Surveyor profile — only shown once such data exists */}
+        {progOptions.length > 0 && (
+          <select value={fProg} onChange={e => setFProg(e.target.value)} aria-label="Filtrar por programa del encuestador">
+            <option value="">Todos los programas (encuestador)</option>
+            {progOptions.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        )}
+        <div>
+          <div style={{ fontSize: 11, color: C.hint, marginBottom: 6 }}>Institución del encuestador</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {OPT.etrTipoInst.map(t => (
+              <Chip key={t} label={t} active={fTipo === t} onClick={() => setFTipo(fTipo === t ? '' : t)} />
             ))}
           </div>
         </div>

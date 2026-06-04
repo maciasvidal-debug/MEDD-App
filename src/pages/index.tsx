@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { TopBar, StepBar } from '../components/layout'
 import {
   Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, Dialog, C,
+  Field, SectionHead, Dialog, ChipGroup, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
@@ -11,7 +11,7 @@ import {
   calcEdad, fmtDate, compareSortable,
   toCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
-import { TOTAL_STEPS } from '../lib/constants'
+import { TOTAL_STEPS, OPT } from '../lib/constants'
 import type { SurveyDraft, Survey } from '../types'
 
 // DashboardPage lives in its own lazily-loaded chunk (pages/Dashboard.tsx) to
@@ -638,6 +638,41 @@ export function AjustesPage() {
             value={form.nuiEncuestador}
             onChange={e => set('nuiEncuestador')(e.target.value)}
             placeholder="Ej: 1012345678"
+          />
+        </Field>
+
+        <SectionHead icon="ti-user-shield" label="Perfil del encuestador" />
+        <p style={{ fontSize: 12, color: C.hint, margin: '-8px 0 16px', lineHeight: 1.5 }}>
+          Se registra una sola vez y se adjunta a cada encuesta que captures.
+          Permite analizar los datos por perfil del encuestador (control de
+          calidad y sesgo entre observadores).
+        </p>
+
+        <Field label="Programa académico">
+          <select value={form.etrPrograma} onChange={e => set('etrPrograma')(e.target.value)}>
+            <option value="">— Selecciona —</option>
+            {OPT.etrPrograma.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </Field>
+
+        <Field label="Tipo de institución">
+          <ChipGroup options={OPT.etrTipoInst} value={form.etrTipoInst} onChange={set('etrTipoInst')} />
+        </Field>
+
+        <Field label="Semestre" hint="1 a 12">
+          <input
+            type="number" min={1} max={12}
+            value={form.etrSemestre}
+            onChange={e => set('etrSemestre')(e.target.value)}
+            placeholder="Ej: 8"
+          />
+        </Field>
+
+        <Field label="Institución (nombre)">
+          <input
+            value={form.etrInstitucion}
+            onChange={e => set('etrInstitucion')(e.target.value)}
+            placeholder="Ej: Universidad Nacional de Colombia"
           />
         </Field>
 
