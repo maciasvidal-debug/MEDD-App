@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, type ButtonHTMLAttributes } from 'react'
+import React, { useEffect, useId, useRef, useState, type ButtonHTMLAttributes } from 'react'
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
@@ -52,13 +52,13 @@ export const CHART = {
 
 // ─── Label ────────────────────────────────────────────────────────────────────
 
-interface LabelProps { children: React.ReactNode; htmlFor?: string; required?: boolean }
-export function Label({ children, htmlFor, required }: LabelProps) {
+interface LabelProps { children: React.ReactNode; htmlFor?: string; required?: boolean; noMargin?: boolean }
+export function Label({ children, htmlFor, required, noMargin }: LabelProps) {
   return (
     <label
       htmlFor={htmlFor}
       style={{
-        display: 'block', marginBottom: 6,
+        display: 'block', marginBottom: noMargin ? 0 : 6,
         fontSize: 11, fontWeight: 500,
         color: C.muted, textTransform: 'uppercase', letterSpacing: '0.6px',
       }}
@@ -66,6 +66,47 @@ export function Label({ children, htmlFor, required }: LabelProps) {
       {children}
       {required && <span style={{ color: C.red, marginLeft: 3 }}>*</span>}
     </label>
+  )
+}
+
+// ─── HelpTip ──────────────────────────────────────────────────────────────────
+// Tap-to-toggle info bubble carrying a codebook definition. The bubble uses the
+// inverse of the surface tokens (C.text/C.surface) so it stays high-contrast in
+// both light and dark themes.
+
+export function HelpTip({ text, label }: { text: string; label?: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        type="button"
+        aria-label={label ? `Ayuda: ${label}` : 'Ayuda'}
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+        onBlur={() => setOpen(false)}
+        style={{
+          width: 20, height: 20, padding: 0, borderRadius: '50%', border: 'none',
+          background: 'transparent', cursor: 'pointer', color: C.muted,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <i className="ti ti-help-circle" style={{ fontSize: 16 }} aria-hidden />
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          style={{
+            position: 'absolute', top: '130%', left: 0, zIndex: 60,
+            width: 250, maxWidth: '72vw', padding: '8px 10px', borderRadius: 8,
+            background: C.text, color: C.surface, fontSize: 12, lineHeight: 1.45,
+            fontWeight: 400, textTransform: 'none', letterSpacing: 0,
+            boxShadow: C.shadowLg,
+          }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -88,13 +129,21 @@ interface FieldProps {
   htmlFor?: string
   required?: boolean
   hint?: string
+  help?: string
   error?: string
   children: React.ReactNode
 }
-export function Field({ label, htmlFor, required, hint, error, children }: FieldProps) {
+export function Field({ label, htmlFor, required, hint, help, error, children }: FieldProps) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <Label htmlFor={htmlFor} required={required}>{label}</Label>
+      {help ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+          <Label htmlFor={htmlFor} required={required} noMargin>{label}</Label>
+          <HelpTip text={help} label={label} />
+        </div>
+      ) : (
+        <Label htmlFor={htmlFor} required={required}>{label}</Label>
+      )}
       {children}
       {hint && !error && (
         <p style={{ margin: '4px 0 0', fontSize: 12, color: C.hint }}>{hint}</p>
