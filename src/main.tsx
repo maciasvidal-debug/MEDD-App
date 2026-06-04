@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 // Self-hosted Inter (variable) — bundled into the build so it works offline
 // (the app is offline-first) instead of relying on a font CDN.
 import '@fontsource-variable/inter'
+// Space Grotesk (variable) — display face for titles and large figures; gives
+// the UI a distinct, modern identity instead of the default-Inter template look.
+import '@fontsource-variable/space-grotesk'
 import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import './styles/global.css'
