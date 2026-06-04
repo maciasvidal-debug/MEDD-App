@@ -215,8 +215,8 @@ export function IconButton({ icon, label, size = 40, style, ...rest }: IconBtnPr
     <button
       aria-label={label}
       style={{
-        width: size, height: size, borderRadius: 8,
-        border: `0.5px solid ${C.border}`, background: 'transparent',
+        width: size, height: size, borderRadius: 10,
+        border: `1px solid ${C.border}`, background: 'transparent',
         cursor: 'pointer', display: 'flex', alignItems: 'center',
         justifyContent: 'center', color: C.text, flexShrink: 0,
         transition: 'background 0.12s',

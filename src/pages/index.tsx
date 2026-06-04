@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { TopBar, StepBar } from '../components/layout'
 import {
   Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, Dialog, ChipGroup, IconChip, C,
+  Field, SectionHead, Dialog, ChipGroup, IconChip, IconButton, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
 import { useStore } from '../lib/store'
@@ -48,20 +48,8 @@ export function WizardPage() {
         title={editingId ? 'Editar encuesta' : 'Nueva encuesta'}
         actions={
           <>
-            <button
-              aria-label="Guía de campo"
-              onClick={() => setGuideOpen(true)}
-              style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
-            >
-              <i className="ti ti-help" style={{ fontSize: 18 }} aria-hidden />
-            </button>
-            <button
-              aria-label="Cancelar"
-              onClick={closeWizard}
-              style={{ width: 40, height: 40, borderRadius: 8, border: `0.5px solid ${C.border}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}
-            >
-              <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden />
-            </button>
+            <IconButton icon="ti-help" label="Guía de campo" onClick={() => setGuideOpen(true)} />
+            <IconButton icon="ti-x" label="Cancelar" onClick={closeWizard} />
           </>
         }
       />
