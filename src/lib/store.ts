@@ -126,48 +126,61 @@ export const useStore = create<AppStore>((set, get) => ({
   userRole: null,
 
   initAuth() {
-    // Restore existing session and fetch role
-    supabase.auth.getSession().then(async ({ data }) => {
-      const user = data.session?.user ?? null
-      let userRole: UserRole | null = null
-      if (user) {
-        await applyUserScope(user.id)
-        const { data: roleRow } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single()
-        userRole = (roleRow?.role as UserRole) ?? 'encuestador'
-      }
-      set({ session: data.session, user, userRole, authReady: true })
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // `onAuthStateChange` is the single source of truth: supabase-js fires an
+    // `INITIAL_SESSION` event immediately on subscribe (covering a page reload
+    // with a restored session), so a separate `getSession()` call is redundant.
+    //
+    // CRITICAL: this callback runs while supabase-js holds an internal auth
+    // lock. Calling any other Supabase API that needs the JWT (e.g. a
+    // `from(...)` query) and awaiting it *inside* the callback deadlocks the
+    // client — that lock is never released, which froze the app on reload and
+    // made `signOut` hang silently. So we keep this callback synchronous: it
+    // only updates React state, then defers all further Supabase work to a
+    // macrotask via `setTimeout(0)`, which runs after the lock is released.
+    // See: https://supabase.com/docs/reference/javascript/auth-onauthstatechange
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const prev = get().user
       const next = session?.user ?? null
 
-      // A different account signing in on this device → clear the previous
-      // user's local data before loading anything for the new one.
-      if (next && next.id !== prev?.id) {
-        await applyUserScope(next.id)
+      // Resolve auth eagerly so the UI never gets stuck on the loading spinner,
+      // even if the deferred role lookup below is slow or fails.
+      set({ session, user: next, authReady: true })
+
+      if (!next) {
+        set({ userRole: null })
+        return
       }
 
-      let userRole: UserRole | null = null
-      if (next) {
-        const { data: roleRow } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', next.id)
-          .single()
-        userRole = (roleRow?.role as UserRole) ?? 'encuestador'
-      }
+      const differentUser = next.id !== prev?.id
+      const isFreshSession = !prev
 
-      set({ session, user: next, userRole })
+      // Deferred (post-lock) hydration: scope check, role lookup and sync.
+      setTimeout(async () => {
+        try {
+          // A different account on this device → wipe the previous user's
+          // local data before loading anything for the new one.
+          if (differentUser) await applyUserScope(next.id)
 
-      // First login → load local data and sync with remote
-      if (next && !prev) {
-        get().loadSurveys().then(() => get().triggerSync())
-      }
+          let userRole: UserRole = 'encuestador'
+          try {
+            const { data: roleRow } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', next.id)
+              .single()
+            userRole = (roleRow?.role as UserRole) ?? 'encuestador'
+          } catch {
+            // Role lookup is best-effort; fall back to the default role rather
+            // than leaving the user in a broken/blocked state.
+          }
+          set({ userRole })
+
+          // Newly resolved session (login or restored on reload) → pull remote.
+          if (isFreshSession) get().triggerSync()
+        } catch {
+          // Never let hydration errors leave the app wedged.
+        }
+      }, 0)
     })
 
     return () => subscription.unsubscribe()
@@ -184,9 +197,19 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   async signOut() {
-    await supabase.auth.signOut()
-    await clearDraft()
-    set({ user: null, session: null, userRole: null, surveys: [], surveysLoaded: false, pendingDraft: null })
+    // Offline-first field app: `scope: 'local'` clears the local session
+    // without a mandatory network round-trip to revoke the token, so sign-out
+    // works even with no connectivity. We still clear local state in `finally`
+    // and surface any error instead of failing silently.
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (error) throw error
+    } catch {
+      get().pushToast('Sesión cerrada localmente (sin conexión con el servidor).', 'info')
+    } finally {
+      await clearDraft()
+      set({ user: null, session: null, userRole: null, surveys: [], surveysLoaded: false, pendingDraft: null })
+    }
   },
 
   // ── Sync ─────────────────────────────────────────────────────────────
