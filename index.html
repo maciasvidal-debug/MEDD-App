@@ -12,6 +12,10 @@
     <!-- PWA: installable, offline-capable field app -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
+    <!-- Standard PWA fullscreen hint (Chromium/modern). Required to avoid the
+         "apple-mobile-web-app-capable is deprecated" console warning. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- Kept for older iOS Safari, which still relies on the apple-prefixed tag. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="MEDD" />
