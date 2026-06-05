@@ -11,6 +11,12 @@ on:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
 
+# 🛡️ Sentinel: least privilege. Without this, GITHUB_TOKEN inherits the repo's
+# default (often read/write) scopes; this job only needs to read the code, so
+# we drop everything else to limit blast radius if a build step is compromised.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
