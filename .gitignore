@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# 🛡️ Sentinel: never commit real secrets. Env files hold the Supabase keys,
+# the Postgres DATABASE_URL and SUPABASE_JWT_SECRET. `*.local` above only
+# catches `.env.local`, leaving `.env`/`.env.production`/etc. exposed to an
+# accidental `git add .`. Ignore all env files but keep the secret-free template.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

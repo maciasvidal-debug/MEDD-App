@@ -6,6 +6,10 @@ on:
     - cron: '0 8 * * 1'
   workflow_dispatch:  # Permite ejecutar manualmente desde GitHub Actions
 
+# 🛡️ Sentinel: least privilege. This job only pings an external URL and never
+# touches the repo, so GITHUB_TOKEN needs no permissions at all.
+permissions: {}
+
 jobs:
   keepalive:
     runs-on: ubuntu-latest
