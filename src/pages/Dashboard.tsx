@@ -6,6 +6,7 @@ import {
 import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
+import { useShallow } from 'zustand/react/shallow'
 import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2 } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
@@ -76,7 +77,24 @@ function DistBar({ data, dataKey = 'n', color, yWidth = 80, barName }: {
 }
 
 export default function DashboardPage() {
-  const { surveys, openWizard, userRole, setView, pendingDraft, resumeDraft } = useStore()
+  // ⚡ Bolt: subscribe only to the slices this view needs (via useShallow) instead
+  // of the whole store. The Dashboard is the heaviest view to render (≈6 Recharts
+  // ResponsiveContainers + 3 PieCharts), and a bare `useStore()` re-rendered all of
+  // them on *any* state change — notably every transient toast push/auto-remove
+  // (e.g. the "Sincronizado…" toast after a background sync) and every `syncing`
+  // toggle, none of which affect the charts. Selecting only these fields lets the
+  // whole chart tree bail out of those unrelated re-renders (actions are stable
+  // refs; data fields compared shallowly).
+  const { surveys, openWizard, userRole, setView, pendingDraft, resumeDraft } = useStore(
+    useShallow(s => ({
+      surveys: s.surveys,
+      openWizard: s.openWizard,
+      userRole: s.userRole,
+      setView: s.setView,
+      pendingDraft: s.pendingDraft,
+      resumeDraft: s.resumeDraft,
+    })),
+  )
   const isInvestigador = userRole === 'investigador'
 
   // Investigator cockpit filters (encuestadores see only their own data, unfiltered)
