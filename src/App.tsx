@@ -8,6 +8,7 @@ import {
 } from './pages'
 import AuthPage from './pages/auth'
 import ProfileOnboarding from './pages/ProfileOnboarding'
+import Welcome from './pages/Welcome'
 import { isProfileComplete } from './lib/validators'
 
 // Dashboard pulls in Recharts (heavy); load it on demand so it stays out of the
@@ -27,7 +28,15 @@ export default function App() {
     view, loadSurveys, loadSettings, loadDraft, surveysLoaded, surveys,
     user, authReady, initAuth, syncing,
     settings, settingsLoaded, userRole,
+    welcomeOpen, maybeOpenWelcome,
   } = useStore()
+
+  // Whether an encuestador still owes a complete surveyor profile. Computed here
+  // (before any early return) so the welcome effect below can avoid popping over
+  // the mandatory profile screen — React hooks must run unconditionally.
+  const profileIncomplete =
+    userRole === 'encuestador' && settingsLoaded && !isProfileComplete(settings)
+  const onMandatoryProfile = profileIncomplete && surveysLoaded && surveys.length === 0
 
   // Subscribe to Supabase auth state changes
   useEffect(() => {
@@ -43,6 +52,14 @@ export default function App() {
       loadDraft()
     }
   }, [user])
+
+  // First-run welcome tour: auto-open once the app proper is shown (role known,
+  // settings loaded, and not sitting on the mandatory profile screen).
+  useEffect(() => {
+    if (user && userRole && settingsLoaded && !onMandatoryProfile) {
+      maybeOpenWelcome()
+    }
+  }, [user, userRole, settingsLoaded, onMandatoryProfile])
 
   // Auth not resolved yet
   if (!authReady) {
@@ -61,9 +78,7 @@ export default function App() {
   // onboarding when they have no surveys yet (brand-new account). Returning
   // users with data instead see a non-blocking banner (below) and are stopped
   // at the wizard (store.openWizard) — so they're never blocked from their data.
-  const profileIncomplete =
-    userRole === 'encuestador' && settingsLoaded && !isProfileComplete(settings)
-  if (profileIncomplete && surveysLoaded && surveys.length === 0) {
+  if (onMandatoryProfile) {
     return <ProfileOnboarding />
   }
 
@@ -77,6 +92,7 @@ export default function App() {
         <NetworkBanner />
         {profileIncomplete && <ProfileBanner />}
         <ToastContainer />
+        {welcomeOpen && <Welcome />}
 
         {/* Sync indicator */}
         {syncing && (

@@ -43,6 +43,18 @@ function applyDensity(density: Density) {
   localStorage.setItem(DENSITY_KEY, density)
 }
 
+// First-run welcome tour: remembered per user so it shows once automatically
+// but can be re-opened on demand from Ajustes. Stored in localStorage (not the
+// per-user IDB stores) so it survives the cross-user wipe and is cheap to read.
+const WELCOME_KEY = 'medd_welcome_seen'
+function welcomeSeen(uid: string): boolean {
+  if (typeof localStorage === 'undefined') return true
+  return localStorage.getItem(`${WELCOME_KEY}:${uid}`) === '1'
+}
+function markWelcomeSeen(uid: string): void {
+  try { localStorage.setItem(`${WELCOME_KEY}:${uid}`, '1') } catch { /* private mode */ }
+}
+
 export type ToastLevel = 'success' | 'error' | 'info'
 export interface ToastAction { label: string; onClick: () => void }
 export interface Toast { id: string; message: string; level: ToastLevel; action?: ToastAction }
@@ -104,6 +116,12 @@ interface AppStore {
   // Density (comfortable/compact)
   density: Density
   setDensity: (d: Density) => void
+
+  // First-run welcome tour (role-aware; shown once, re-openable from Ajustes)
+  welcomeOpen: boolean
+  openWelcome: () => void
+  closeWelcome: () => void
+  maybeOpenWelcome: () => void
 }
 
 // Track which account owns the local data so we can wipe device-local stores
@@ -516,5 +534,20 @@ export const useStore = create<AppStore>((set, get) => ({
   setDensity(density) {
     applyDensity(density)
     set({ density })
+  },
+
+  // ── Welcome tour ────────────────────────────────────────────────────────
+  welcomeOpen: false,
+  openWelcome() {
+    set({ welcomeOpen: true })
+  },
+  closeWelcome() {
+    const u = get().user
+    if (u) markWelcomeSeen(u.id)
+    set({ welcomeOpen: false })
+  },
+  maybeOpenWelcome() {
+    const u = get().user
+    if (u && !welcomeSeen(u.id)) set({ welcomeOpen: true })
   },
 }))
