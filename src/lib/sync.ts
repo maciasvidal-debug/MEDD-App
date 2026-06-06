@@ -9,55 +9,80 @@ import type { Survey, UserRole, Settings } from '../types'
 // IndexedDB. Returns the profile slice of Settings, or null if none exists yet.
 
 export async function fetchProfile(): Promise<Partial<Settings> | null> {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('nui_encuestador, etr_programa, etr_tipo_inst, etr_semestre, etr_institucion')
-    .maybeSingle()
-  if (error || !data) return null
-  return {
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('nui_encuestador, etr_programa, etr_tipo_inst, etr_semestre, etr_institucion')
+      .maybeSingle()
+    if (error || !data) return null
+    return {
     nuiEncuestador: data.nui_encuestador ?? '',
     etrPrograma:    (data.etr_programa as Settings['etrPrograma']) ?? '',
     etrTipoInst:    (data.etr_tipo_inst as Settings['etrTipoInst']) ?? '',
-    etrSemestre:    data.etr_semestre != null ? String(data.etr_semestre) : '',
-    etrInstitucion: data.etr_institucion ?? '',
+      etrSemestre:    data.etr_semestre != null ? String(data.etr_semestre) : '',
+      etrInstitucion: data.etr_institucion ?? '',
+    }
+  } catch {
+    return null
   }
 }
 
 export async function upsertProfile(userId: string, settings: Settings): Promise<boolean> {
   const semestre = settings.etrSemestre ? parseInt(settings.etrSemestre, 10) : null
-  const { error } = await supabase.from('user_profiles').upsert({
-    user_id:         userId,
-    nui_encuestador: settings.nuiEncuestador || null,
-    etr_programa:    settings.etrPrograma    || null,
-    etr_tipo_inst:   settings.etrTipoInst    || null,
-    etr_semestre:    Number.isFinite(semestre) ? semestre : null,
-    etr_institucion: settings.etrInstitucion || null,
-    updated_at:      new Date().toISOString(),
-  }, { onConflict: 'user_id' })
-  return !error
+  try {
+    const { error } = await supabase.from('user_profiles').upsert({
+      user_id:         userId,
+      nui_encuestador: settings.nuiEncuestador || null,
+      etr_programa:    settings.etrPrograma    || null,
+      etr_tipo_inst:   settings.etrTipoInst    || null,
+      etr_semestre:    Number.isFinite(semestre) ? semestre : null,
+      etr_institucion: settings.etrInstitucion || null,
+      updated_at:      new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+    return !error
+  } catch {
+    return false
+  }
 }
 
 // ─── Remote operations ───────────────────────────────────────────────────────
 
+// All remote helpers below are deliberately non-throwing: a hard network failure
+// (offline, DNS, CORS, abort) can reject the underlying fetch rather than return
+// an { error } object. Returning a safe sentinel keeps offline behaviour
+// deterministic and avoids unhandled rejections in fire-and-forget callers; the
+// next sync simply retries.
 export async function pushSurvey(survey: Survey, userId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('surveys')
-    .upsert(toRow(survey, userId), { onConflict: 'id' })
-  return !error
+  try {
+    const { error } = await supabase
+      .from('surveys')
+      .upsert(toRow(survey, userId), { onConflict: 'id' })
+    return !error
+  } catch {
+    return false
+  }
 }
 
 export async function deleteSurveyRemote(id: string): Promise<boolean> {
-  const { error } = await supabase.from('surveys').delete().eq('id', id)
-  return !error
+  try {
+    const { error } = await supabase.from('surveys').delete().eq('id', id)
+    return !error
+  } catch {
+    return false
+  }
 }
 
 export async function pullSurveys(): Promise<Survey[]> {
-  const { data, error } = await supabase
-    .from('surveys')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (error || !data) return []
-  return data.map(fromRow)
+  try {
+    const { data, error } = await supabase
+      .from('surveys')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error || !data) return []
+    return data.map(fromRow)
+  } catch {
+    return []
+  }
 }
 
 // ─── Full sync on login ──────────────────────────────────────────────────────
