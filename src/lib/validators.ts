@@ -1,4 +1,21 @@
 import { z } from 'zod'
+import type { Settings } from '../types'
+
+// ─── Surveyor profile completeness ──────────────────────────────────────────
+// The profile is stamped onto every captured survey, so an incomplete profile
+// silently corrupts the surveyor-effect / program-adjusted analyses. All five
+// fields are required before an encuestador may capture. Single source of truth
+// reused by the onboarding gate, the wizard gate and the settings indicator.
+export function isProfileComplete(s: Settings): boolean {
+  return Boolean(
+    s.nuiEncuestador?.trim() &&
+    s.etrPrograma?.trim() &&
+    s.etrTipoInst?.trim() &&
+    s.etrSemestre?.trim() &&
+    s.etrInstitucion?.trim(),
+  )
+}
+
 
 const optStr  = z.string()
 const siNo    = z.string()

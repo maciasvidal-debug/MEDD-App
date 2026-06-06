@@ -8,7 +8,8 @@ import {
   clearLocalUserData,
 } from '../lib/db'
 import { supabase } from '../lib/supabase'
-import { pushSurvey, deleteSurveyRemote, fullSync } from '../lib/sync'
+import { pushSurvey, deleteSurveyRemote, fullSync, fetchProfile, upsertProfile } from '../lib/sync'
+import { isProfileComplete } from '../lib/validators'
 import { uuid, todayISO } from '../lib/utils'
 import { EMPTY_DRAFT, DEFAULT_SETTINGS } from '../lib/constants'
 
@@ -175,6 +176,31 @@ export const useStore = create<AppStore>((set, get) => ({
           }
           set({ userRole })
 
+          // Load local settings first, then overlay the account-synced surveyor
+          // profile (user_profiles) so it follows the user across devices and is
+          // available for the completeness gate / survey stamping. Only non-empty
+          // remote fields override local ones, so a half-filled remote row never
+          // wipes good local data.
+          await get().loadSettings()
+          try {
+            const remote = await fetchProfile()
+            if (remote) {
+              const cur = get().settings
+              const merged: Settings = {
+                ...cur,
+                nuiEncuestador: remote.nuiEncuestador || cur.nuiEncuestador,
+                etrPrograma:    remote.etrPrograma    || cur.etrPrograma,
+                etrTipoInst:    remote.etrTipoInst    || cur.etrTipoInst,
+                etrSemestre:    remote.etrSemestre    || cur.etrSemestre,
+                etrInstitucion: remote.etrInstitucion || cur.etrInstitucion,
+              }
+              await saveSettings(merged)
+              set({ settings: merged })
+            }
+          } catch {
+            // Profile sync is best-effort; the local copy still gates correctly.
+          }
+
           // Newly resolved session (login or restored on reload) → pull remote.
           if (isFreshSession) get().triggerSync()
         } catch {
@@ -331,7 +357,15 @@ export const useStore = create<AppStore>((set, get) => ({
   wizard: null,
   pendingDraft: null,
   openWizard(surveyCount) {
-    const { settings } = get()
+    const { settings, userRole } = get()
+    // Hard gate: the surveyor profile is stamped onto every survey, so an
+    // encuestador may not start one until the profile is complete. Route them
+    // to Ajustes instead of silently capturing data with missing provenance.
+    if (userRole === 'encuestador' && !isProfileComplete(settings)) {
+      set({ view: 'ajustes' })
+      get().pushToast('Completa tu perfil de encuestador antes de registrar encuestas.', 'info')
+      return
+    }
     const nuiEtr = settings.nuiEncuestador ? parseInt(settings.nuiEncuestador, 10) || null : null
     const draft: SurveyDraft = {
       ...EMPTY_DRAFT,
@@ -399,6 +433,10 @@ export const useStore = create<AppStore>((set, get) => ({
   async persistSettings(settings) {
     await saveSettings(settings)
     set({ settings })
+    // Mirror the surveyor profile to the account so it survives device changes
+    // and local-data wipes. Best-effort/background: local save already succeeded.
+    const { user } = get()
+    if (user) upsertProfile(user.id, settings)
     get().pushToast('Configuración guardada')
   },
 

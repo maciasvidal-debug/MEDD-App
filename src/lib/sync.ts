@@ -1,6 +1,40 @@
 import { supabase } from './supabase'
 import { getAllSurveys, saveManySurveys } from './db'
-import type { Survey, Medication, UserRole } from '../types'
+import type { Survey, Medication, UserRole, Settings } from '../types'
+
+// ─── Surveyor profile (account-synced) ───────────────────────────────────────
+// The profile lives in public.user_profiles (RLS: each user owns its row) so it
+// follows the account across devices instead of being trapped in this device's
+// IndexedDB. Returns the profile slice of Settings, or null if none exists yet.
+
+export async function fetchProfile(): Promise<Partial<Settings> | null> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('nui_encuestador, etr_programa, etr_tipo_inst, etr_semestre, etr_institucion')
+    .maybeSingle()
+  if (error || !data) return null
+  return {
+    nuiEncuestador: data.nui_encuestador ?? '',
+    etrPrograma:    (data.etr_programa as Settings['etrPrograma']) ?? '',
+    etrTipoInst:    (data.etr_tipo_inst as Settings['etrTipoInst']) ?? '',
+    etrSemestre:    data.etr_semestre != null ? String(data.etr_semestre) : '',
+    etrInstitucion: data.etr_institucion ?? '',
+  }
+}
+
+export async function upsertProfile(userId: string, settings: Settings): Promise<boolean> {
+  const semestre = settings.etrSemestre ? parseInt(settings.etrSemestre, 10) : null
+  const { error } = await supabase.from('user_profiles').upsert({
+    user_id:         userId,
+    nui_encuestador: settings.nuiEncuestador || null,
+    etr_programa:    settings.etrPrograma    || null,
+    etr_tipo_inst:   settings.etrTipoInst    || null,
+    etr_semestre:    Number.isFinite(semestre) ? semestre : null,
+    etr_institucion: settings.etrInstitucion || null,
+    updated_at:      new Date().toISOString(),
+  }, { onConflict: 'user_id' })
+  return !error
+}
 
 // ─── Mapping helpers ─────────────────────────────────────────────────────────
 
