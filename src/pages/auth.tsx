@@ -37,24 +37,31 @@ export default function AuthPage() {
     }
     setLoading(true)
 
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError(error.message)
-    } else {
-      const { data, error } = await supabase.auth.signUp({ email, password })
-      if (error) {
-        setError(error.message)
-      } else if (data.session) {
-        // Email confirmation is disabled → signUp returns a session and the user
-        // is already signed in. The auth listener (store.initAuth) picks up the
-        // SIGNED_IN event and routes into the app, so no message is needed here.
+    // try/finally so a thrown network error (no connectivity, DNS, CORS) still
+    // clears the spinner and surfaces a message, instead of hanging the button.
+    try {
+      if (mode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) setError(error.message)
       } else {
-        // Email confirmation is enabled → no session yet; the user must verify
-        // via the emailed link before logging in.
-        setInfo('Cuenta creada. Revisa tu correo para confirmar el registro.')
+        const { data, error } = await supabase.auth.signUp({ email, password })
+        if (error) {
+          setError(error.message)
+        } else if (data.session) {
+          // Email confirmation is disabled → signUp returns a session and the user
+          // is already signed in. The auth listener (store.initAuth) picks up the
+          // SIGNED_IN event and routes into the app, so no message is needed here.
+        } else {
+          // Email confirmation is enabled → no session yet; the user must verify
+          // via the emailed link before logging in.
+          setInfo('Cuenta creada. Revisa tu correo para confirmar el registro.')
+        }
       }
+    } catch {
+      setError('No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (

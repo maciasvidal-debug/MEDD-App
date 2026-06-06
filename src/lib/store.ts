@@ -347,9 +347,9 @@ export const useStore = create<AppStore>((set, get) => ({
     // Push to remote in background
     const { user } = get()
     if (user) {
-      pushSurvey(survey, user.id).then(ok => {
-        if (ok) saveSurvey({ ...survey, syncStatus: 'synced' })
-      })
+      pushSurvey(survey, user.id)
+        .then(ok => { if (ok) saveSurvey({ ...survey, syncStatus: 'synced' }) })
+        .catch(() => { /* stays 'local'; the next sync retries */ })
     }
   },
 
@@ -373,9 +373,9 @@ export const useStore = create<AppStore>((set, get) => ({
 
     const { user } = get()
     if (user) {
-      pushSurvey(updated, user.id).then(ok => {
-        if (ok) saveSurvey({ ...updated, syncStatus: 'synced' })
-      })
+      pushSurvey(updated, user.id)
+        .then(ok => { if (ok) saveSurvey({ ...updated, syncStatus: 'synced' }) })
+        .catch(() => { /* stays 'local'; the next sync retries */ })
     }
   },
 
