@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Settings } from '../types'
+import type { Settings, Survey } from '../types'
 
 // ─── Surveyor profile completeness ──────────────────────────────────────────
 // The profile is stamped onto every captured survey, so an incomplete profile
@@ -13,6 +13,18 @@ export function isProfileComplete(s: Settings): boolean {
     s.etrTipoInst?.trim() &&
     s.etrSemestre?.trim() &&
     s.etrInstitucion?.trim(),
+  )
+}
+
+// True when a survey is missing any surveyor-profile field — i.e. it was
+// captured before the profile was complete and can be backfilled from settings.
+export function surveyMissingProfile(s: Survey): boolean {
+  return (
+    s.nuiEtr == null ||
+    !s.etrPrograma ||
+    !s.etrTipoInst ||
+    s.etrSemestre == null ||
+    !s.etrInstitucion
   )
 }
 
