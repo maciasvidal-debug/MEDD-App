@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="meddTileM" x1="6" y1="3" x2="42" y2="45" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#19C3B1"/>
+      <stop offset=".52" stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#1E3A5F"/>
+    </linearGradient>
+    <clipPath id="meddCapM">
+      <rect x="11" y="18.8" width="26" height="10.4" rx="5.2" transform="rotate(-45 24 24)"/>
+    </clipPath>
+  </defs>
+  <!-- Full-bleed background: maskable icons are clipped to the platform shape
+       (circle/squircle), so the artwork must reach the edges with no rounded
+       corners of its own. -->
+  <rect width="48" height="48" fill="url(#meddTileM)"/>
+  <!-- Glyph scaled to ~70% about the centre so it stays inside the maskable
+       safe zone (~80%) and is never clipped by the platform mask. -->
+  <g transform="translate(24 24) scale(0.7) translate(-24 -24)">
+    <g clip-path="url(#meddCapM)">
+      <rect x="11" y="18.8" width="26" height="10.4" rx="5.2" transform="rotate(-45 24 24)" fill="#fff"/>
+      <rect x="24" y="18.8" width="13" height="10.4" transform="rotate(-45 24 24)" fill="#0B2A3F" fill-opacity="0.26"/>
+    </g>
+    <line x1="24" y1="18.8" x2="24" y2="29.2" transform="rotate(-45 24 24)" stroke="#0F766E" stroke-width="1.6" stroke-opacity="0.4" stroke-linecap="round"/>
+  </g>
+</svg>
