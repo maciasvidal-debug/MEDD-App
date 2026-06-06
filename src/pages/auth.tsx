@@ -12,10 +12,29 @@ export default function AuthPage() {
   const [error, setError]     = useState<string | null>(null)
   const [info, setInfo]       = useState<string | null>(null)
 
+  // Mirror the Supabase password policy (min 6 + lower/upper/digit/symbol) on the
+  // client so users see the rules and get a friendly message, instead of passing
+  // local validation only to be rejected by the server with a raw English error.
+  const pwChecks = [
+    { ok: password.length >= 6,        label: 'Mínimo 6 caracteres' },
+    { ok: /[a-z]/.test(password),      label: 'Una minúscula' },
+    { ok: /[A-Z]/.test(password),      label: 'Una mayúscula' },
+    { ok: /\d/.test(password),         label: 'Un número' },
+    { ok: /[^A-Za-z0-9]/.test(password), label: 'Un símbolo' },
+  ]
+  const passwordValid = pwChecks.every(c => c.ok)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setInfo(null)
+
+    // Enforce the policy on registration only — existing accounts may predate it,
+    // so login must never be blocked by a format check.
+    if (mode === 'register' && !passwordValid) {
+      setError('La contraseña debe tener mínimo 6 caracteres e incluir mayúscula, minúscula, número y símbolo.')
+      return
+    }
     setLoading(true)
 
     if (mode === 'login') {
@@ -93,14 +112,28 @@ export default function AuthPage() {
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               value={password}
               onChange={e => setPass(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
+              placeholder={mode === 'register' ? 'Crea una contraseña segura' : 'Tu contraseña'}
             />
+            {mode === 'register' && password.length > 0 && (
+              <ul style={styles.pwList} aria-label="Requisitos de la contraseña">
+                {pwChecks.map(c => (
+                  <li key={c.label} style={{ ...styles.pwItem, color: c.ok ? 'var(--c-green)' : 'var(--c-muted)' }}>
+                    <i className={`ti ${c.ok ? 'ti-circle-check-filled' : 'ti-circle'}`} style={{ fontSize: 14 }} aria-hidden />
+                    {c.label}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {error && <p role="alert" aria-live="assertive" style={styles.error}>{error}</p>}
           {info  && <p role="alert" aria-live="assertive" style={styles.info}>{info}</p>}
 
-          <button type="submit" disabled={loading} style={styles.btn}>
+          <button
+            type="submit"
+            disabled={loading || (mode === 'register' && !passwordValid)}
+            style={{ ...styles.btn, opacity: loading || (mode === 'register' && !passwordValid) ? 0.6 : 1 }}
+          >
             {loading
               ? <i className="ti ti-loader-2" style={{ animation: 'spin 0.8s linear infinite' }} />
               : mode === 'login' ? 'Ingresar' : 'Crear cuenta'}
@@ -190,6 +223,21 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 4,
+  },
+  pwList: {
+    listStyle: 'none',
+    margin: '8px 0 0',
+    padding: 0,
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '4px 12px',
+  },
+  pwItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    fontSize: 11.5,
+    transition: 'color 0.15s',
   },
   label: {
     fontSize: 12,

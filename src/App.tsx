@@ -7,6 +7,8 @@ import {
   BuscarPage, ExportarPage, AjustesPage,
 } from './pages'
 import AuthPage from './pages/auth'
+import ProfileOnboarding from './pages/ProfileOnboarding'
+import { isProfileComplete } from './lib/validators'
 
 // Dashboard pulls in Recharts (heavy); load it on demand so it stays out of the
 // initial bundle and only downloads when the user opens the panel.
@@ -22,8 +24,9 @@ function PageLoader() {
 
 export default function App() {
   const {
-    view, loadSurveys, loadSettings, loadDraft, surveysLoaded,
+    view, loadSurveys, loadSettings, loadDraft, surveysLoaded, surveys,
     user, authReady, initAuth, syncing,
+    settings, settingsLoaded, userRole,
   } = useStore()
 
   // Subscribe to Supabase auth state changes
@@ -53,6 +56,17 @@ export default function App() {
   // Not logged in
   if (!user) return <AuthPage />
 
+  // Surveyor profile gate. The profile is stamped onto every survey, so an
+  // encuestador with an incomplete profile is taken straight to a mandatory
+  // onboarding when they have no surveys yet (brand-new account). Returning
+  // users with data instead see a non-blocking banner (below) and are stopped
+  // at the wizard (store.openWizard) — so they're never blocked from their data.
+  const profileIncomplete =
+    userRole === 'encuestador' && settingsLoaded && !isProfileComplete(settings)
+  if (profileIncomplete && surveysLoaded && surveys.length === 0) {
+    return <ProfileOnboarding />
+  }
+
   return (
     <div className="app-root">
       {/* Desktop/tablet left rail (hidden on phones via CSS) */}
@@ -61,6 +75,7 @@ export default function App() {
       <div className="app-shell">
         <h1 className="sr-only">MEDD — Aplicación de investigación de medicamentos no utilizados</h1>
         <NetworkBanner />
+        {profileIncomplete && <ProfileBanner />}
         <ToastContainer />
 
         {/* Sync indicator */}
@@ -131,6 +146,39 @@ function NetworkBanner() {
     >
       <i className="ti ti-wifi-off" style={{ fontSize: 14 }} aria-hidden />
       Sin conexión — los datos se guardan localmente y se sincronizarán al reconectar
+    </div>
+  )
+}
+
+// Non-blocking nudge for returning encuestadores whose surveyor profile is
+// incomplete. They keep full access to their existing data; this just routes
+// them to finish the profile (also enforced as a hard gate at the wizard).
+function ProfileBanner() {
+  const setView = useStore(s => s.setView)
+  return (
+    <div
+      role="region"
+      aria-label="Perfil incompleto"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        background: C.amberLight, color: C.amber,
+        padding: '8px 12px', borderBottom: `0.5px solid ${C.amber}40`,
+        fontSize: 12.5, fontWeight: 500,
+      }}
+    >
+      <i className="ti ti-user-exclamation" style={{ fontSize: 16, flexShrink: 0 }} aria-hidden />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        Tu perfil de encuestador está incompleto — complétalo para poder registrar encuestas.
+      </span>
+      <button
+        onClick={() => setView('ajustes')}
+        style={{
+          flexShrink: 0, border: 'none', background: C.amber, color: '#fff',
+          borderRadius: 7, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+        }}
+      >
+        Completar
+      </button>
     </div>
   )
 }

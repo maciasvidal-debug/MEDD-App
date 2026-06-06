@@ -12,6 +12,7 @@ import {
   toCSV, toCodebookCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
 import { TOTAL_STEPS, OPT, FIELD_GUIDE } from '../lib/constants'
+import { isProfileComplete, surveyMissingProfile } from '../lib/validators'
 import type { SurveyDraft, Survey } from '../types'
 
 // DashboardPage lives in its own lazily-loaded chunk (pages/Dashboard.tsx) to
@@ -684,13 +685,18 @@ export function ExportarPage() {
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────
 
 export function AjustesPage() {
-  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, theme, toggleTheme, density, setDensity } = useStore()
+  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, backfillProfile, theme, toggleTheme, density, setDensity } = useStore()
   const [form, setForm] = useState(settings)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const isInvestigador = userRole === 'investigador'
   const pendingCount   = surveys.filter(s => s.syncStatus !== 'synced').length
+  // Surveys captured before the profile was complete that can be backfilled.
+  // Only meaningful for encuestadores with a now-complete profile.
+  const backfillCount  = (!isInvestigador && isProfileComplete(settings))
+    ? surveys.filter(surveyMissingProfile).length
+    : 0
 
   return (
     <div>
@@ -753,6 +759,27 @@ export function AjustesPage() {
         <Button fullWidth onClick={() => persistSettings(form)} icon="ti-device-floppy">
           Guardar ajustes
         </Button>
+
+        {/* Retroactively stamp the completed profile onto older surveys that were
+            captured before it was filled in (fills only blank fields). */}
+        {backfillCount > 0 && (
+          <Card style={{ marginTop: 10, background: C.tealLight, border: `0.5px solid ${C.teal}40` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <i className="ti ti-history-toggle" style={{ fontSize: 18, color: C.teal, flexShrink: 0 }} aria-hidden />
+              <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>
+                Tienes <strong>{backfillCount}</strong> encuesta(s) anteriores sin el perfil del
+                encuestador. Puedes completarlas con tu perfil actual.
+              </div>
+            </div>
+            <Button
+              fullWidth size="sm" variant="secondary" icon="ti-wand"
+              style={{ marginTop: 10 }}
+              onClick={() => backfillProfile()}
+            >
+              Completar {backfillCount} encuesta(s) anterior(es)
+            </Button>
+          </Card>
+        )}
 
         <Divider label="apariencia" />
 

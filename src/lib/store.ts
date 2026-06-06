@@ -2,13 +2,14 @@ import { create } from 'zustand'
 import type { User, Session } from '@supabase/supabase-js'
 import type { Survey, AppView, WizardState, Settings, SurveyDraft, UserRole } from '../types'
 import {
-  getAllSurveys, saveSurvey, deleteSurvey,
+  getAllSurveys, saveSurvey, saveManySurveys, deleteSurvey,
   getSettings, saveSettings,
   getDraft, saveDraft, clearDraft,
   clearLocalUserData,
 } from '../lib/db'
 import { supabase } from '../lib/supabase'
-import { pushSurvey, deleteSurveyRemote, fullSync } from '../lib/sync'
+import { pushSurvey, deleteSurveyRemote, fullSync, fetchProfile, upsertProfile } from '../lib/sync'
+import { isProfileComplete, surveyMissingProfile } from '../lib/validators'
 import { uuid, todayISO } from '../lib/utils'
 import { EMPTY_DRAFT, DEFAULT_SETTINGS } from '../lib/constants'
 
@@ -72,6 +73,7 @@ interface AppStore {
   addSurvey: (draft: SurveyDraft) => Promise<void>
   updateSurvey: (id: string, draft: SurveyDraft) => Promise<void>
   removeSurvey: (id: string) => Promise<void>
+  backfillProfile: () => Promise<void>
 
   wizard: WizardState | null
   openWizard: (surveyCount: number) => void
@@ -175,6 +177,31 @@ export const useStore = create<AppStore>((set, get) => ({
           }
           set({ userRole })
 
+          // Load local settings first, then overlay the account-synced surveyor
+          // profile (user_profiles) so it follows the user across devices and is
+          // available for the completeness gate / survey stamping. Only non-empty
+          // remote fields override local ones, so a half-filled remote row never
+          // wipes good local data.
+          await get().loadSettings()
+          try {
+            const remote = await fetchProfile()
+            if (remote) {
+              const cur = get().settings
+              const merged: Settings = {
+                ...cur,
+                nuiEncuestador: remote.nuiEncuestador || cur.nuiEncuestador,
+                etrPrograma:    remote.etrPrograma    || cur.etrPrograma,
+                etrTipoInst:    remote.etrTipoInst    || cur.etrTipoInst,
+                etrSemestre:    remote.etrSemestre    || cur.etrSemestre,
+                etrInstitucion: remote.etrInstitucion || cur.etrInstitucion,
+              }
+              await saveSettings(merged)
+              set({ settings: merged })
+            }
+          } catch {
+            // Profile sync is best-effort; the local copy still gates correctly.
+          }
+
           // Newly resolved session (login or restored on reload) → pull remote.
           if (isFreshSession) get().triggerSync()
         } catch {
@@ -183,7 +210,18 @@ export const useStore = create<AppStore>((set, get) => ({
       }, 0)
     })
 
-    return () => subscription.unsubscribe()
+    // Auto-sync when the device regains connectivity. This is an offline-first
+    // field app: surveys captured offline stay 'local' until a sync runs, and
+    // previously the only triggers were login/reload and the manual button. Now
+    // a reconnect flushes pending surveys automatically. triggerSync no-ops when
+    // logged out or already syncing, so this is safe to fire on every 'online'.
+    const onOnline = () => { get().triggerSync() }
+    if (typeof window !== 'undefined') window.addEventListener('online', onOnline)
+
+    return () => {
+      subscription.unsubscribe()
+      if (typeof window !== 'undefined') window.removeEventListener('online', onOnline)
+    }
   },
 
   async signIn(email, password) {
@@ -327,11 +365,59 @@ export const useStore = create<AppStore>((set, get) => ({
     }, GRACE_MS)
   },
 
+  // Backfill the surveyor profile onto surveys captured before it was complete,
+  // filling only blank fields from the current (complete) profile. Restricted to
+  // encuestadores: their local store only holds their own RLS-scoped surveys, so
+  // this can never overwrite another surveyor's data (an investigador holds the
+  // whole pulled dataset and must never run this).
+  async backfillProfile() {
+    const { surveys, settings, userRole, user } = get()
+    if (!user || userRole === 'investigador') return
+    const semestre = settings.etrSemestre ? parseInt(settings.etrSemestre, 10) || null : null
+    const nuiEtr   = settings.nuiEncuestador ? parseInt(settings.nuiEncuestador, 10) || null : null
+    const now = new Date().toISOString()
+
+    const updated: Survey[] = []
+    const next = surveys.map(s => {
+      if (!surveyMissingProfile(s)) return s
+      const patched: Survey = {
+        ...s,
+        nuiEtr:         s.nuiEtr ?? nuiEtr,
+        etrPrograma:    s.etrPrograma    || settings.etrPrograma,
+        etrTipoInst:    s.etrTipoInst    || settings.etrTipoInst,
+        etrSemestre:    s.etrSemestre ?? semestre,
+        etrInstitucion: s.etrInstitucion || settings.etrInstitucion,
+        updatedAt:  now,
+        syncStatus: 'local',
+      }
+      updated.push(patched)
+      return patched
+    })
+
+    if (updated.length === 0) {
+      get().pushToast('No hay encuestas por completar', 'info')
+      return
+    }
+    await saveManySurveys(updated)
+    set({ surveys: next })
+    get().pushToast(`Perfil aplicado a ${updated.length} encuesta(s) anterior(es)`)
+    // Push the updates to the server (no-op if offline; retried on reconnect).
+    get().triggerSync()
+  },
+
   // ── Wizard ────────────────────────────────────────────────────────────
   wizard: null,
   pendingDraft: null,
   openWizard(surveyCount) {
-    const { settings } = get()
+    const { settings, userRole } = get()
+    // Hard gate: the surveyor profile is stamped onto every survey, so an
+    // encuestador may not start one until the profile is complete. Route them
+    // to Ajustes instead of silently capturing data with missing provenance.
+    if (userRole === 'encuestador' && !isProfileComplete(settings)) {
+      set({ view: 'ajustes' })
+      get().pushToast('Completa tu perfil de encuestador antes de registrar encuestas.', 'info')
+      return
+    }
     const nuiEtr = settings.nuiEncuestador ? parseInt(settings.nuiEncuestador, 10) || null : null
     const draft: SurveyDraft = {
       ...EMPTY_DRAFT,
@@ -399,6 +485,10 @@ export const useStore = create<AppStore>((set, get) => ({
   async persistSettings(settings) {
     await saveSettings(settings)
     set({ settings })
+    // Mirror the surveyor profile to the account so it survives device changes
+    // and local-data wipes. Best-effort/background: local save already succeeded.
+    const { user } = get()
+    if (user) upsertProfile(user.id, settings)
     get().pushToast('Configuración guardada')
   },
 
