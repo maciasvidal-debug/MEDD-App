@@ -8,6 +8,7 @@ import {
 } from './pages'
 import AuthPage from './pages/auth'
 import ProfileOnboarding from './pages/ProfileOnboarding'
+import Welcome from './pages/Welcome'
 import { isProfileComplete } from './lib/validators'
 
 // Dashboard pulls in Recharts (heavy); load it on demand so it stays out of the
@@ -27,7 +28,15 @@ export default function App() {
     view, loadSurveys, loadSettings, loadDraft, surveysLoaded, surveys,
     user, authReady, initAuth, syncing,
     settings, settingsLoaded, userRole,
+    welcomeOpen, maybeOpenWelcome,
   } = useStore()
+
+  // Whether an encuestador still owes a complete surveyor profile. Computed here
+  // (before any early return) so the welcome effect below can avoid popping over
+  // the mandatory profile screen — React hooks must run unconditionally.
+  const profileIncomplete =
+    userRole === 'encuestador' && settingsLoaded && !isProfileComplete(settings)
+  const onMandatoryProfile = profileIncomplete && surveysLoaded && surveys.length === 0
 
   // Subscribe to Supabase auth state changes
   useEffect(() => {
@@ -43,6 +52,14 @@ export default function App() {
       loadDraft()
     }
   }, [user])
+
+  // First-run welcome tour: auto-open once the app proper is shown (role known,
+  // settings loaded, and not sitting on the mandatory profile screen).
+  useEffect(() => {
+    if (user && userRole && settingsLoaded && !onMandatoryProfile) {
+      maybeOpenWelcome()
+    }
+  }, [user, userRole, settingsLoaded, onMandatoryProfile])
 
   // Auth not resolved yet
   if (!authReady) {
@@ -61,9 +78,7 @@ export default function App() {
   // onboarding when they have no surveys yet (brand-new account). Returning
   // users with data instead see a non-blocking banner (below) and are stopped
   // at the wizard (store.openWizard) — so they're never blocked from their data.
-  const profileIncomplete =
-    userRole === 'encuestador' && settingsLoaded && !isProfileComplete(settings)
-  if (profileIncomplete && surveysLoaded && surveys.length === 0) {
+  if (onMandatoryProfile) {
     return <ProfileOnboarding />
   }
 
@@ -76,7 +91,9 @@ export default function App() {
         <h1 className="sr-only">MEDD — Aplicación de investigación de medicamentos no utilizados</h1>
         <NetworkBanner />
         {profileIncomplete && <ProfileBanner />}
+        <PendingSyncBanner />
         <ToastContainer />
+        {welcomeOpen && <Welcome />}
 
         {/* Sync indicator */}
         {syncing && (
@@ -146,6 +163,55 @@ function NetworkBanner() {
     >
       <i className="ti ti-wifi-off" style={{ fontSize: 14 }} aria-hidden />
       Sin conexión — los datos se guardan localmente y se sincronizarán al reconectar
+    </div>
+  )
+}
+
+// Surfaces unsynced surveys so a field worker can trust (and force) the upload
+// instead of wondering whether data left the device. Shows only when online,
+// not already syncing, and there is something pending — otherwise renders null.
+function PendingSyncBanner() {
+  const { surveys, syncing, triggerSync } = useStore()
+  const [online, setOnline] = React.useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true,
+  )
+  useEffect(() => {
+    const on = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+    }
+  }, [])
+
+  const pending = surveys.filter(s => s.syncStatus !== 'synced').length
+  if (!online || syncing || pending === 0) return null
+
+  return (
+    <div
+      role="status"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        background: C.tealLight, color: C.teal,
+        padding: '8px 12px', borderBottom: `0.5px solid ${C.teal}40`,
+        fontSize: 12.5, fontWeight: 500,
+      }}
+    >
+      <i className="ti ti-cloud-up" style={{ fontSize: 16, flexShrink: 0 }} aria-hidden />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        {pending} encuesta{pending !== 1 ? 's' : ''} sin sincronizar.
+      </span>
+      <button
+        onClick={() => triggerSync()}
+        style={{
+          flexShrink: 0, border: 'none', background: C.teal, color: '#fff',
+          borderRadius: 7, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+        }}
+      >
+        Sincronizar
+      </button>
     </div>
   )
 }

@@ -685,7 +685,7 @@ export function ExportarPage() {
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────
 
 export function AjustesPage() {
-  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, backfillProfile, theme, toggleTheme, density, setDensity } = useStore()
+  const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, backfillProfile, openWelcome, theme, toggleTheme, density, setDensity } = useStore()
   const [form, setForm] = useState(settings)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -847,6 +847,14 @@ export function AjustesPage() {
             })}
           </div>
         </Card>
+
+        <Button
+          fullWidth variant="ghost" icon="ti-help-circle"
+          style={{ marginTop: 10 }}
+          onClick={() => openWelcome()}
+        >
+          Ver introducción de nuevo
+        </Button>
 
         <Divider label="cuenta" />
 
