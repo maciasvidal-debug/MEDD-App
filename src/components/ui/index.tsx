@@ -1,4 +1,5 @@
-import React, { useEffect, useId, useRef, useState, type ButtonHTMLAttributes } from 'react'
+import React, { useId, useRef, useState, type ButtonHTMLAttributes } from 'react'
+import { useFocusTrap } from './useFocusTrap'
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
@@ -361,38 +362,7 @@ interface DialogProps {
 export function Dialog({ title, onClose, children }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId  = useId()
-
-  useEffect(() => {
-    const prevFocus    = document.activeElement as HTMLElement | null
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    panelRef.current?.focus()
-
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return }
-      if (e.key !== 'Tab') return
-      const panel = panelRef.current
-      if (!panel) return
-      const focusables = Array.from(
-        panel.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
-        )
-      )
-      if (focusables.length === 0) { e.preventDefault(); return }
-      const first = focusables[0]
-      const last  = focusables[focusables.length - 1]
-      const active = document.activeElement
-      if (e.shiftKey && active === first) { e.preventDefault(); last.focus() }
-      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus() }
-    }
-
-    document.addEventListener('keydown', onKey, true)
-    return () => {
-      document.removeEventListener('keydown', onKey, true)
-      document.body.style.overflow = prevOverflow
-      prevFocus?.focus?.()
-    }
-  }, [onClose])
+  useFocusTrap(panelRef, onClose)
 
   return (
     <div
