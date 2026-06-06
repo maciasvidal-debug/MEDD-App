@@ -6,6 +6,7 @@ import {
   getSettings, saveSettings,
   getDraft, saveDraft, clearDraft,
   clearLocalUserData,
+  addDeletion, removeDeletion,
 } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { pushSurvey, deleteSurveyRemote, fullSync, fetchProfile, upsertProfile } from '../lib/sync'
@@ -138,6 +139,20 @@ async function applyUserScope(uid: string): Promise<void> {
 
 // ─── Store implementation ─────────────────────────────────────────────────
 
+// Debounced draft persistence: updateDraft fires on every keystroke, but writing
+// to IndexedDB that often is wasteful on low-end field devices. We coalesce
+// writes and always persist the LATEST wizard state at fire time (reading it
+// fresh from the store), so a step change saved immediately is never clobbered
+// by a stale queued write — and a cleared draft (wizard === null) is not resurrected.
+let draftSaveTimer: ReturnType<typeof setTimeout> | null = null
+function persistDraftDebounced(): void {
+  if (draftSaveTimer) clearTimeout(draftSaveTimer)
+  draftSaveTimer = setTimeout(() => {
+    const w = useStore.getState().wizard
+    if (w) saveDraft(w)
+  }, 400)
+}
+
 export const useStore = create<AppStore>((set, get) => ({
   // ── Auth ──────────────────────────────────────────────────────────────
   user: null,
@@ -236,9 +251,18 @@ export const useStore = create<AppStore>((set, get) => ({
     const onOnline = () => { get().triggerSync() }
     if (typeof window !== 'undefined') window.addEventListener('online', onOnline)
 
+    // Also flush when the user returns to the app (tab refocus / app resume) and
+    // there's connectivity — covers the common field case where the device never
+    // fired an 'online' event but regained signal while the app was backgrounded.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) get().triggerSync()
+    }
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible)
+
     return () => {
       subscription.unsubscribe()
       if (typeof window !== 'undefined') window.removeEventListener('online', onOnline)
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
     }
   },
 
@@ -378,8 +402,14 @@ export const useStore = create<AppStore>((set, get) => ({
     setTimeout(async () => {
       if (undone) return
       await deleteSurvey(id)
+      // Record a tombstone so a failed/offline remote delete is retried on the
+      // next sync and the row is never resurrected by a pull in the meantime.
+      await addDeletion(id)
       const { user } = get()
-      if (user) deleteSurveyRemote(id)
+      if (user) {
+        const ok = await deleteSurveyRemote(id)
+        if (ok) await removeDeletion(id)
+      }
     }, GRACE_MS)
   },
 
@@ -474,8 +504,8 @@ export const useStore = create<AppStore>((set, get) => ({
         ? { wizard: { ...s.wizard, draft: { ...s.wizard.draft, ...patch } } }
         : {}
     )
-    const { wizard } = get()
-    if (wizard) saveDraft(wizard)
+    // Debounced: keystrokes coalesce into one IndexedDB write (see helper above).
+    if (get().wizard) persistDraftDebounced()
   },
 
   // Resume / discard a persisted in-progress survey

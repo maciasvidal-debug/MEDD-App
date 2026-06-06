@@ -1,0 +1,94 @@
+// =====================================================================
+// Pure mapping between the local Survey shape (camelCase) and the Supabase
+// `surveys` row shape (snake_case). Kept dependency-free (no Supabase client)
+// so it loads without env vars and can be unit-tested in isolation.
+// =====================================================================
+import type { Survey, Medication } from '../types'
+
+export type SupabaseRow = Record<string, unknown>
+
+export function toRow(survey: Survey, userId: string): SupabaseRow {
+  return {
+    id:           survey.id,
+    user_id:      userId,
+    created_at:   survey.createdAt,
+    updated_at:   survey.updatedAt,
+    f_eta:        survey.fEta   || null,
+    nui_etr:      survey.nuiEtr,
+    nui:          survey.nui,
+    etr_programa:    survey.etrPrograma    || null,
+    etr_tipo_inst:   survey.etrTipoInst    || null,
+    etr_semestre:    survey.etrSemestre,
+    etr_institucion: survey.etrInstitucion || null,
+    f_nac:        survey.fNac   || null,
+    ciudad:       survey.ciudad || null,
+    dir:          survey.dir    || null,
+    estrato:      survey.estrato,
+    etnia:        survey.etnia  || null,
+    as_salud:     survey.asSalud  || null,
+    est_lab:      survey.estLab   || null,
+    ingreso:      survey.ingreso  || null,
+    nv_estu:      survey.nvEstu   || null,
+    nv_posg:      survey.nvPosg   || null,
+    per_salud:    survey.perSalud || null,
+    est_salud:    survey.estSalud || null,
+    prb_salud:    survey.prbSalud || null,
+    con_med:      survey.conMed   || null,
+    med_prc:      survey.medPrc   || null,
+    f_prc:        survey.fPrc     || null,
+    f_disp:       survey.fDisp    || null,
+    ind_med:      survey.indMed   || null,
+    med_sob:      survey.medSob      || null,
+    disp_med_vc:  survey.dispMedVc   || null,
+    cto_disp_vc:  survey.ctoDispVc   || null,
+    vto_med_nc:   survey.vtoMedNc    || null,
+    cant_med:     survey.cantMed,
+    cant_med_vto: survey.cantMedVto,
+    peso_med_nc:  survey.pesoMedNc,
+    medications:  survey.medications,
+    obs:          survey.obs || null,
+  }
+}
+
+export function fromRow(row: SupabaseRow): Survey {
+  return {
+    id:          row.id as string,
+    createdAt:   row.created_at as string,
+    updatedAt:   row.updated_at as string,
+    fEta:        (row.f_eta as string)  ?? '',
+    nuiEtr:      row.nui_etr as number | null,
+    nui:         row.nui as number,
+    etrPrograma:    ((row.etr_programa as string)  ?? '') as Survey['etrPrograma'],
+    etrTipoInst:    ((row.etr_tipo_inst as string) ?? '') as Survey['etrTipoInst'],
+    etrSemestre:    row.etr_semestre as number | null,
+    etrInstitucion: (row.etr_institucion as string) ?? '',
+    fNac:        (row.f_nac as string)  ?? '',
+    ciudad:      (row.ciudad as string) ?? '',
+    dir:         (row.dir as string)    ?? '',
+    estrato:     row.estrato as number | null,
+    etnia:       ((row.etnia as string)    ?? '') as Survey['etnia'],
+    asSalud:     ((row.as_salud as string) ?? '') as Survey['asSalud'],
+    estLab:      ((row.est_lab as string)  ?? '') as Survey['estLab'],
+    ingreso:     ((row.ingreso as string)  ?? '') as Survey['ingreso'],
+    nvEstu:      ((row.nv_estu as string)  ?? '') as Survey['nvEstu'],
+    nvPosg:      ((row.nv_posg as string)  ?? '') as Survey['nvPosg'],
+    perSalud:    ((row.per_salud as string) ?? '') as Survey['perSalud'],
+    estSalud:    ((row.est_salud as string) ?? '') as Survey['estSalud'],
+    prbSalud:    (row.prb_salud as string)  ?? '',
+    conMed:      ((row.con_med as string)   ?? '') as Survey['conMed'],
+    medPrc:      ((row.med_prc as string)   ?? '') as Survey['medPrc'],
+    fPrc:        (row.f_prc as string)  ?? '',
+    fDisp:       (row.f_disp as string) ?? '',
+    indMed:      ((row.ind_med as string)   ?? '') as Survey['indMed'],
+    medSob:      ((row.med_sob as string)     ?? '') as Survey['medSob'],
+    dispMedVc:   ((row.disp_med_vc as string) ?? '') as Survey['dispMedVc'],
+    ctoDispVc:   (row.cto_disp_vc as string)  ?? '',
+    vtoMedNc:    ((row.vto_med_nc as string)  ?? '') as Survey['vtoMedNc'],
+    cantMed:     row.cant_med    as number | null,
+    cantMedVto:  row.cant_med_vto as number | null,
+    pesoMedNc:   row.peso_med_nc  as number | null,
+    medications: (row.medications as Medication[]) ?? [],
+    obs:         (row.obs as string) ?? '',
+    syncStatus:  'synced',
+  }
+}

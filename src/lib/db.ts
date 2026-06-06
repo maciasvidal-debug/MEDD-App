@@ -3,7 +3,7 @@ import type { Survey, Settings, WizardState } from '../types'
 import { DEFAULT_SETTINGS } from './constants'
 
 const DB_NAME    = 'medd_db'
-const DB_VERSION = 3   // v2: codebook fields + 1:N meds · v3: wizard draft store
+const DB_VERSION = 4   // v2: codebook fields + 1:N meds · v3: wizard draft · v4: deletion tombstones
 
 interface MEDDSchema {
   surveys: {
@@ -22,6 +22,13 @@ interface MEDDSchema {
   drafts: {
     key: string
     value: WizardState & { id: string }
+  }
+  // Tombstones for surveys deleted locally whose remote delete hasn't been
+  // confirmed yet. They let sync (a) retry the remote delete and (b) avoid
+  // resurrecting the row when pulling, until the server acknowledges.
+  deletions: {
+    key: string
+    value: { id: string; deletedAt: string }
   }
 }
 
@@ -54,6 +61,12 @@ async function getDB(): Promise<IDBPDatabase<MEDDSchema>> {
       // an in-progress survey survives reloads / the tab being killed.
       if (oldVersion < 3 && !db.objectStoreNames.contains('drafts')) {
         db.createObjectStore('drafts', { keyPath: 'id' })
+      }
+
+      // v3 → v4: add the deletion-tombstone store so offline deletes survive
+      // until the server confirms them (prevents resurrection on the next pull).
+      if (oldVersion < 4 && !db.objectStoreNames.contains('deletions')) {
+        db.createObjectStore('deletions', { keyPath: 'id' })
       }
     },
   })
@@ -107,7 +120,25 @@ export async function clearLocalUserData(): Promise<void> {
     db.clear('surveys'),
     db.clear('settings'),
     db.clear('drafts'),
+    db.clear('deletions'),
   ])
+}
+
+// ─── Deletion tombstones ────────────────────────────────────────────────────
+
+export async function addDeletion(id: string): Promise<void> {
+  const db = await getDB()
+  await db.put('deletions', { id, deletedAt: new Date().toISOString() })
+}
+
+export async function getDeletionIds(): Promise<string[]> {
+  const db = await getDB()
+  return db.getAllKeys('deletions') as Promise<string[]>
+}
+
+export async function removeDeletion(id: string): Promise<void> {
+  const db = await getDB()
+  await db.delete('deletions', id)
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────
