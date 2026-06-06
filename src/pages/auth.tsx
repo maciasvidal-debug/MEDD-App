@@ -22,9 +22,18 @@ export default function AuthPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError(error.message)
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) setError(error.message)
-      else setInfo('Revisa tu correo para confirmar el registro.')
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) {
+        setError(error.message)
+      } else if (data.session) {
+        // Email confirmation is disabled → signUp returns a session and the user
+        // is already signed in. The auth listener (store.initAuth) picks up the
+        // SIGNED_IN event and routes into the app, so no message is needed here.
+      } else {
+        // Email confirmation is enabled → no session yet; the user must verify
+        // via the emailed link before logging in.
+        setInfo('Cuenta creada. Revisa tu correo para confirmar el registro.')
+      }
     }
     setLoading(false)
   }
