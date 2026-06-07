@@ -6,8 +6,8 @@
 //  • Tabler icon CDN (unpkg): cached so glyphs render offline.
 //  • Supabase API: never intercepted — the app already handles offline via
 //    IndexedDB and deferred sync, so requests must reach the network normally.
-const CACHE = 'medd-cache-v1'
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg']
+const CACHE = 'medd-cache-v2'
+const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/icon.svg', '/maskable.svg']
 const CDN_HOSTS = ['unpkg.com']
 
 self.addEventListener('install', event => {

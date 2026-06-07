@@ -6,11 +6,12 @@ Aplicación web para el registro y análisis de medicamentos no utilizados en ho
 
 | Capa | Tecnología |
 |------|-----------|
-| UI | React 18 + TypeScript |
+| UI | React 19 + TypeScript |
 | Bundler | Vite 8 |
 | Estado | Zustand |
 | Formularios | React Hook Form + Zod |
-| Persistencia | IndexedDB (via `idb`) |
+| Persistencia local | IndexedDB (via `idb`) — offline-first |
+| Auth y sincronización | Supabase (Postgres + RLS) |
 | Gráficos | Recharts |
 | API medicamentos | CUM-INVIMA (datos.gov.co) |
 
@@ -56,10 +57,16 @@ El `dist/` generado es un SPA estático. Compatible con:
 
 Nota: requiere HTTPS para que IndexedDB y `crypto.randomUUID()` funcionen correctamente.
 
-## Persistencia
+## Persistencia y sincronización
 
-Los datos se almacenan en **IndexedDB** del navegador. Sobreviven cierres de pestaña y reinicios del navegador. No se sincronizan entre dispositivos ni usuarios. Para compartir datos, use la función de exportación (CSV/JSON).
+La app es **offline-first**: las encuestas se guardan primero en **IndexedDB** del navegador (sobreviven cierres de pestaña y reinicios) y se **sincronizan con Supabase** (Postgres) cuando hay conexión — al iniciar sesión, al reconectar, al volver el foco a la app y con el botón manual. Cada usuario solo ve y modifica sus propios datos (Row-Level Security); el rol `investigador` tiene lectura agregada. El perfil del encuestador también se sincroniza a la cuenta, por lo que viaja entre dispositivos.
 
 ## Privacidad
 
-La app no envía datos a ningún servidor externo, excepto las consultas opcionales a la API pública CUM-INVIMA (`datos.gov.co`) para la búsqueda de medicamentos.
+La app sincroniza las encuestas y el perfil del encuestador con el proyecto **Supabase** del estudio (Postgres con RLS por usuario). Además, realiza consultas opcionales a la API pública **CUM-INVIMA** (`datos.gov.co`) para la búsqueda de medicamentos. No comparte datos con otros terceros.
+
+## Backend (`backend/`) — API Express independiente, **no usada por la app web**
+
+El directorio `backend/` contiene un API Express (encuestas + analítica) con autenticación JWT de Supabase, validación y SQL parametrizado, además de su propia suite de tests y CI (`backend-ci.yml`).
+
+**La app web (`src/`) no lo consume**: el frontend accede directamente a Supabase con RLS. Este backend es un servicio servidor *separado* —accede a Postgres con un pool privilegiado que **omite RLS**, por lo que autoriza cada petición por su cuenta— pensado para consumidores de servidor (p. ej. analítica/exportación). Actualmente **no tiene configuración de despliegue**. Si no hay un plan para usarlo, considérese archivarlo para reducir mantenimiento y superficie de credenciales.

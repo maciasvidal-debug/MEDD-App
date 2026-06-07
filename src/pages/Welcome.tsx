@@ -1,6 +1,7 @@
-import { useState, type CSSProperties } from 'react'
+import { useState, useRef, useId, type CSSProperties } from 'react'
 import { useStore } from '../lib/store'
 import { Button, C } from '../components/ui'
+import { useFocusTrap } from '../components/ui/useFocusTrap'
 
 interface Step { icon: string; title: string; body: string }
 
@@ -31,10 +32,13 @@ export default function Welcome() {
   const [i, setI] = useState(0)
   const last = i === steps.length - 1
   const step = steps[i]
+  const panelRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+  useFocusTrap(panelRef, closeWelcome)
 
   return (
-    <div style={styles.overlay} role="dialog" aria-modal="true" aria-label="Introducción a MEDD">
-      <div style={styles.card}>
+    <div style={styles.overlay} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div ref={panelRef} tabIndex={-1} style={{ ...styles.card, outline: 'none' }}>
         <button type="button" onClick={closeWelcome} style={styles.skip} aria-label="Saltar introducción">
           Saltar
         </button>
@@ -42,7 +46,7 @@ export default function Welcome() {
         <div style={styles.iconWrap} aria-hidden>
           <i className={`ti ${step.icon}`} style={{ fontSize: 34, color: C.teal }} />
         </div>
-        <h2 style={styles.title}>{step.title}</h2>
+        <h2 id={titleId} style={styles.title}>{step.title}</h2>
         <p style={styles.body}>{step.body}</p>
 
         <div style={styles.dots} aria-hidden>

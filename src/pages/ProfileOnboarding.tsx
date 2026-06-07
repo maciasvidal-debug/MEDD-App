@@ -1,8 +1,9 @@
-import { useState, type CSSProperties } from 'react'
+import { useState, useRef, useId, type CSSProperties } from 'react'
 import { useStore } from '../lib/store'
 import { isProfileComplete } from '../lib/validators'
 import { OPT } from '../lib/constants'
 import { Field, ChipGroup, Button, Logo, C } from '../components/ui'
+import { useFocusTrap } from '../components/ui/useFocusTrap'
 
 // Mandatory first-run gate for encuestadores. The surveyor profile is stamped
 // onto every captured survey, so we block entry until it is complete (App only
@@ -14,6 +15,11 @@ export default function ProfileOnboarding() {
   const [saving, setSaving] = useState(false)
   const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
   const complete = isProfileComplete(form)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+  // Mandatory gate → no Escape handler (it must not be dismissable from the
+  // keyboard); still trap focus, lock scroll and restore focus on unmount.
+  useFocusTrap(panelRef)
 
   async function handleSave() {
     if (!complete || saving) return
@@ -23,13 +29,13 @@ export default function ProfileOnboarding() {
   }
 
   return (
-    <div style={styles.shell}>
-      <div style={styles.card}>
+    <div style={styles.shell} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div ref={panelRef} tabIndex={-1} style={{ ...styles.card, outline: 'none' }}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ width: 56, height: 56, margin: '0 auto 12px' }}>
             <Logo variant="tile" size={56} />
           </div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.text, margin: 0 }}>
+          <h1 id={titleId} style={{ fontSize: 20, fontWeight: 700, color: C.text, margin: 0 }}>
             Completa tu perfil
           </h1>
           <p style={{ fontSize: 13, color: C.muted, margin: '8px 0 0', lineHeight: 1.5 }}>
