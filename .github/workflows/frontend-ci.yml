@@ -44,8 +44,10 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
-      - name: Test
-        run: npm test
+      # Runs the suite AND enforces the coverage ratchet (vitest.config.ts
+      # thresholds) so a drop in business-logic coverage fails the PR.
+      - name: Test (with coverage gate)
+        run: npm run test:coverage
       # Type-checks (tsc -b) and bundles (vite build). Vite does not execute app
       # modules at build time, so no Supabase secrets are required here.
       - name: Build
