@@ -45,9 +45,14 @@ router.get('/', asyncHandler(async (req, res) => {
     const where = all ? '' : 'WHERE s.user_id = $1';
     const params = all ? [] : [req.user.id];
     const result = await pool.query(
-        `SELECT s.*,
-                (SELECT COUNT(*) FROM medications m WHERE m.nui = s.nui) AS med_count
-         FROM surveys s ${where} ORDER BY s.nui DESC`,
+        `SELECT s.*, COALESCE(mc.med_count, 0) AS med_count
+         FROM surveys s
+         LEFT JOIN (
+             SELECT nui, COUNT(*) AS med_count
+             FROM medications
+             GROUP BY nui
+         ) mc ON mc.nui = s.nui
+         ${where} ORDER BY s.nui DESC`,
         params
     );
     res.json(result.rows);
