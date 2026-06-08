@@ -483,7 +483,6 @@ export const useStore = create<AppStore>((set, get) => ({
     saveDraft(wizard)
   },
   openEditWizard(survey) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, createdAt, updatedAt, syncStatus, ...draft } = survey
     const wizard: WizardState = { step: 1, draft, editingId: id }
     set({ wizard, view: 'wizard', pendingDraft: null })

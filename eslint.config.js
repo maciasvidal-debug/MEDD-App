@@ -23,6 +23,9 @@ export default defineConfig([
       // alongside components — the recommended setting for Vite + Fast Refresh.
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       'no-await-in-loop': 'error',
+      // ignoreRestSiblings: destructuring siblings out of a rest spread
+      // (e.g. `const { id, ...rest } = obj`) is a deliberate omit pattern, not dead code.
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
     },
   },
   {
