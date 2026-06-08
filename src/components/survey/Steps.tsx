@@ -19,7 +19,7 @@ import {
   step1Schema, step2Schema, step3Schema, step4Schema,
   type Step1Data, type Step2Data, type Step3Data, type Step4Data,
 } from '../../lib/validators'
-import type { SurveyDraft, Medication, UnidadConc } from '../../types'
+import type { SurveyDraft, Medication, UnidadConc, CUMRecord } from '../../types'
 
 // ─── Municipio combobox ───────────────────────────────────────────────────────
 
@@ -223,12 +223,13 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
   )
 }
 
-// ─── Step 2 — Demografía ─────────────────────────────────────────────────
+// ─── Reusable RHF field wrappers ──────────────────────────────────────────
+// The survey steps repeat the same Field + Controller + control pattern dozens
+// of times, differing only by label/options. These generic wrappers collapse
+// each occurrence to a single line while keeping all form state in the step.
 
-// Generic Field + Controller + ChipGroup wrapper. Step 2 has many single-select
-// chip questions that only differ by label/options; this collapses each into a
-// one-liner. `onAfterChange` runs after the field updates, for dependent fields
-// (e.g. clearing a sub-level when its parent changes).
+// Single-select chip question. `onAfterChange` runs after the field updates, for
+// dependent fields (e.g. clearing a sub-level when its parent changes).
 function ChipField<T extends FieldValues>({
   control, name, label, options, required, help, error, onAfterChange,
 }: {
@@ -254,6 +255,29 @@ function ChipField<T extends FieldValues>({
     </Field>
   )
 }
+
+// Yes/No question (steps 3 and 4).
+function YesNoField<T extends FieldValues>({
+  control, name, label, required, help, error,
+}: {
+  control:   Control<T>
+  name:      Path<T>
+  label:     string
+  required?: boolean
+  help?:     string
+  error?:    string
+}) {
+  return (
+    <Field label={label} required={required} help={help} error={error}>
+      <Controller name={name} control={control}
+        render={({ field }) => (
+          <YesNo value={(field.value as string) ?? ''} onChange={field.onChange} />
+        )} />
+    </Field>
+  )
+}
+
+// ─── Step 2 — Demografía ─────────────────────────────────────────────────
 
 // Date of birth + live age readout derived from the interview date.
 function BirthDateField({ register, max, edad, error }: {
@@ -442,22 +466,16 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
     <form onSubmit={handleSubmit(handleNext)} noValidate>
       <SectionHead icon="ti-heart-rate-monitor" label="Estado de salud" />
 
-      <Field label="Percepción general de salud" required error={errors.perSalud?.message}>
-        <Controller name="perSalud" control={control}
-          render={({ field }) => (
-            <ChipGroup options={OPT.perSalud} value={field.value} onChange={field.onChange} />
-          )} />
-      </Field>
+      <ChipField control={control} name="perSalud" label="Percepción general de salud" required
+        options={OPT.perSalud} error={errors.perSalud?.message} />
 
       <Divider />
 
-      <Field
+      <YesNoField
+        control={control} name="estSalud"
         label="¿En las últimas 4 semanas ha padecido alguna enfermedad o problema de salud?"
         required error={errors.estSalud?.message}
-      >
-        <Controller name="estSalud" control={control}
-          render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
-      </Field>
+      />
 
       {estSalud === 'Sí' && (
         <div className="fade-in">
@@ -468,17 +486,12 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
               )} />
           </Field>
 
-          <Field label="¿Consume medicamentos para este problema?">
-            <Controller name="conMed" control={control}
-              render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
-          </Field>
+          <YesNoField control={control} name="conMed" label="¿Consume medicamentos para este problema?" />
 
           {conMed === 'Sí' && (
             <div className="fade-in">
-              <Field label="¿Los medicamentos fueron prescritos por un profesional de salud?">
-                <Controller name="medPrc" control={control}
-                  render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
-              </Field>
+              <YesNoField control={control} name="medPrc"
+                label="¿Los medicamentos fueron prescritos por un profesional de salud?" />
 
               {medPrc === 'Sí' && (
                 <div className="fade-in">
@@ -506,10 +519,8 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
                     </p>
                   </Field>
 
-                  <Field label="¿Sigue las indicaciones del profesional de salud?">
-                    <Controller name="indMed" control={control}
-                      render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
-                  </Field>
+                  <YesNoField control={control} name="indMed"
+                    label="¿Sigue las indicaciones del profesional de salud?" />
                 </div>
               )}
             </div>
@@ -553,19 +564,15 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
     <form onSubmit={handleSubmit(handleNext)} noValidate>
       <SectionHead icon="ti-package" label="Medicamentos sin consumir y disposición" />
 
-      <Field label="¿Tiene medicamentos guardados sin consumir?" required help={FIELD_HELP.medSob} error={errors.medSob?.message}>
-        <Controller name="medSob" control={control}
-          render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
-      </Field>
+      <YesNoField control={control} name="medSob" required help={FIELD_HELP.medSob}
+        label="¿Tiene medicamentos guardados sin consumir?" error={errors.medSob?.message} />
 
       {medSob === 'Sí' && (
         <div className="fade-in">
           <Divider label="Conocimiento del entrevistado" />
 
-          <Field label="¿Sabe qué hacer con los medicamentos vencidos?" help={FIELD_HELP.dispMedVc}>
-            <Controller name="dispMedVc" control={control}
-              render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
-          </Field>
+          <YesNoField control={control} name="dispMedVc" help={FIELD_HELP.dispMedVc}
+            label="¿Sabe qué hacer con los medicamentos vencidos?" />
 
           {dispMedVc === 'Sí' && (
             <div className="fade-in">
@@ -580,10 +587,8 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
 
           <Divider label="Observación directa — encuestador" />
 
-          <Field label="¿Hay unidades vencidas entre los almacenados?" help={FIELD_HELP.vtoMedNc}>
-            <Controller name="vtoMedNc" control={control}
-              render={({ field }) => <YesNo value={field.value} onChange={field.onChange} />} />
-          </Field>
+          <YesNoField control={control} name="vtoMedNc" help={FIELD_HELP.vtoMedNc}
+            label="¿Hay unidades vencidas entre los almacenados?" />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Cant. sin consumir" help={FIELD_HELP.cantMed} error={errors.cantMed?.message}>
@@ -624,111 +629,95 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
 
 const EMPTY_MED: Medication = { nmMed: '', dci: '', concMed: null, undConc: '', fVto: '' }
 
-export function Step5({ draft, onNext, onBack }: StepProps) {
-  const [meds, setMeds]     = useState<Medication[]>(draft.medications ?? [])
-  const [entry, setEntry]   = useState<Medication>({ ...EMPTY_MED })
-  const [addErr, setAddErr] = useState('')
-
+// CUM-INVIMA lookup panel. Owns its own query / selection / network state and
+// only reports the chosen record to the parent via `onPick`, which prefills the
+// manual-entry form. `clearSelectionToken` clears the highlight when bumped
+// (the parent does so after a medication is added).
+function CumSearchPanel({ onPick, clearSelectionToken }: {
+  onPick:              (r: CUMRecord) => void
+  clearSelectionToken: number
+}) {
   const { results, loading, error: cumError, searched, search } = useCUM()
-  const [query, setQuery]   = useState('')
-  const [selIdx, setSelIdx] = useState<number | null>(null)
+  const [query, setQuery]     = useState('')
+  const [selected, setSelected] = useState<{ token: number; idx: number } | null>(null)
 
-  function applyResult(r: typeof results[0], idx: number) {
-    setEntry(e => ({
-      ...e,
-      nmMed:   r.producto ?? '',
-      dci:     r.principioactivo ?? '',
-      concMed: r.concentracion ? parseFloat(r.concentracion) : null,
-      undConc: (r.unidadmedida ?? '') as UnidadConc,
-    }))
-    setSelIdx(idx)
-  }
+  // Derive the highlighted index from the parent's token instead of an effect:
+  // when the parent bumps the token (after an add), the stored selection no
+  // longer matches and the highlight clears on the next render.
+  const selIdx = selected?.token === clearSelectionToken ? selected.idx : null
 
-  function addMedication() {
-    if (!entry.nmMed.trim() && !entry.dci.trim()) {
-      setAddErr('Ingrese al menos el nombre comercial o el principio activo.')
-      return
-    }
-    setMeds(prev => [...prev, { ...entry }])
-    setEntry({ ...EMPTY_MED })
-    setSelIdx(null)
-    setAddErr('')
-  }
-
-  function removeMed(idx: number) {
-    setMeds(prev => prev.filter((_, i) => i !== idx))
-  }
-
-  function handleNext(e: React.FormEvent) {
-    e.preventDefault()
-    onNext({ medications: meds })
+  function pick(r: CUMRecord, idx: number) {
+    onPick(r)
+    setSelected({ token: clearSelectionToken, idx })
   }
 
   return (
-    <form onSubmit={handleNext} noValidate>
-      <SectionHead icon="ti-pill" label="Medicamentos almacenados" />
-      <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
-        Registre cada producto almacenado sin consumir. Busque en el CUM-INVIMA para evitar errores de tipeo.
-      </p>
-
-      {/* CUM Search */}
-      <Card style={{ marginBottom: 16, background: C.tealLight, border: `1px solid color-mix(in srgb, ${C.teal} 22%, transparent)` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: C.teal, marginBottom: 9 }}>
-          <i className="ti ti-search" style={{ fontSize: 14 }} aria-hidden /> Buscar en CUM-INVIMA
+    <Card style={{ marginBottom: 16, background: C.tealLight, border: `1px solid color-mix(in srgb, ${C.teal} 22%, transparent)` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: C.teal, marginBottom: 9 }}>
+        <i className="ti ti-search" style={{ fontSize: 14 }} aria-hidden /> Buscar en CUM-INVIMA
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), query.trim().length >= 3 && search(query.trim()))}
+          placeholder="acetaminofén, ibuprofeno…"
+          style={{ flex: 1 }}
+        />
+        <Button
+          type="button" variant="primary"
+          disabled={loading || query.trim().length < 3}
+          onClick={() => search(query.trim())}
+          style={{ flexShrink: 0, paddingLeft: 16, paddingRight: 16 }}
+        >
+          {loading ? <Spinner size={16} color="#fff" /> : 'Buscar'}
+        </Button>
+      </div>
+      {cumError && (
+        <p style={{ fontSize: 12, color: C.amber, margin: 0 }}>
+          <i className="ti ti-wifi-off" style={{ marginRight: 4 }} aria-hidden />{cumError}
+        </p>
+      )}
+      {searched && !cumError && results.length === 0 && (
+        <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Sin resultados para "{query}".</p>
+      )}
+      {results.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', marginTop: 4 }}>
+          {results.map((r, i) => (
+            <button
+              key={i} type="button"
+              onClick={() => pick(r, i)}
+              style={{
+                padding: '8px 10px', textAlign: 'left',
+                border: `1.5px solid ${selIdx === i ? C.teal : C.border}`,
+                borderRadius: 8, cursor: 'pointer',
+                background: selIdx === i ? C.tealLight : C.surface,
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 500, color: selIdx === i ? C.teal : C.text }}>
+                {r.producto || '—'}
+              </div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                {r.principioactivo} · {r.concentracion}{r.unidadmedida} · {r.formafarmaceutica}
+              </div>
+            </button>
+          ))}
         </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), query.trim().length >= 3 && search(query.trim()))}
-            placeholder="acetaminofén, ibuprofeno…"
-            style={{ flex: 1 }}
-          />
-          <Button
-            type="button" variant="primary"
-            disabled={loading || query.trim().length < 3}
-            onClick={() => search(query.trim())}
-            style={{ flexShrink: 0, paddingLeft: 16, paddingRight: 16 }}
-          >
-            {loading ? <Spinner size={16} color="#fff" /> : 'Buscar'}
-          </Button>
-        </div>
-        {cumError && (
-          <p style={{ fontSize: 12, color: C.amber, margin: 0 }}>
-            <i className="ti ti-wifi-off" style={{ marginRight: 4 }} aria-hidden />{cumError}
-          </p>
-        )}
-        {searched && !cumError && results.length === 0 && (
-          <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Sin resultados para "{query}".</p>
-        )}
-        {results.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', marginTop: 4 }}>
-            {results.map((r, i) => (
-              <button
-                key={i} type="button"
-                onClick={() => applyResult(r, i)}
-                style={{
-                  padding: '8px 10px', textAlign: 'left',
-                  border: `1.5px solid ${selIdx === i ? C.teal : C.border}`,
-                  borderRadius: 8, cursor: 'pointer',
-                  background: selIdx === i ? C.tealLight : C.surface,
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 500, color: selIdx === i ? C.teal : C.text }}>
-                  {r.producto || '—'}
-                </div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-                  {r.principioactivo} · {r.concentracion}{r.unidadmedida} · {r.formafarmaceutica}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </Card>
+      )}
+    </Card>
+  )
+}
 
-      <Divider label="Complete / ingrese manualmente y agregue" />
-
-      {/* Manual entry form */}
+// Controlled manual-entry form for a single medication, prefilled by the CUM
+// search. The draft entry and its validation live in the parent.
+function MedicationEntryForm({ entry, setEntry, addErr, onAdd }: {
+  entry:    Medication
+  setEntry: React.Dispatch<React.SetStateAction<Medication>>
+  addErr:   string
+  onAdd:    () => void
+}) {
+  return (
+    <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <Field label="Nombre comercial">
           <input
@@ -773,78 +762,151 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
         </p>
       )}
 
-      <Button type="button" variant="secondary" icon="ti-plus" onClick={addMedication} fullWidth style={{ marginBottom: 16 }}>
+      <Button type="button" variant="secondary" icon="ti-plus" onClick={onAdd} fullWidth style={{ marginBottom: 16 }}>
         Agregar medicamento a la lista
       </Button>
+    </>
+  )
+}
 
-      {/* Current list */}
-      {meds.length > 0 && (
-        <Card style={{ marginBottom: 12 }}>
-          <GroupLabel>Medicamentos registrados ({meds.length})</GroupLabel>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {meds.map((m, i) => {
-              const metrics = productMetrics(draft.fEta, draft.fDisp, m)
-              return (
-                <div
-                  key={i}
-                  style={{
-                    padding: '10px 12px',
-                    background: metrics.isExpired ? C.amberLight : C.bg,
-                    borderRadius: 10, border: `1px solid ${metrics.isExpired ? `color-mix(in srgb, ${C.amber} 40%, transparent)` : C.border}`,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ fontWeight: 500, fontSize: 13 }}>{m.nmMed || '—'}</span>
-                      {m.dci && <span style={{ fontSize: 12, color: C.muted }}> · {m.dci}</span>}
-                      {m.concMed != null && m.undConc && (
-                        <span style={{ fontSize: 12, color: C.hint }}> · {m.concMed} {m.undConc}</span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={`Eliminar medicamento ${m.nmMed || ''}`}
-                      onClick={() => removeMed(i)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.red, fontSize: 12, padding: 0, flexShrink: 0 }}
-                    >
-                      <i className="ti ti-trash" style={{ fontSize: 15 }} aria-hidden />
-                    </button>
-                  </div>
+// Read-only preview of the medications added so far, with derived time metrics.
+function MedicationList({ meds, fEta, fDisp, onRemove }: {
+  meds:     Medication[]
+  fEta:     string
+  fDisp:    string
+  onRemove: (idx: number) => void
+}) {
+  if (meds.length === 0) {
+    return (
+      <p style={{ fontSize: 13, color: C.hint, textAlign: 'center', padding: '12px 0' }}>
+        Sin medicamentos registrados. Puede continuar sin agregar.
+      </p>
+    )
+  }
+  return (
+    <Card style={{ marginBottom: 12 }}>
+      <GroupLabel>Medicamentos registrados ({meds.length})</GroupLabel>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {meds.map((m, i) => (
+          <MedicationListItem
+            key={i} med={m}
+            metrics={productMetrics(fEta, fDisp, m)}
+            onRemove={() => onRemove(i)}
+          />
+        ))}
+      </div>
+    </Card>
+  )
+}
 
-                  {/* Time metrics preview */}
-                  <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
-                    {m.fVto && (
-                      <span style={{ fontSize: 11, color: metrics.isExpired ? C.amber : C.muted }}>
-                        <i className="ti ti-calendar-x" style={{ marginRight: 3, fontSize: 11 }} aria-hidden />
-                        Vence: {fmtDate(m.fVto)}
-                        {metrics.isExpired && metrics.tVto !== null && (
-                          <strong style={{ marginLeft: 4 }}>({metrics.tVto} d vencido)</strong>
-                        )}
-                      </span>
-                    )}
-                    {metrics.tDisp !== null && (
-                      <span style={{ fontSize: 11, color: C.muted }}>
-                        En bodega: {metrics.tDisp} d
-                      </span>
-                    )}
-                    {metrics.vUtil !== null && (
-                      <span style={{ fontSize: 11, color: C.muted }}>
-                        Vida útil: {metrics.vUtil} d
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      )}
+function MedicationListItem({ med: m, metrics, onRemove }: {
+  med:      Medication
+  metrics:  ReturnType<typeof productMetrics>
+  onRemove: () => void
+}) {
+  return (
+    <div
+      style={{
+        padding: '10px 12px',
+        background: metrics.isExpired ? C.amberLight : C.bg,
+        borderRadius: 10, border: `1px solid ${metrics.isExpired ? `color-mix(in srgb, ${C.amber} 40%, transparent)` : C.border}`,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <span style={{ fontWeight: 500, fontSize: 13 }}>{m.nmMed || '—'}</span>
+          {m.dci && <span style={{ fontSize: 12, color: C.muted }}> · {m.dci}</span>}
+          {m.concMed != null && m.undConc && (
+            <span style={{ fontSize: 12, color: C.hint }}> · {m.concMed} {m.undConc}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          aria-label={`Eliminar medicamento ${m.nmMed || ''}`}
+          onClick={onRemove}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.red, fontSize: 12, padding: 0, flexShrink: 0 }}
+        >
+          <i className="ti ti-trash" style={{ fontSize: 15 }} aria-hidden />
+        </button>
+      </div>
 
-      {meds.length === 0 && (
-        <p style={{ fontSize: 13, color: C.hint, textAlign: 'center', padding: '12px 0' }}>
-          Sin medicamentos registrados. Puede continuar sin agregar.
-        </p>
-      )}
+      {/* Time metrics preview */}
+      <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
+        {m.fVto && (
+          <span style={{ fontSize: 11, color: metrics.isExpired ? C.amber : C.muted }}>
+            <i className="ti ti-calendar-x" style={{ marginRight: 3, fontSize: 11 }} aria-hidden />
+            Vence: {fmtDate(m.fVto)}
+            {metrics.isExpired && metrics.tVto !== null && (
+              <strong style={{ marginLeft: 4 }}>({metrics.tVto} d vencido)</strong>
+            )}
+          </span>
+        )}
+        {metrics.tDisp !== null && (
+          <span style={{ fontSize: 11, color: C.muted }}>
+            En bodega: {metrics.tDisp} d
+          </span>
+        )}
+        {metrics.vUtil !== null && (
+          <span style={{ fontSize: 11, color: C.muted }}>
+            Vida útil: {metrics.vUtil} d
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function Step5({ draft, onNext, onBack }: StepProps) {
+  const [meds, setMeds]     = useState<Medication[]>(draft.medications ?? [])
+  const [entry, setEntry]   = useState<Medication>({ ...EMPTY_MED })
+  const [addErr, setAddErr] = useState('')
+  // Bumped on add so the CUM panel clears its highlighted selection.
+  const [clearToken, setClearToken] = useState(0)
+
+  function applyResult(r: CUMRecord) {
+    setEntry(e => ({
+      ...e,
+      nmMed:   r.producto ?? '',
+      dci:     r.principioactivo ?? '',
+      concMed: r.concentracion ? parseFloat(r.concentracion) : null,
+      undConc: (r.unidadmedida ?? '') as UnidadConc,
+    }))
+  }
+
+  function addMedication() {
+    if (!entry.nmMed.trim() && !entry.dci.trim()) {
+      setAddErr('Ingrese al menos el nombre comercial o el principio activo.')
+      return
+    }
+    setMeds(prev => [...prev, { ...entry }])
+    setEntry({ ...EMPTY_MED })
+    setAddErr('')
+    setClearToken(t => t + 1)
+  }
+
+  function removeMed(idx: number) {
+    setMeds(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function handleNext(e: React.FormEvent) {
+    e.preventDefault()
+    onNext({ medications: meds })
+  }
+
+  return (
+    <form onSubmit={handleNext} noValidate>
+      <SectionHead icon="ti-pill" label="Medicamentos almacenados" />
+      <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
+        Registre cada producto almacenado sin consumir. Busque en el CUM-INVIMA para evitar errores de tipeo.
+      </p>
+
+      <CumSearchPanel onPick={applyResult} clearSelectionToken={clearToken} />
+
+      <Divider label="Complete / ingrese manualmente y agregue" />
+
+      <MedicationEntryForm entry={entry} setEntry={setEntry} addErr={addErr} onAdd={addMedication} />
+
+      <MedicationList meds={meds} fEta={draft.fEta} fDisp={draft.fDisp} onRemove={removeMed} />
 
       <WizardNavBar onBack={onBack} />
     </form>
