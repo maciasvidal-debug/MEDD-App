@@ -34,5 +34,21 @@ describe('DashboardPage', () => {
     render(<DashboardPage />)
     // The populated header replaces the empty state.
     expect(screen.getAllByText(/Panel analítico|Análisis/i).length).toBeGreaterThan(0)
+    // The exploratory / multiplicity disclaimer is shown alongside the inference.
+    expect(screen.getByText(/análisis exploratorio/i)).toBeInTheDocument()
+  })
+
+  it('renders the per-surveyor QC card (para-data) for an investigador', () => {
+    useStore.setState({
+      userRole: 'investigador',
+      surveys: [
+        // 60s interview → flagged as too fast
+        mkSurvey('a', { nuiEtr: 42, createdAt: '2026-01-01T00:02:00.000Z', startedAt: '2026-01-01T00:01:00.000Z' }),
+        mkSurvey('b', { nuiEtr: 42, createdAt: '2026-01-01T00:12:00.000Z', startedAt: '2026-01-01T00:01:00.000Z' }),
+      ],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Control de calidad por encuestador/i)).toBeInTheDocument()
+    expect(screen.getByText(/#42/)).toBeInTheDocument()
   })
 })

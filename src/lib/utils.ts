@@ -441,6 +441,64 @@ function regLowerGamma(a: number, x: number): number {
   return 1 - q
 }
 
+// ─── Multiple-comparisons control ─────────────────────────────────────────
+
+export interface HolmResult<K = string> {
+  key:    K
+  p:      number
+  pAdj:   number   // Holm-adjusted p-value (monotone, capped at 1)
+  reject: boolean  // reject H0 at the family-wise alpha
+}
+
+/**
+ * Holm–Bonferroni step-down adjustment. Controls the family-wise error rate at
+ * `alpha` across a family of simultaneous tests and is uniformly more powerful
+ * than plain Bonferroni. Sorts by ascending p, scales the k-th smallest by the
+ * number of remaining tests (m−k), enforces monotonicity, and rejects down to
+ * the first non-significant test. Returned in ascending-p order.
+ */
+export function holmAdjust<K = string>(
+  tests: { key: K; p: number }[],
+  alpha = 0.05,
+): HolmResult<K>[] {
+  const m = tests.length
+  if (m === 0) return []
+  const ordered = [...tests].sort((a, b) => a.p - b.p)
+  let running = 0
+  let stillRejecting = true
+  return ordered.map((t, i) => {
+    const pAdj = Math.max(running, Math.min(1, t.p * (m - i)))
+    running = pAdj
+    if (pAdj > alpha) stillRejecting = false
+    return { key: t.key, p: t.p, pAdj, reject: stillRejecting }
+  })
+}
+
+// ─── Data-quality / fraud signals ─────────────────────────────────────────
+
+export interface DigitTest { chi2: number; df: number; p: number; n: number }
+
+/**
+ * Terminal-digit (last-digit) uniformity test: chi-square goodness-of-fit of the
+ * final digit of a set of measured numbers against a uniform 0–9 distribution.
+ * Genuinely measured quantities have ~uniform last digits; fabricated or heavily
+ * rounded data show digit preference (excess 0/5), which this flags (small p).
+ * Returns null with too few values to assess (n < 20).
+ */
+export function terminalDigitTest(values: number[]): DigitTest | null {
+  const digits = values
+    .filter(v => Number.isFinite(v))
+    .map(v => Math.abs(Math.trunc(v)) % 10)
+  const n = digits.length
+  if (n < 20) return null
+  const counts = new Array(10).fill(0)
+  for (const d of digits) counts[d]++
+  const expected = n / 10
+  let chi2 = 0
+  for (const c of counts) chi2 += (c - expected) ** 2 / expected
+  return { chi2, df: 9, p: chiSquareP(chi2, 9), n }
+}
+
 // ─── Frequency table ──────────────────────────────────────────────────────
 
 export function freqTable<T extends string>(
