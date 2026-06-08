@@ -3,7 +3,7 @@
 // `surveys` row shape (snake_case). Kept dependency-free (no Supabase client)
 // so it loads without env vars and can be unit-tested in isolation.
 // =====================================================================
-import type { Survey, Medication } from '../types'
+import type { Survey, Medication, DataEnv } from '../types'
 
 export type SupabaseRow = Record<string, unknown>
 
@@ -57,6 +57,7 @@ export function fromRow(row: SupabaseRow): Survey {
     createdAt:   row.created_at as string,
     updatedAt:   row.updated_at as string,
     startedAt:   (row.started_at as string) ?? undefined,
+    dataEnv:     (row.data_env as DataEnv) ?? undefined,
     fEta:        (row.f_eta as string)  ?? '',
     nuiEtr:      row.nui_etr as number | null,
     nui:         row.nui as number,

@@ -37,6 +37,9 @@ export interface Survey {
   // interview-duration QC (too-fast interviews are a fabrication signal).
   // Optional: surveys captured before this field existed have no value.
   startedAt?: string
+  // Data environment (pilot vs prod) on a single backend. Stamped server-side
+  // from the account on insert; the client only reads it (never sends it).
+  dataEnv?: DataEnv
 
   // Identificación
   fEta:   string        // F_ETA   : Fecha de la entrevista YYYY-MM-DD
@@ -91,8 +94,9 @@ export interface Survey {
 
 export type SyncStatus = 'local' | 'synced' | 'syncing' | 'error'
 export type UserRole   = 'encuestador' | 'investigador'
+export type DataEnv    = 'pilot' | 'prod'
 
-export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus' | 'startedAt'>
+export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus' | 'startedAt' | 'dataEnv'>
 
 // ─── CUM-INVIMA ────────────────────────────────────────────────────────────
 export interface CUMRecord {

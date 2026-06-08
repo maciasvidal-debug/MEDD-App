@@ -74,6 +74,14 @@ describe('sync mapping toRow/fromRow', () => {
     expect(fromRow(toRow(survey, 'u')).startedAt).toBeUndefined()
   })
 
+  it('reads data_env from the row but never sends it (server-authoritative)', () => {
+    // toRow omits data_env so the DB trigger stamps it from the account.
+    expect('data_env' in toRow(survey, 'u')).toBe(false)
+    // fromRow surfaces it for the client (e.g. investigator env filtering).
+    expect(fromRow({ ...toRow(survey, 'u'), data_env: 'prod' }).dataEnv).toBe('prod')
+    expect(fromRow(toRow(survey, 'u')).dataEnv).toBeUndefined()
+  })
+
   it('preserves null numeric fields (not coerced to 0)', () => {
     const row = toRow({ ...survey, estrato: null, cantMed: null, pesoMedNc: null, nuiEtr: null, etrSemestre: null }, 'u')
     expect(row.estrato).toBeNull()
