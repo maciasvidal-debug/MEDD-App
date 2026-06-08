@@ -15,7 +15,18 @@
 -- =====================================================================
 
 -- ─── TIPO ENUM ───────────────────────────────────────────────────────
-create type public.app_role as enum ('encuestador', 'investigador');
+-- Guarded so re-applying the migration on an existing DB is a no-op
+-- (CREATE TYPE has no IF NOT EXISTS).
+do $$
+begin
+  if not exists (
+    select 1 from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'app_role' and n.nspname = 'public'
+  ) then
+    create type public.app_role as enum ('encuestador', 'investigador');
+  end if;
+end $$;
 
 -- ─── TABLA DE ROLES ──────────────────────────────────────────────────
 create table if not exists public.user_roles (
@@ -27,6 +38,7 @@ create table if not exists public.user_roles (
 alter table public.user_roles enable row level security;
 
 -- Cada usuario puede leer su propio rol (necesario para el frontend)
+drop policy if exists "user_reads_own_role" on public.user_roles;
 create policy "user_reads_own_role"
   on public.user_roles for select
   using ((select auth.uid()) = user_id);
@@ -69,6 +81,7 @@ create or replace trigger on_auth_user_created
 drop policy if exists "Usuarios gestionan sus propias encuestas" on public.surveys;
 
 -- SELECT: encuestadores ven solo las suyas; investigadores ven todas
+drop policy if exists "survey_select" on public.surveys;
 create policy "survey_select"
   on public.surveys for select
   using (
@@ -77,17 +90,20 @@ create policy "survey_select"
   );
 
 -- INSERT: cualquier rol inserta solo sus propias encuestas
+drop policy if exists "survey_insert" on public.surveys;
 create policy "survey_insert"
   on public.surveys for insert
   with check ((select auth.uid()) = user_id);
 
 -- UPDATE: cada usuario edita solo las suyas
+drop policy if exists "survey_update" on public.surveys;
 create policy "survey_update"
   on public.surveys for update
   using  ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
 -- DELETE: cada usuario elimina solo las suyas
+drop policy if exists "survey_delete" on public.surveys;
 create policy "survey_delete"
   on public.surveys for delete
   using  ((select auth.uid()) = user_id);

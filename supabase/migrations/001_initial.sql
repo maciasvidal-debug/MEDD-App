@@ -71,6 +71,7 @@ create index if not exists idx_surveys_f_eta   on public.surveys(f_eta);
 -- ─── ROW LEVEL SECURITY ──────────────────────────────────────────────
 alter table public.surveys enable row level security;
 
+drop policy if exists "Usuarios gestionan sus propias encuestas" on public.surveys;
 create policy "Usuarios gestionan sus propias encuestas"
   on public.surveys
   for all
