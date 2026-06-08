@@ -66,6 +66,14 @@ describe('sync mapping toRow/fromRow', () => {
     expect(back.obs).toBe('')
   })
 
+  it('round-trips the started_at para-data (absent → null/undefined)', () => {
+    const withStart = { ...survey, startedAt: '2026-01-01T09:55:00.000Z' }
+    expect(toRow(withStart, 'u').started_at).toBe('2026-01-01T09:55:00.000Z')
+    expect(fromRow(toRow(withStart, 'u')).startedAt).toBe('2026-01-01T09:55:00.000Z')
+    expect(toRow(survey, 'u').started_at).toBeNull()
+    expect(fromRow(toRow(survey, 'u')).startedAt).toBeUndefined()
+  })
+
   it('preserves null numeric fields (not coerced to 0)', () => {
     const row = toRow({ ...survey, estrato: null, cantMed: null, pesoMedNc: null, nuiEtr: null, etrSemestre: null }, 'u')
     expect(row.estrato).toBeNull()

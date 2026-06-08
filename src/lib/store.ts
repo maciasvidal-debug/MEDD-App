@@ -336,6 +336,9 @@ export const useStore = create<AppStore>((set, get) => ({
       id: uuid(),
       createdAt: now,
       updatedAt: now,
+      // Para-data: stamp when this capture session began (set in openWizard) so
+      // interview duration = createdAt − startedAt is available for QC.
+      startedAt: get().wizard?.startedAt,
       syncStatus: 'local',
     }
     await saveSurvey(survey)
@@ -478,7 +481,7 @@ export const useStore = create<AppStore>((set, get) => ({
       etrSemestre:    settings.etrSemestre ? parseInt(settings.etrSemestre, 10) || null : null,
       etrInstitucion: settings.etrInstitucion,
     }
-    const wizard: WizardState = { step: 1, draft }
+    const wizard: WizardState = { step: 1, draft, startedAt: new Date().toISOString() }
     set({ wizard, view: 'wizard', pendingDraft: null })
     saveDraft(wizard)
   },

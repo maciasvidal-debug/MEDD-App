@@ -7,7 +7,7 @@ import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
 import { useShallow } from 'zustand/react/shallow'
-import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, terminalDigitTest, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult, type DigitTest } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
 
@@ -186,6 +186,7 @@ export default function DashboardPage() {
   const assoc = useMemo(() => buildEstratoAssociation(data), [data])
   const retention = useMemo(() => buildRetention(data), [data])
   const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
+  const surveyorQC = useMemo(() => buildSurveyorQC(data), [data])
   const adjusted = useMemo(() => buildEstratoAdjusted(data), [data])
 
   // Family of inferential contrasts shown on this panel, for a family-wise
@@ -320,6 +321,9 @@ export default function DashboardPage() {
 
         {/* Control de calidad: efecto del encuestador */}
         {surveyorEffect && <SurveyorEffectCard s={surveyorEffect} />}
+
+        {/* Control de calidad operativo por encuestador (para-data / antifraude) */}
+        {isInvestigador && surveyorQC && <SurveyorQCCard qc={surveyorQC} />}
 
         {/* Asociación ajustada por confusión (Mantel–Haenszel) */}
         {adjusted && <AdjustedAssociationCard a={adjusted} />}
@@ -910,6 +914,133 @@ function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
             ✓ Sin señal de efecto del encuestador con los datos actuales.
           </div>
         )}
+      </div>
+    </Card>
+  )
+}
+
+// ─── Per-surveyor operational QC (para-data / fraud monitoring) ─────────────
+
+// Always-applicable fields (not behind skip logic) used for a fill-rate proxy.
+const QC_KEY_FIELDS: (keyof Survey)[] = [
+  'fEta', 'fNac', 'ciudad', 'estrato', 'etnia', 'asSalud', 'estLab',
+  'ingreso', 'nvEstu', 'perSalud', 'estSalud', 'medSob',
+]
+const QC_SINO_FIELDS: (keyof Survey)[] = [
+  'estSalud', 'conMed', 'medPrc', 'indMed', 'medSob', 'dispMedVc', 'vtoMedNc',
+]
+const FAST_SECONDS = 120 // a full 6-step interview under 2 min is implausibly fast
+
+const qcFilled = (v: unknown) => v !== '' && v !== null && v !== undefined
+
+// Heuristic straightlining: all answered Sí/No items share the same value.
+function isStraightlined(s: Survey): boolean {
+  const ans = QC_SINO_FIELDS.map(f => s[f]).filter(v => v === 'Sí' || v === 'No') as string[]
+  return ans.length >= 3 && ans.every(v => v === ans[0])
+}
+
+function durationSec(s: Survey): number | null {
+  if (!s.startedAt || !s.createdAt) return null
+  const d = (new Date(s.createdAt).getTime() - new Date(s.startedAt).getTime()) / 1000
+  return Number.isFinite(d) && d > 0 ? d : null
+}
+
+interface SurveyorQCRow {
+  nuiEtr: number; n: number; completeness: number; straightPct: number
+  vencPct: number; medianDurSec: number | null; fastCount: number
+}
+interface SurveyorQC { rows: SurveyorQCRow[]; poolVencPct: number; digit: DigitTest | null }
+
+// Per-surveyor data-quality signals to prioritise back-checks: completeness,
+// straightlining, interview speed and outcome rate vs the pool, plus a pooled
+// terminal-digit test on the measured weight (digit preference → fabrication).
+function buildSurveyorQC(surveys: Survey[]): SurveyorQC | null {
+  const byId = new Map<number, Survey[]>()
+  for (const s of surveys) {
+    if (s.nuiEtr == null) continue
+    const arr = byId.get(s.nuiEtr) ?? []
+    arr.push(s); byId.set(s.nuiEtr, arr)
+  }
+  if (byId.size === 0) return null
+
+  const rows: SurveyorQCRow[] = Array.from(byId.entries()).map(([nuiEtr, list]) => {
+    const n = list.length
+    const completeness = list.reduce((acc, s) =>
+      acc + QC_KEY_FIELDS.filter(f => qcFilled(s[f])).length / QC_KEY_FIELDS.length, 0) / n
+    const straightPct = list.filter(isStraightlined).length / n
+    const vencPct = list.filter(s => s.vtoMedNc === 'Sí').length / n
+    const durs = list.map(durationSec).filter((d): d is number => d != null).sort((a, b) => a - b)
+    const medianDurSec = durs.length ? quantile(durs, 0.5, true) : null
+    const fastCount = durs.filter(d => d < FAST_SECONDS).length
+    return { nuiEtr, n, completeness, straightPct, vencPct, medianDurSec, fastCount }
+  }).sort((a, b) => b.n - a.n)
+
+  const poolVencPct = surveys.length
+    ? surveys.filter(s => s.vtoMedNc === 'Sí').length / surveys.length
+    : 0
+  const digit = terminalDigitTest(
+    surveys.map(s => s.pesoMedNc).filter((v): v is number => v != null),
+  )
+  return { rows, poolVencPct, digit }
+}
+
+function SurveyorQCCard({ qc }: { qc: SurveyorQC }) {
+  const { rows, poolVencPct, digit } = qc
+  const digitFlag = digit !== null && digit.p < 0.05
+  const fmtPctN = (x: number) => `${(x * 100).toFixed(0)}%`
+  const fmtDur = (d: number | null) =>
+    d == null ? '—' : d >= 60 ? `${Math.floor(d / 60)}m ${Math.round(d % 60)}s` : `${Math.round(d)}s`
+  const th: React.CSSProperties = { padding: '4px 6px' }
+  const td: React.CSSProperties = { padding: '5px 6px' }
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Control de calidad por encuestador (para-data / antifraude)</SectionLabel>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Señales operativas por encuestador para priorizar <strong>back-checks</strong>: completitud
+        baja, exceso de respuestas planas (straightlining), entrevistas demasiado rápidas o
+        prevalencias atípicas pueden indicar errores de captura o fabricación.
+      </p>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ color: C.muted, textAlign: 'right' }}>
+              <th style={{ ...th, textAlign: 'left' }}>Encuestador</th>
+              <th style={th}>n</th>
+              <th style={th}>Compl.</th>
+              <th style={th}>Plana</th>
+              <th style={th}>%Venc</th>
+              <th style={th}>Mediana</th>
+              <th style={th}>Rápidas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => {
+              const flag = r.straightPct >= 0.5 || r.fastCount > 0 || r.completeness < 0.7
+              return (
+                <tr key={r.nuiEtr} style={{ textAlign: 'right', color: flag ? C.amber : C.text, borderTop: `0.5px solid ${C.border}` }}>
+                  <td style={{ ...td, textAlign: 'left' }}>#{r.nuiEtr}{flag ? ' ⚠' : ''}</td>
+                  <td style={td} className="tnum">{r.n}</td>
+                  <td style={td} className="tnum">{fmtPctN(r.completeness)}</td>
+                  <td style={td} className="tnum">{fmtPctN(r.straightPct)}</td>
+                  <td style={td} className="tnum">{fmtPctN(r.vencPct)}</td>
+                  <td style={td} className="tnum">{fmtDur(r.medianDurSec)}</td>
+                  <td style={td} className="tnum">{r.fastCount || '·'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
+        Prevalencia de vencidos en el pool: <strong>{fmtPctN(poolVencPct)}</strong> (referencia para «%Venc»).
+        {digit
+          ? <> · Dígito terminal del peso (n = {digit.n}): χ² = {digit.chi2.toFixed(1)} (gl 9), p = {fmtP(digit.p)} — {digitFlag ? '⚠ posible redondeo/fabricación' : 'sin preferencia de dígito'}.</>
+          : <> · Dígito terminal: datos insuficientes (n &lt; 20).</>}
+        <div style={{ marginTop: 4, color: C.hint }}>
+          «Plana» = % de encuestas con todas las respuestas Sí/No idénticas (≥3 ítems).
+          «Rápidas» = entrevistas &lt; {FAST_SECONDS}s (heurístico); la duración solo está disponible
+          desde esta versión. Estas señales orientan auditoría, no son prueba por sí solas.
+        </div>
       </div>
     </Card>
   )

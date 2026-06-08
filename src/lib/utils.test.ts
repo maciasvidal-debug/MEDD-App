@@ -4,7 +4,7 @@ import {
   wilsonCI, quantile, prevalenceRatio, chiSquareTest, cochranArmitage,
   mantelHaenszelRR, iccBinary, breslowDay, toCSV, compareSortable,
   fmtDate, fmtTimestamp, todayISO, dateTag, uuid, freqTable, groupSum, toCodebookCSV,
-  holmAdjust,
+  holmAdjust, terminalDigitTest,
 } from './utils'
 import type { Survey } from '../types'
 
@@ -336,6 +336,28 @@ describe('holmAdjust', () => {
     expect(res[0].pAdj).toBeLessThanOrEqual(res[1].pAdj)
     expect(res[1].pAdj).toBeLessThanOrEqual(res[2].pAdj)
     expect(res.every(r => r.reject === false)).toBe(true)
+  })
+})
+
+describe('terminalDigitTest', () => {
+  it('returns null with fewer than 20 values', () => {
+    expect(terminalDigitTest([1, 2, 3])).toBeNull()
+  })
+
+  it('does not flag uniformly-distributed last digits', () => {
+    // 0..9 repeated → perfectly uniform → chi2 ≈ 0, large p.
+    const vals = Array.from({ length: 100 }, (_, i) => i % 10)
+    const r = terminalDigitTest(vals)!
+    expect(r.n).toBe(100)
+    expect(r.df).toBe(9)
+    expect(r.chi2).toBeCloseTo(0, 6)
+    expect(r.p).toBeGreaterThan(0.99)
+  })
+
+  it('flags strong digit preference (all values end in 0)', () => {
+    const vals = Array.from({ length: 50 }, (_, i) => (i + 1) * 10) // 10,20,…
+    const r = terminalDigitTest(vals)!
+    expect(r.p).toBeLessThan(0.001)
   })
 })
 

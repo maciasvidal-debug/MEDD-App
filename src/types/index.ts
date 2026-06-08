@@ -33,6 +33,10 @@ export interface Survey {
   id:        string
   createdAt: string
   updatedAt: string
+  // Para-data: ISO timestamp when capture began (wizard opened). Enables
+  // interview-duration QC (too-fast interviews are a fabrication signal).
+  // Optional: surveys captured before this field existed have no value.
+  startedAt?: string
 
   // Identificación
   fEta:   string        // F_ETA   : Fecha de la entrevista YYYY-MM-DD
@@ -88,7 +92,7 @@ export interface Survey {
 export type SyncStatus = 'local' | 'synced' | 'syncing' | 'error'
 export type UserRole   = 'encuestador' | 'investigador'
 
-export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>
+export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus' | 'startedAt'>
 
 // ─── CUM-INVIMA ────────────────────────────────────────────────────────────
 export interface CUMRecord {
@@ -110,6 +114,7 @@ export interface WizardState {
   step: number
   draft: SurveyDraft
   editingId?: string
+  startedAt?: string  // para-data: when this capture session began
 }
 
 export interface Settings {
