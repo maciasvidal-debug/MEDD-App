@@ -231,6 +231,19 @@ describe('toCSV', () => {
     expect(dataRow).toContain('"dijo ""hola"""')
   })
 
+  it('exports the para-data columns and derives interview duration (s)', () => {
+    const surveys = [
+      { id: 'a', nui: 1, medications: [],
+        startedAt: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:03:00.000Z', dataEnv: 'pilot' },
+      { id: 'b', nui: 2, medications: [] }, // no para-data → empty duration
+    ] as unknown as Survey[]
+    const [header, r1, r2] = toCSV(surveys).trim().split('\n')
+    expect(header).toContain('startedAt,dataEnv,duracion_s')
+    const di = header.split(',').indexOf('duracion_s')
+    expect(r1.split(',')[di]).toBe('180') // 3 min = 180 s
+    expect(r2.split(',')[di]).toBe('')    // no para-data → blank duration
+  })
+
   it('serialises multiple medications with ; field and | record separators', () => {
     const surveys = [
       { id: 'a', nui: 1, medications: [

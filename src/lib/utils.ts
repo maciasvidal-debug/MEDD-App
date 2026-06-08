@@ -540,7 +540,7 @@ const CSV_COLUMNS: (keyof Survey)[] = [
   'fPrc', 'fDisp', 'indMed',
   'medSob', 'dispMedVc', 'ctoDispVc', 'vtoMedNc',
   'cantMed', 'cantMedVto', 'pesoMedNc',
-  'obs', 'createdAt', 'updatedAt',
+  'obs', 'createdAt', 'updatedAt', 'startedAt', 'dataEnv',
 ]
 
 function escapeCSV(value: unknown): string {
@@ -551,16 +551,22 @@ function escapeCSV(value: unknown): string {
 }
 
 export function toCSV(surveys: Survey[]): string {
+  // duracion_s: para-data interview duration in seconds (createdAt − startedAt),
+  // a derived QC field for detecting implausibly fast (fabricated) interviews.
   const medHeader = 'nmMed,dci,concMed,undConc,fVto'
-  const header = [...CSV_COLUMNS, medHeader].join(',')
+  const header = [...CSV_COLUMNS, 'duracion_s', medHeader].join(',')
   const rows = surveys.map(s => {
     const base = CSV_COLUMNS.map(col => escapeCSV(s[col])).join(',')
+    const durSec = s.startedAt && s.createdAt
+      ? Math.round((new Date(s.createdAt).getTime() - new Date(s.startedAt).getTime()) / 1000)
+      : null
+    const dur = durSec != null && durSec >= 0 ? String(durSec) : ''
     const meds = s.medications?.length
       ? s.medications.map(m =>
           [m.nmMed, m.dci, m.concMed, m.undConc, m.fVto].map(escapeCSV).join(';'),
         ).join('|')
       : ''
-    return `${base},${escapeCSV(meds)}`
+    return `${base},${dur},${escapeCSV(meds)}`
   })
   return '﻿' + [header, ...rows].join('\n')
 }
