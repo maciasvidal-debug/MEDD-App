@@ -23,14 +23,17 @@ alter table public.user_profiles enable row level security;
 
 -- Cada usuario sólo puede leer y escribir su propio perfil. Sin política para
 -- otros roles: un investigador no necesita (ni debe) ver perfiles ajenos aquí.
+drop policy if exists "profile_select_own" on public.user_profiles;
 create policy "profile_select_own"
   on public.user_profiles for select
   using ((select auth.uid()) = user_id);
 
+drop policy if exists "profile_insert_own" on public.user_profiles;
 create policy "profile_insert_own"
   on public.user_profiles for insert
   with check ((select auth.uid()) = user_id);
 
+drop policy if exists "profile_update_own" on public.user_profiles;
 create policy "profile_update_own"
   on public.user_profiles for update
   using  ((select auth.uid()) = user_id)
