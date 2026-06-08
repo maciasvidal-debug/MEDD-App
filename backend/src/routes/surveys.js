@@ -45,9 +45,14 @@ router.get('/', asyncHandler(async (req, res) => {
     const where = all ? '' : 'WHERE s.user_id = $1';
     const params = all ? [] : [req.user.id];
     const result = await pool.query(
-        `SELECT s.*,
-                (SELECT COUNT(*) FROM medications m WHERE m.nui = s.nui) AS med_count
-         FROM surveys s ${where} ORDER BY s.nui DESC`,
+        `SELECT s.*, COALESCE(mc.med_count, 0) AS med_count
+         FROM surveys s
+         LEFT JOIN (
+             SELECT nui, COUNT(*) AS med_count
+             FROM medications
+             GROUP BY nui
+         ) mc ON mc.nui = s.nui
+         ${where} ORDER BY s.nui DESC`,
         params
     );
     res.json(result.rows);
@@ -59,19 +64,21 @@ router.get('/', asyncHandler(async (req, res) => {
 // the existence of other users' records.
 router.get('/:id', asyncHandler(async (req, res) => {
     const all = req.user.role === 'investigador';
-    const surveyResult = await pool.query(
-        all
-            ? 'SELECT * FROM surveys WHERE nui = $1'
-            : 'SELECT * FROM surveys WHERE nui = $1 AND user_id = $2',
-        all ? [req.params.id] : [req.params.id, req.user.id]
-    );
+    const [surveyResult, medsResult] = await Promise.all([
+        pool.query(
+            all
+                ? 'SELECT * FROM surveys WHERE nui = $1'
+                : 'SELECT * FROM surveys WHERE nui = $1 AND user_id = $2',
+            all ? [req.params.id] : [req.params.id, req.user.id]
+        ),
+        pool.query(
+            'SELECT * FROM medications WHERE nui = $1 ORDER BY id', [req.params.id]
+        ),
+    ]);
     if (surveyResult.rows.length === 0) {
         return res.status(404).json({ error: 'Survey not found' });
     }
     const survey = surveyResult.rows[0];
-    const medsResult = await pool.query(
-        'SELECT * FROM medications WHERE nui = $1 ORDER BY id', [req.params.id]
-    );
     survey.medications = medsResult.rows.map((m) => ({
         ...m,
         metrics: productMetrics(toIso(survey), toIsoMed(m)),

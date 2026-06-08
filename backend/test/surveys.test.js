@@ -32,7 +32,7 @@ describe('surveys ownership (list)', () => {
         await request(app).get('/api/surveys').set('Authorization', `Bearer ${token}`);
 
         const [sql, params] = pool.query.mock.calls[0];
-        // No owner filter is applied (the only WHERE is the med_count subquery).
+        // No owner filter is applied for investigador — no WHERE clause on user_id.
         expect(sql).not.toMatch(/WHERE s\.user_id/);
         expect(params).toEqual([]);
     });
