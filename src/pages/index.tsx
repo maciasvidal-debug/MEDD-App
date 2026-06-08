@@ -2,18 +2,22 @@ import React, { useState, useMemo } from 'react'
 import { TopBar, StepBar } from '../components/layout'
 import {
   Card, Button, Badge, EmptyState, Divider,
-  Field, SectionHead, Dialog, ConfirmDialog, ChipGroup, IconChip, IconButton, C,
+  Dialog, IconChip, IconButton, C,
 } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
+import {
+  ProjectConfigSection, SurveyorProfileSection, AppearanceSection,
+  AccountSection, AppInfoSection,
+} from '../components/settings'
 import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
 import {
   calcEdad, fmtDate, compareSortable,
   toCSV, toCodebookCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
-import { TOTAL_STEPS, OPT, FIELD_GUIDE } from '../lib/constants'
+import { TOTAL_STEPS, FIELD_GUIDE } from '../lib/constants'
 import { isProfileComplete, surveyMissingProfile } from '../lib/validators'
-import type { SurveyDraft, Survey } from '../types'
+import type { SurveyDraft, Survey, Settings } from '../types'
 
 // DashboardPage lives in its own lazily-loaded chunk (pages/Dashboard.tsx) to
 // keep Recharts out of the initial bundle; App.tsx imports it via React.lazy.
@@ -687,8 +691,7 @@ export function ExportarPage() {
 export function AjustesPage() {
   const { settings, persistSettings, surveys, user, userRole, signOut, syncing, triggerSync, backfillProfile, openWelcome, theme, toggleTheme, density, setDensity } = useStore()
   const [form, setForm] = useState(settings)
-  const [confirmSignOut, setConfirmSignOut] = useState(false)
-  const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof Settings) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const isInvestigador = userRole === 'investigador'
   const pendingCount   = surveys.filter(s => s.syncStatus !== 'synced').length
@@ -702,236 +705,38 @@ export function AjustesPage() {
     <div>
       <TopBar title="Ajustes" subtitle="Proyecto y perfil" icon="ti-settings" accent={C.gray} />
       <div className="page-content narrow">
-        <SectionHead icon="ti-settings" label="Configuración del proyecto" />
+        <ProjectConfigSection form={form} set={set} />
 
-        <Field label="Nombre del proyecto">
-          <input
-            value={form.nombreProyecto}
-            onChange={e => set('nombreProyecto')(e.target.value)}
-            placeholder="MEDD – Medicamentos No Utilizados"
-          />
-        </Field>
-
-        <Field label="ID del encuestador" hint="Se prellena en cada nueva encuesta">
-          <input
-            type="number" min={1}
-            value={form.nuiEncuestador}
-            onChange={e => set('nuiEncuestador')(e.target.value)}
-            placeholder="Ej: 1012345678"
-          />
-        </Field>
-
-        <SectionHead icon="ti-user-shield" label="Perfil del encuestador" />
-        <p style={{ fontSize: 12, color: C.hint, margin: '-8px 0 16px', lineHeight: 1.5 }}>
-          Se registra una sola vez y se adjunta a cada encuesta que captures.
-          Permite analizar los datos por perfil del encuestador (control de
-          calidad y sesgo entre observadores).
-        </p>
-
-        <Field label="Programa académico">
-          <select value={form.etrPrograma} onChange={e => set('etrPrograma')(e.target.value)}>
-            <option value="">— Selecciona —</option>
-            {OPT.etrPrograma.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </Field>
-
-        <Field label="Tipo de institución">
-          <ChipGroup options={OPT.etrTipoInst} value={form.etrTipoInst} onChange={set('etrTipoInst')} />
-        </Field>
-
-        <Field label="Semestre" hint="1 a 12">
-          <input
-            type="number" min={1} max={12}
-            value={form.etrSemestre}
-            onChange={e => set('etrSemestre')(e.target.value)}
-            placeholder="Ej: 8"
-          />
-        </Field>
-
-        <Field label="Institución educativa">
-          <input
-            value={form.etrInstitucion}
-            onChange={e => set('etrInstitucion')(e.target.value)}
-            placeholder="Ej: Universidad Nacional de Colombia"
-          />
-        </Field>
-
-        <Button fullWidth onClick={() => persistSettings(form)} icon="ti-device-floppy">
-          Guardar ajustes
-        </Button>
-
-        {/* Retroactively stamp the completed profile onto older surveys that were
-            captured before it was filled in (fills only blank fields). */}
-        {backfillCount > 0 && (
-          <Card style={{ marginTop: 10, background: C.tealLight, border: `0.5px solid ${C.teal}40` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <i className="ti ti-history-toggle" style={{ fontSize: 18, color: C.teal, flexShrink: 0 }} aria-hidden />
-              <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>
-                Tienes <strong>{backfillCount}</strong> encuesta(s) anteriores sin el perfil del
-                encuestador. Puedes completarlas con tu perfil actual.
-              </div>
-            </div>
-            <Button
-              fullWidth size="sm" variant="secondary" icon="ti-wand"
-              style={{ marginTop: 10 }}
-              onClick={() => backfillProfile()}
-            >
-              Completar {backfillCount} encuesta(s) anterior(es)
-            </Button>
-          </Card>
-        )}
+        <SurveyorProfileSection
+          form={form}
+          set={set}
+          onSave={() => persistSettings(form)}
+          backfillCount={backfillCount}
+          onBackfill={() => backfillProfile()}
+        />
 
         <Divider label="apariencia" />
-
-        <Card style={{ background: C.surface }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <IconChip icon={theme === 'dark' ? 'ti-moon' : 'ti-sun'} accent={C.teal} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Tema {theme === 'dark' ? 'oscuro' : 'claro'}</div>
-              <div style={{ fontSize: 12, color: C.muted }}>Ajusta la app a tu entorno de trabajo.</div>
-            </div>
-            <button
-              role="switch"
-              aria-checked={theme === 'dark'}
-              aria-label="Alternar tema oscuro"
-              onClick={toggleTheme}
-              style={{
-                width: 52, height: 30, borderRadius: 999, border: 'none', cursor: 'pointer',
-                background: theme === 'dark' ? C.primary : C.border, flexShrink: 0,
-                position: 'relative', transition: 'background 0.18s',
-              }}
-            >
-              <span style={{
-                position: 'absolute', top: 3, left: theme === 'dark' ? 25 : 3,
-                width: 24, height: 24, borderRadius: '50%', background: '#fff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left 0.18s',
-              }} />
-            </button>
-          </div>
-        </Card>
-
-        <Card style={{ background: C.surface, marginTop: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <IconChip icon="ti-layout-distribute-vertical" accent={C.teal} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Densidad</div>
-              <div style={{ fontSize: 12, color: C.muted }}>Espaciado de tarjetas y listas.</div>
-            </div>
-          </div>
-          <div role="radiogroup" aria-label="Densidad de la interfaz" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {([
-              { id: 'comfortable', label: 'Cómoda', icon: 'ti-baseline-density-medium' },
-              { id: 'compact',     label: 'Compacta', icon: 'ti-baseline-density-small' },
-            ] as const).map(o => {
-              const active = density === o.id
-              return (
-                <button
-                  key={o.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => setDensity(o.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    padding: '11px 0', borderRadius: 8, cursor: 'pointer',
-                    border: active ? `1.5px solid ${C.teal}` : `1px solid ${C.border}`,
-                    background: active ? C.tealLight : C.surface,
-                    color: active ? C.teal : C.text,
-                    fontSize: 14, fontWeight: active ? 600 : 400,
-                  }}
-                >
-                  <i className={`ti ${o.icon}`} style={{ fontSize: 18 }} aria-hidden />
-                  {o.label}
-                </button>
-              )
-            })}
-          </div>
-        </Card>
-
-        <Button
-          fullWidth variant="ghost" icon="ti-help-circle"
-          style={{ marginTop: 10 }}
-          onClick={() => openWelcome()}
-        >
-          Ver introducción de nuevo
-        </Button>
+        <AppearanceSection
+          theme={theme}
+          toggleTheme={toggleTheme}
+          density={density}
+          setDensity={setDensity}
+          onShowWelcome={() => openWelcome()}
+        />
 
         <Divider label="cuenta" />
-
-        <Card style={{ background: C.bg }}>
-          <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
-            <InfoRow label="Sesión activa" value={user?.email ?? '—'} />
-            <InfoRow
-              label="Rol"
-              value={
-                <span style={{
-                  background: isInvestigador ? '#EFF6FF' : '#F0FDF9',
-                  color:      isInvestigador ? '#1D4ED8' : '#0F766E',
-                  border:     `0.5px solid ${isInvestigador ? '#BFDBFE' : '#99F6E4'}`,
-                  borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600,
-                }}>
-                  {isInvestigador ? 'Investigador' : 'Encuestador'}
-                </span>
-              }
-            />
-            <InfoRow
-              label="Encuestas pendientes de sync"
-              value={pendingCount > 0 ? `${pendingCount} local(es)` : 'Al día'}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <Button
-              onClick={() => triggerSync()}
-              icon={syncing ? 'ti-loader-2' : 'ti-cloud-upload'}
-              style={{ flex: 1 }}
-            >
-              {syncing ? 'Sincronizando…' : 'Sincronizar ahora'}
-            </Button>
-            <Button
-              onClick={() => setConfirmSignOut(true)}
-              icon="ti-logout"
-              style={{ flex: 1, background: C.redLight, color: C.red }}
-            >
-              Cerrar sesión
-            </Button>
-          </div>
-        </Card>
-
-        {confirmSignOut && (
-          <ConfirmDialog
-            title="Cerrar sesión"
-            icon="ti-logout"
-            danger
-            confirmLabel="Cerrar sesión"
-            message={
-              pendingCount > 0
-                ? `Tienes ${pendingCount} encuesta(s) sin sincronizar. Si cierras sesión podrías perder esos datos locales. ¿Quieres cerrar sesión de todas formas?`
-                : '¿Seguro que quieres cerrar sesión?'
-            }
-            onConfirm={() => signOut()}
-            onClose={() => setConfirmSignOut(false)}
-          />
-        )}
+        <AccountSection
+          userEmail={user?.email ?? '—'}
+          isInvestigador={isInvestigador}
+          pendingCount={pendingCount}
+          syncing={syncing}
+          onSync={() => triggerSync()}
+          onSignOut={() => signOut()}
+        />
 
         <Divider label="información" />
-
-        <Card style={{ background: C.bg }}>
-          <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
-            <InfoRow label="Encuestas almacenadas" value={surveys.length} />
-            <InfoRow label="Almacenamiento" value="IndexedDB + Supabase" />
-            <InfoRow label="Versión esquema" value="2.0 (codebook-aligned)" />
-          </div>
-        </Card>
+        <AppInfoSection surveyCount={surveys.length} />
       </div>
-    </div>
-  )
-}
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-      <span style={{ color: C.muted }}>{label}</span>
-      <strong>{value}</strong>
     </div>
   )
 }
