@@ -18,7 +18,7 @@ export default defineConfig({
       reporter: ['text-summary'],
       // Ratchet floor: set just below current measured coverage so a drop fails
       // CI, without forcing new tests today. Raise these as coverage grows.
-      thresholds: { lines: 67, statements: 66, branches: 67, functions: 64 },
+      thresholds: { lines: 83, statements: 81, branches: 77, functions: 85 },
     },
   },
 })
