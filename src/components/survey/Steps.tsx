@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
   useForm, Controller,
-  type Control, type FieldValues, type Path, type FieldErrors,
+  type Control, type FieldErrors,
   type UseFormSetValue, type UseFormRegisterReturn,
 } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
-  Field, YesNo, ChipGroup, SectionHead, Divider,
+  Field, ChipGroup, SectionHead, Divider,
   Card, Button, Spinner, C, Badge,
 } from '../ui'
+import { ChipField, YesNoField } from '../form'
 import { useCUM } from '../../hooks/useCUM'
 import { useMunicipios } from '../../hooks/useMunicipios'
 import { OPT, FIELD_HELP } from '../../lib/constants'
@@ -220,60 +221,6 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
 
       <WizardNavBar onBack={onBack} showBack={!isFirst} />
     </form>
-  )
-}
-
-// ─── Reusable RHF field wrappers ──────────────────────────────────────────
-// The survey steps repeat the same Field + Controller + control pattern dozens
-// of times, differing only by label/options. These generic wrappers collapse
-// each occurrence to a single line while keeping all form state in the step.
-
-// Single-select chip question. `onAfterChange` runs after the field updates, for
-// dependent fields (e.g. clearing a sub-level when its parent changes).
-function ChipField<T extends FieldValues>({
-  control, name, label, options, required, help, error, onAfterChange,
-}: {
-  control:        Control<T>
-  name:           Path<T>
-  label:          string
-  options:        readonly string[]
-  required?:      boolean
-  help?:          string
-  error?:         string
-  onAfterChange?: (val: string) => void
-}) {
-  return (
-    <Field label={label} required={required} help={help} error={error}>
-      <Controller name={name} control={control}
-        render={({ field }) => (
-          <ChipGroup
-            options={options}
-            value={(field.value as string) ?? ''}
-            onChange={val => { field.onChange(val); onAfterChange?.(val) }}
-          />
-        )} />
-    </Field>
-  )
-}
-
-// Yes/No question (steps 3 and 4).
-function YesNoField<T extends FieldValues>({
-  control, name, label, required, help, error,
-}: {
-  control:   Control<T>
-  name:      Path<T>
-  label:     string
-  required?: boolean
-  help?:     string
-  error?:    string
-}) {
-  return (
-    <Field label={label} required={required} help={help} error={error}>
-      <Controller name={name} control={control}
-        render={({ field }) => (
-          <YesNo value={(field.value as string) ?? ''} onChange={field.onChange} />
-        )} />
-    </Field>
   )
 }
 
@@ -931,6 +878,131 @@ function Row({ label, value }: { label: string; value?: string | number | null }
   )
 }
 
+// Read-only summary cards for the Confirmar step. Each renders one section of the
+// draft; split out so the Step6 body reads as a list of sections instead of one
+// long block. They depend only on `draft`, so they're trivially reusable.
+function IdentificacionCard({ draft }: { draft: SurveyDraft }) {
+  return (
+    <Card style={{ marginBottom: 10 }}>
+      <GroupLabel>Identificación</GroupLabel>
+      <Row label="Fecha de la entrevista"   value={fmtDate(draft.fEta)} />
+      <Row label="N° de encuesta"           value={draft.nui} />
+      <Row label="ID del encuestador"       value={draft.nuiEtr} />
+    </Card>
+  )
+}
+
+function DemografiaCard({ draft, edad }: { draft: SurveyDraft; edad: number | null }) {
+  return (
+    <Card style={{ marginBottom: 10 }}>
+      <GroupLabel>Demografía</GroupLabel>
+      <Row label="Fecha de nacimiento"      value={fmtDate(draft.fNac)} />
+      {edad !== null && <Row label="Edad"   value={`${edad} años`} />}
+      <Row label="Ciudad"                   value={draft.ciudad} />
+      {draft.dir && <Row label="Dirección"  value={draft.dir} />}
+      {draft.estrato && <Row label="Estrato" value={draft.estrato} />}
+      <Row label="Pertenencia étnica"       value={draft.etnia} />
+      <Row label="Régimen de salud"         value={draft.asSalud} />
+      <Row label="Ocupación"                value={draft.estLab} />
+      <Row label="Ingresos mensuales"       value={draft.ingreso} />
+      <Row label="Nivel educativo"          value={draft.nvEstu} />
+      {draft.nvPosg && <Row label="Nivel de posgrado" value={draft.nvPosg} />}
+    </Card>
+  )
+}
+
+function SaludCard({ draft }: { draft: SurveyDraft }) {
+  return (
+    <Card style={{ marginBottom: 10 }}>
+      <GroupLabel>Salud</GroupLabel>
+      <Row label="Percepción de salud"      value={draft.perSalud} />
+      <Row label="Enfermedad reciente"      value={draft.estSalud} />
+      {draft.estSalud === 'Sí' && <>
+        {draft.prbSalud && <Row label="Problema de salud"  value={draft.prbSalud} />}
+        <Row label="Consume medicamentos"   value={draft.conMed} />
+        {draft.conMed === 'Sí' && <>
+          <Row label="Con prescripción"     value={draft.medPrc} />
+          {draft.medPrc === 'Sí' && <>
+            {draft.fPrc  && <Row label="Fecha de prescripción"  value={fmtDate(draft.fPrc)} />}
+            {draft.fDisp && <Row label="Fecha de dispensación"  value={fmtDate(draft.fDisp)} />}
+            <Row label="Sigue indicaciones" value={draft.indMed} />
+          </>}
+        </>}
+      </>}
+    </Card>
+  )
+}
+
+function AlmacenamientoCard({ draft }: { draft: SurveyDraft }) {
+  return (
+    <Card style={{ marginBottom: 10 }}>
+      <GroupLabel>Almacenamiento y disposición</GroupLabel>
+      <Row label="Med. sin consumir"        value={draft.medSob} />
+      {draft.medSob === 'Sí' && <>
+        <Row label="Sabe qué hacer con vencidos"  value={draft.dispMedVc} />
+        {draft.dispMedVc === 'Sí' && draft.ctoDispVc &&
+          <Row label="Práctica de disposición"    value={draft.ctoDispVc} />
+        }
+        <Row label="Vencidos observados"    value={draft.vtoMedNc} />
+        <Row label="Cantidad sin consumir"  value={draft.cantMed} />
+        <Row label="Cantidad vencidos"      value={draft.cantMedVto} />
+        {draft.pesoMedNc != null && <Row label="Peso (g)" value={draft.pesoMedNc} />}
+      </>}
+    </Card>
+  )
+}
+
+function MedicacionesCard({ draft }: { draft: SurveyDraft }) {
+  return (
+    <Card style={{ marginBottom: 10 }}>
+      <GroupLabel>Medicamentos almacenados — {draft.medications.length} producto(s)</GroupLabel>
+      {draft.medications.map((m, i) => (
+        <MedSummaryItem key={i} med={m} metrics={productMetrics(draft.fEta, draft.fDisp, m)} />
+      ))}
+    </Card>
+  )
+}
+
+function MedSummaryItem({ med: m, metrics: mx }: {
+  med:     Medication
+  metrics: ReturnType<typeof productMetrics>
+}) {
+  return (
+    <div style={{ padding: '8px 0', borderBottom: `0.5px solid ${C.border}` }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ fontWeight: 500, fontSize: 13 }}>{m.nmMed || '—'}</span>
+        {m.dci && <span style={{ fontSize: 12, color: C.muted }}>{m.dci}</span>}
+        {m.concMed != null && m.undConc && (
+          <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
+        )}
+        {m.fVto && (
+          <Badge
+            label={`Vence: ${fmtDate(m.fVto)}`}
+            variant={mx.isExpired ? 'amber' : 'teal'}
+          />
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {mx.tVto !== null && (
+          <span style={{ fontSize: 11, color: mx.isExpired ? C.amber : C.muted }}>
+            Días vencido: <strong>{mx.tVto} d</strong>
+          </span>
+        )}
+        {mx.tDisp !== null && (
+          <span style={{ fontSize: 11, color: C.muted }}>
+            En bodega: <strong>{mx.tDisp} d</strong>
+          </span>
+        )}
+        {mx.vUtil !== null && (
+          <span style={{ fontSize: 11, color: C.muted }}>
+            Vida útil: <strong>{mx.vUtil} d</strong>
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function Step6({ draft, onNext, onBack }: StepProps) {
   const { control, handleSubmit } = useForm({ defaultValues: { obs: draft.obs } })
   const { surveys, wizard, pushToast } = useStore()
@@ -955,110 +1027,11 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
 
       <QualityCard report={report} />
 
-      {/* Identificación */}
-      <Card style={{ marginBottom: 10 }}>
-        <GroupLabel>Identificación</GroupLabel>
-        <Row label="Fecha de la entrevista"   value={fmtDate(draft.fEta)} />
-        <Row label="N° de encuesta"           value={draft.nui} />
-        <Row label="ID del encuestador"       value={draft.nuiEtr} />
-      </Card>
-
-      {/* Demografía */}
-      <Card style={{ marginBottom: 10 }}>
-        <GroupLabel>Demografía</GroupLabel>
-        <Row label="Fecha de nacimiento"      value={fmtDate(draft.fNac)} />
-        {edad !== null && <Row label="Edad"   value={`${edad} años`} />}
-        <Row label="Ciudad"                   value={draft.ciudad} />
-        {draft.dir && <Row label="Dirección"  value={draft.dir} />}
-        {draft.estrato && <Row label="Estrato" value={draft.estrato} />}
-        <Row label="Pertenencia étnica"       value={draft.etnia} />
-        <Row label="Régimen de salud"         value={draft.asSalud} />
-        <Row label="Ocupación"                value={draft.estLab} />
-        <Row label="Ingresos mensuales"       value={draft.ingreso} />
-        <Row label="Nivel educativo"          value={draft.nvEstu} />
-        {draft.nvPosg && <Row label="Nivel de posgrado" value={draft.nvPosg} />}
-      </Card>
-
-      {/* Salud */}
-      <Card style={{ marginBottom: 10 }}>
-        <GroupLabel>Salud</GroupLabel>
-        <Row label="Percepción de salud"      value={draft.perSalud} />
-        <Row label="Enfermedad reciente"      value={draft.estSalud} />
-        {draft.estSalud === 'Sí' && <>
-          {draft.prbSalud && <Row label="Problema de salud"  value={draft.prbSalud} />}
-          <Row label="Consume medicamentos"   value={draft.conMed} />
-          {draft.conMed === 'Sí' && <>
-            <Row label="Con prescripción"     value={draft.medPrc} />
-            {draft.medPrc === 'Sí' && <>
-              {draft.fPrc  && <Row label="Fecha de prescripción"  value={fmtDate(draft.fPrc)} />}
-              {draft.fDisp && <Row label="Fecha de dispensación"  value={fmtDate(draft.fDisp)} />}
-              <Row label="Sigue indicaciones" value={draft.indMed} />
-            </>}
-          </>}
-        </>}
-      </Card>
-
-      {/* Almacenamiento */}
-      <Card style={{ marginBottom: 10 }}>
-        <GroupLabel>Almacenamiento y disposición</GroupLabel>
-        <Row label="Med. sin consumir"        value={draft.medSob} />
-        {draft.medSob === 'Sí' && <>
-          <Row label="Sabe qué hacer con vencidos"  value={draft.dispMedVc} />
-          {draft.dispMedVc === 'Sí' && draft.ctoDispVc &&
-            <Row label="Práctica de disposición"    value={draft.ctoDispVc} />
-          }
-          <Row label="Vencidos observados"    value={draft.vtoMedNc} />
-          <Row label="Cantidad sin consumir"  value={draft.cantMed} />
-          <Row label="Cantidad vencidos"      value={draft.cantMedVto} />
-          {draft.pesoMedNc != null && <Row label="Peso (g)" value={draft.pesoMedNc} />}
-        </>}
-      </Card>
-
-      {/* Medicamentos 1:N con métricas */}
-      {draft.medications.length > 0 && (
-        <Card style={{ marginBottom: 10 }}>
-          <GroupLabel>Medicamentos almacenados — {draft.medications.length} producto(s)</GroupLabel>
-          {draft.medications.map((m, i) => {
-            const mx = productMetrics(draft.fEta, draft.fDisp, m)
-            return (
-              <div key={i} style={{
-                padding: '8px 0', borderBottom: `0.5px solid ${C.border}`,
-              }}>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ fontWeight: 500, fontSize: 13 }}>{m.nmMed || '—'}</span>
-                  {m.dci && <span style={{ fontSize: 12, color: C.muted }}>{m.dci}</span>}
-                  {m.concMed != null && m.undConc && (
-                    <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
-                  )}
-                  {m.fVto && (
-                    <Badge
-                      label={`Vence: ${fmtDate(m.fVto)}`}
-                      variant={mx.isExpired ? 'amber' : 'teal'}
-                    />
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {mx.tVto !== null && (
-                    <span style={{ fontSize: 11, color: mx.isExpired ? C.amber : C.muted }}>
-                      Días vencido: <strong>{mx.tVto} d</strong>
-                    </span>
-                  )}
-                  {mx.tDisp !== null && (
-                    <span style={{ fontSize: 11, color: C.muted }}>
-                      En bodega: <strong>{mx.tDisp} d</strong>
-                    </span>
-                  )}
-                  {mx.vUtil !== null && (
-                    <span style={{ fontSize: 11, color: C.muted }}>
-                      Vida útil: <strong>{mx.vUtil} d</strong>
-                    </span>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </Card>
-      )}
+      <IdentificacionCard draft={draft} />
+      <DemografiaCard draft={draft} edad={edad} />
+      <SaludCard draft={draft} />
+      <AlmacenamientoCard draft={draft} />
+      {draft.medications.length > 0 && <MedicacionesCard draft={draft} />}
 
       {/* OBS */}
       <Field label="Observaciones — opcional">
