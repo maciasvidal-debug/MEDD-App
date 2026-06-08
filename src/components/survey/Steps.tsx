@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import {
+  useForm, Controller,
+  type Control, type FieldValues, type Path, type FieldErrors,
+  type UseFormSetValue, type UseFormRegisterReturn,
+} from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Field, YesNo, ChipGroup, SectionHead, Divider,
@@ -221,6 +225,115 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
 
 // ─── Step 2 — Demografía ─────────────────────────────────────────────────
 
+// Generic Field + Controller + ChipGroup wrapper. Step 2 has many single-select
+// chip questions that only differ by label/options; this collapses each into a
+// one-liner. `onAfterChange` runs after the field updates, for dependent fields
+// (e.g. clearing a sub-level when its parent changes).
+function ChipField<T extends FieldValues>({
+  control, name, label, options, required, help, error, onAfterChange,
+}: {
+  control:        Control<T>
+  name:           Path<T>
+  label:          string
+  options:        readonly string[]
+  required?:      boolean
+  help?:          string
+  error?:         string
+  onAfterChange?: (val: string) => void
+}) {
+  return (
+    <Field label={label} required={required} help={help} error={error}>
+      <Controller name={name} control={control}
+        render={({ field }) => (
+          <ChipGroup
+            options={options}
+            value={(field.value as string) ?? ''}
+            onChange={val => { field.onChange(val); onAfterChange?.(val) }}
+          />
+        )} />
+    </Field>
+  )
+}
+
+// Date of birth + live age readout derived from the interview date.
+function BirthDateField({ register, max, edad, error }: {
+  register: UseFormRegisterReturn
+  max?:     string
+  edad:     number | null
+  error?:   string
+}) {
+  return (
+    <Field label="Fecha de nacimiento" required error={error}>
+      <input type="date" max={max} {...register} />
+      {edad !== null && (
+        <div style={{
+          marginTop: 6, padding: '6px 10px',
+          background: C.tealLight, borderRadius: 6,
+          fontSize: 13, color: C.teal, fontWeight: 500,
+        }}>
+          <i className="ti ti-calendar-check" style={{ marginRight: 6, fontSize: 13 }} aria-hidden />
+          Edad calculada: {edad} años
+        </div>
+      )}
+    </Field>
+  )
+}
+
+// Socioeconomic stratum: single-select 1–6 with toggle-off, rendered as a
+// compact square radio group rather than chips.
+function EstratoField({ control, error }: { control: Control<Step2Data>; error?: string }) {
+  return (
+    <Field label="Estrato socioeconómico" help={FIELD_HELP.estrato} error={error}>
+      <Controller name="estrato" control={control}
+        render={({ field }) => (
+          <div role="radiogroup" style={{ display: 'flex', gap: 6 }}>
+            {OPT.estrato.map(n => (
+              <button
+                key={n} type="button" role="radio"
+                aria-checked={field.value === n}
+                onClick={() => field.onChange(field.value === n ? null : n)}
+                style={{
+                  width: 42, height: 38, borderRadius: 8, fontWeight: 500, fontSize: 14,
+                  border: field.value === n ? `1.5px solid ${C.teal}` : `0.5px solid ${C.border}`,
+                  background: field.value === n ? C.tealLight : C.surface,
+                  color: field.value === n ? C.teal : C.text,
+                  cursor: 'pointer', transition: 'all 0.12s',
+                }}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        )} />
+    </Field>
+  )
+}
+
+// Education level + its postgrad sub-level. The sub-level only appears for
+// "Posgrado" and is cleared whenever the parent changes (deterministic gate).
+function EducationFields({ control, nvEstu, setValue, errors }: {
+  control:  Control<Step2Data>
+  nvEstu:   Step2Data['nvEstu']
+  setValue: UseFormSetValue<Step2Data>
+  errors:   FieldErrors<Step2Data>
+}) {
+  return (
+    <>
+      <ChipField
+        control={control} name="nvEstu" label="Nivel educativo" required
+        options={OPT.nvEstu} error={errors.nvEstu?.message}
+        onAfterChange={val => { if (val !== 'Posgrado') setValue('nvPosg', '') }}
+      />
+      {nvEstu === 'Posgrado' && (
+        <ChipField
+          control={control} name="nvPosg" label="Nivel de posgrado" required
+          options={OPT.nvPosg} error={errors.nvPosg?.message}
+        />
+      )}
+    </>
+  )
+}
+
 export function Step2({ draft, onNext, onBack }: StepProps) {
   const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm<Step2Data>({
     resolver: zodResolver(step2Schema),
@@ -246,19 +359,12 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
     <form onSubmit={handleSubmit(data => onNext(data as Partial<SurveyDraft>))} noValidate>
       <SectionHead icon="ti-users" label="Datos sociodemográficos" />
 
-      <Field label="Fecha de nacimiento" required error={errors.fNac?.message}>
-        <input type="date" max={draft.fEta || undefined} {...register('fNac')} />
-        {edad !== null && (
-          <div style={{
-            marginTop: 6, padding: '6px 10px',
-            background: C.tealLight, borderRadius: 6,
-            fontSize: 13, color: C.teal, fontWeight: 500,
-          }}>
-            <i className="ti ti-calendar-check" style={{ marginRight: 6, fontSize: 13 }} aria-hidden />
-            Edad calculada: {edad} años
-          </div>
-        )}
-      </Field>
+      <BirthDateField
+        register={register('fNac')}
+        max={draft.fEta || undefined}
+        edad={edad}
+        error={errors.fNac?.message}
+      />
 
       <Field label="Ciudad / Municipio" error={errors.ciudad?.message}>
         <Controller name="ciudad" control={control}
@@ -271,78 +377,21 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
         <input placeholder="Calle, carrera, barrio…" {...register('dir')} />
       </Field>
 
-      <Field label="Estrato socioeconómico" help={FIELD_HELP.estrato} error={errors.estrato?.message}>
-        <Controller name="estrato" control={control}
-          render={({ field }) => (
-            <div role="radiogroup" style={{ display: 'flex', gap: 6 }}>
-              {OPT.estrato.map(n => (
-                <button
-                  key={n} type="button" role="radio"
-                  aria-checked={field.value === n}
-                  onClick={() => field.onChange(field.value === n ? null : n)}
-                  style={{
-                    width: 42, height: 38, borderRadius: 8, fontWeight: 500, fontSize: 14,
-                    border: field.value === n ? `1.5px solid ${C.teal}` : `0.5px solid ${C.border}`,
-                    background: field.value === n ? C.tealLight : C.surface,
-                    color: field.value === n ? C.teal : C.text,
-                    cursor: 'pointer', transition: 'all 0.12s',
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          )} />
-      </Field>
+      <EstratoField control={control} error={errors.estrato?.message} />
 
-      <Field label="Pertenencia étnica" required error={errors.etnia?.message}>
-        <Controller name="etnia" control={control}
-          render={({ field }) => (
-            <ChipGroup options={OPT.etnia} value={field.value} onChange={field.onChange} />
-          )} />
-      </Field>
+      <ChipField control={control} name="etnia" label="Pertenencia étnica" required
+        options={OPT.etnia} error={errors.etnia?.message} />
 
-      <Field label="Régimen de salud" required help={FIELD_HELP.asSalud} error={errors.asSalud?.message}>
-        <Controller name="asSalud" control={control}
-          render={({ field }) => (
-            <ChipGroup options={OPT.asSalud} value={field.value} onChange={field.onChange} />
-          )} />
-      </Field>
+      <ChipField control={control} name="asSalud" label="Régimen de salud" required
+        help={FIELD_HELP.asSalud} options={OPT.asSalud} error={errors.asSalud?.message} />
 
-      <Field label="Ocupación actual" required help={FIELD_HELP.estLab} error={errors.estLab?.message}>
-        <Controller name="estLab" control={control}
-          render={({ field }) => (
-            <ChipGroup options={OPT.estLab} value={field.value} onChange={field.onChange} />
-          )} />
-      </Field>
+      <ChipField control={control} name="estLab" label="Ocupación actual" required
+        help={FIELD_HELP.estLab} options={OPT.estLab} error={errors.estLab?.message} />
 
-      <Field label="Ingresos mensuales del hogar" required error={errors.ingreso?.message}>
-        <Controller name="ingreso" control={control}
-          render={({ field }) => (
-            <ChipGroup options={OPT.ingreso} value={field.value} onChange={field.onChange} />
-          )} />
-      </Field>
+      <ChipField control={control} name="ingreso" label="Ingresos mensuales del hogar" required
+        options={OPT.ingreso} error={errors.ingreso?.message} />
 
-      <Field label="Nivel educativo" required error={errors.nvEstu?.message}>
-        <Controller name="nvEstu" control={control}
-          render={({ field }) => (
-            <ChipGroup options={OPT.nvEstu} value={field.value}
-              onChange={val => {
-                field.onChange(val)
-                // Limpia el sub-nivel si deja de ser Posgrado (compuerta determinista).
-                if (val !== 'Posgrado') setValue('nvPosg', '')
-              }} />
-          )} />
-      </Field>
-
-      {nvEstu === 'Posgrado' && (
-        <Field label="Nivel de posgrado" required error={errors.nvPosg?.message}>
-          <Controller name="nvPosg" control={control}
-            render={({ field }) => (
-              <ChipGroup options={OPT.nvPosg} value={field.value ?? ''} onChange={field.onChange} />
-            )} />
-        </Field>
-      )}
+      <EducationFields control={control} nvEstu={nvEstu} setValue={setValue} errors={errors} />
 
       <WizardNavBar onBack={onBack} />
     </form>
