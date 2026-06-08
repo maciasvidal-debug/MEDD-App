@@ -22,6 +22,18 @@ export default defineConfig([
       // Allow co-locating non-component constants (e.g. the `C` design tokens)
       // alongside components — the recommended setting for Vite + Fast Refresh.
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'no-await-in-loop': 'error',
+    },
+  },
+  {
+    files: ['backend/src/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
+    },
+    rules: {
+      'no-await-in-loop': 'error',
     },
   },
 ])

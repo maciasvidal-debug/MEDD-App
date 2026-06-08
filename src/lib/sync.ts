@@ -102,10 +102,13 @@ export async function fullSync(
   //    is never lost. Any still-pending id is kept in `tombstoned` to guard the
   //    pull below from resurrecting a row the user already deleted locally.
   const tombstoned = new Set<string>()
-  for (const id of await getDeletionIds()) {
-    const ok = await deleteSurveyRemote(id)
-    if (ok) await removeDeletion(id)
-    else tombstoned.add(id)
+  const deletionIds = await getDeletionIds()
+  const deleteResults = await Promise.all(
+    deletionIds.map(id => deleteSurveyRemote(id).then(ok => ({ id, ok }))),
+  )
+  await Promise.all(deleteResults.filter(r => r.ok).map(r => removeDeletion(r.id)))
+  for (const { id, ok } of deleteResults) {
+    if (!ok) tombstoned.add(id)
   }
 
   // 1. Push (encuestadores only) — all requests in parallel, then batch-save synced ones
