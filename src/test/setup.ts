@@ -13,3 +13,13 @@ import { cleanup } from '@testing-library/react'
 afterEach(() => {
   cleanup()
 })
+
+// jsdom lacks ResizeObserver, which Recharts' ResponsiveContainer needs. Provide
+// a no-op so dashboard/chart components render in tests. Harmless in node.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+}

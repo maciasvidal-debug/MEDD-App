@@ -703,19 +703,31 @@ export function AjustesPage() {
 
   return (
     <div>
-      <TopBar title="Ajustes" subtitle="Proyecto y perfil" icon="ti-settings" accent={C.gray} />
+      <TopBar
+        title="Ajustes"
+        subtitle={isInvestigador ? 'Apariencia y cuenta' : 'Proyecto y perfil'}
+        icon="ti-settings" accent={C.gray}
+      />
       <div className="page-content narrow">
-        <ProjectConfigSection form={form} set={set} />
+        {/* Project config and the surveyor profile only apply to encuestadores:
+            the profile is stamped onto captured surveys and the surveyor id is
+            prefilled into new ones. An investigador is a read-only analyst who
+            never captures, so prompting them for a surveyor profile is wrong. */}
+        {!isInvestigador && (
+          <>
+            <ProjectConfigSection form={form} set={set} />
 
-        <SurveyorProfileSection
-          form={form}
-          set={set}
-          onSave={() => persistSettings(form)}
-          backfillCount={backfillCount}
-          onBackfill={() => backfillProfile()}
-        />
+            <SurveyorProfileSection
+              form={form}
+              set={set}
+              onSave={() => persistSettings(form)}
+              backfillCount={backfillCount}
+              onBackfill={() => backfillProfile()}
+            />
 
-        <Divider label="apariencia" />
+            <Divider label="apariencia" />
+          </>
+        )}
         <AppearanceSection
           theme={theme}
           toggleTheme={toggleTheme}
