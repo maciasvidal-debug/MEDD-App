@@ -26,7 +26,6 @@ const CIUDADES = [
     'Tunja', 'Riohacha', 'Florencia', 'Quibdó', 'Yopal', 'Mocoa', 'Leticia', 'Otro',
 ];
 
-const isInt = (v) => Number.isInteger(v);
 const toDate = (s) => (s ? new Date(s + 'T00:00:00') : null);
 const isValidDateStr = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
 
