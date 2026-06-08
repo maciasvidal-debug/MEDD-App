@@ -5,7 +5,10 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['src/**/*.test.{ts,tsx}'],
+    // Default to node for the lib/ logic suites; component and hook tests opt
+    // into jsdom per-file with a `// @vitest-environment jsdom` docblock.
     environment: 'node',
+    setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
       // Gate the business logic (lib/), not presentational UI. supabase.ts is a
@@ -15,7 +18,7 @@ export default defineConfig({
       reporter: ['text-summary'],
       // Ratchet floor: set just below current measured coverage so a drop fails
       // CI, without forcing new tests today. Raise these as coverage grows.
-      thresholds: { lines: 60, statements: 60, branches: 60, functions: 55 },
+      thresholds: { lines: 67, statements: 66, branches: 67, functions: 64 },
     },
   },
 })

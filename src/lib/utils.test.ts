@@ -3,6 +3,7 @@ import {
   pct, safeNum, calcEdad, dayDiff, productMetrics,
   wilsonCI, quantile, prevalenceRatio, chiSquareTest, cochranArmitage,
   mantelHaenszelRR, iccBinary, breslowDay, toCSV, compareSortable,
+  fmtDate, fmtTimestamp, todayISO, dateTag, uuid, freqTable, groupSum, toCodebookCSV,
 } from './utils'
 import type { Survey } from '../types'
 
@@ -214,5 +215,113 @@ describe('toCSV', () => {
     ] as unknown as Survey[]
     const lines = toCSV(surveys).trim().split('\n')
     expect(lines.length).toBe(3) // header + 2 data rows
+  })
+
+  it('starts with a UTF-8 BOM so Excel detects the encoding', () => {
+    expect(toCSV([]).charCodeAt(0)).toBe(0xfeff)
+  })
+
+  it('escapes fields containing commas, quotes or newlines', () => {
+    const surveys = [
+      { id: 'a', nui: 1, dir: 'Calle 1, #2', obs: 'dijo "hola"', medications: [] },
+    ] as unknown as Survey[]
+    const dataRow = toCSV(surveys).trim().split('\n')[1]
+    expect(dataRow).toContain('"Calle 1, #2"')
+    expect(dataRow).toContain('"dijo ""hola"""')
+  })
+
+  it('serialises multiple medications with ; field and | record separators', () => {
+    const surveys = [
+      { id: 'a', nui: 1, medications: [
+        { nmMed: 'A', dci: 'x', concMed: 500, undConc: 'mg', fVto: '2027-01-01' },
+        { nmMed: 'B', dci: 'y', concMed: 250, undConc: 'mg', fVto: '2027-02-01' },
+      ] },
+    ] as unknown as Survey[]
+    const dataRow = toCSV(surveys).trim().split('\n')[1]
+    expect(dataRow).toContain('A;x;500;mg;2027-01-01|B;y;250;mg;2027-02-01')
+  })
+})
+
+describe('toCodebookCSV', () => {
+  it('emits a BOM, the dictionary header and one row per variable', () => {
+    const csv = toCodebookCSV()
+    expect(csv.charCodeAt(0)).toBe(0xfeff)
+    const lines = csv.trim().split('\n') // trim() drops the leading BOM
+    expect(lines[0]).toBe('variable,etiqueta,tipo,valores')
+    expect(lines.length).toBeGreaterThan(1)
+  })
+})
+
+describe('fmtDate', () => {
+  it('reformats YYYY-MM-DD to DD/MM/YYYY', () => {
+    expect(fmtDate('2026-03-09')).toBe('09/03/2026')
+  })
+  it('returns an em dash for empty input', () => {
+    expect(fmtDate('')).toBe('—')
+  })
+})
+
+describe('fmtTimestamp', () => {
+  it('returns an em dash for empty input', () => {
+    expect(fmtTimestamp('')).toBe('—')
+  })
+  it('formats a valid ISO timestamp to a non-empty localized string', () => {
+    const out = fmtTimestamp('2026-03-09T14:30:00.000Z')
+    expect(out).not.toBe('—')
+    expect(out.length).toBeGreaterThan(0)
+  })
+})
+
+describe('todayISO / dateTag', () => {
+  it('both return a YYYY-MM-DD string', () => {
+    expect(todayISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(dateTag()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
+describe('uuid', () => {
+  it('produces a v4-shaped, unique identifier', () => {
+    const a = uuid()
+    const b = uuid()
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+    expect(a).not.toBe(b)
+  })
+})
+
+describe('freqTable', () => {
+  it('counts occurrences per option, including zero-count options', () => {
+    const surveys = [
+      { asSalud: 'Contributivo' }, { asSalud: 'Contributivo' }, { asSalud: 'Subsidiado' },
+    ] as unknown as Survey[]
+    const t = freqTable(surveys, 'asSalud', ['Contributivo', 'Subsidiado', 'Especial'] as const)
+    expect(t).toEqual([
+      { name: 'Contributivo', n: 2 },
+      { name: 'Subsidiado', n: 1 },
+      { name: 'Especial', n: 0 },
+    ])
+  })
+  it('returns all-zero counts for an empty survey list', () => {
+    expect(freqTable([], 'asSalud', ['Contributivo'] as const)).toEqual([{ name: 'Contributivo', n: 0 }])
+  })
+})
+
+describe('groupSum', () => {
+  it('groups by a key, sums a numeric field and sorts descending', () => {
+    const surveys = [
+      { ciudad: 'Bogotá', cantMed: 3 },
+      { ciudad: 'Bogotá', cantMed: 2 },
+      { ciudad: 'Cali', cantMed: 4 },
+    ] as unknown as Survey[]
+    expect(groupSum(surveys, 'ciudad', 'cantMed')).toEqual([
+      { name: 'Bogotá', value: 5 },
+      { name: 'Cali', value: 4 },
+    ])
+  })
+  it('buckets null/empty group keys and null sums under "Sin dato"/0', () => {
+    const surveys = [
+      { ciudad: '', cantMed: null },
+      { ciudad: null, cantMed: 2 },
+    ] as unknown as Survey[]
+    expect(groupSum(surveys, 'ciudad', 'cantMed')).toEqual([{ name: 'Sin dato', value: 2 }])
   })
 })
