@@ -441,6 +441,39 @@ function regLowerGamma(a: number, x: number): number {
   return 1 - q
 }
 
+// ─── Multiple-comparisons control ─────────────────────────────────────────
+
+export interface HolmResult<K = string> {
+  key:    K
+  p:      number
+  pAdj:   number   // Holm-adjusted p-value (monotone, capped at 1)
+  reject: boolean  // reject H0 at the family-wise alpha
+}
+
+/**
+ * Holm–Bonferroni step-down adjustment. Controls the family-wise error rate at
+ * `alpha` across a family of simultaneous tests and is uniformly more powerful
+ * than plain Bonferroni. Sorts by ascending p, scales the k-th smallest by the
+ * number of remaining tests (m−k), enforces monotonicity, and rejects down to
+ * the first non-significant test. Returned in ascending-p order.
+ */
+export function holmAdjust<K = string>(
+  tests: { key: K; p: number }[],
+  alpha = 0.05,
+): HolmResult<K>[] {
+  const m = tests.length
+  if (m === 0) return []
+  const ordered = [...tests].sort((a, b) => a.p - b.p)
+  let running = 0
+  let stillRejecting = true
+  return ordered.map((t, i) => {
+    const pAdj = Math.max(running, Math.min(1, t.p * (m - i)))
+    running = pAdj
+    if (pAdj > alpha) stillRejecting = false
+    return { key: t.key, p: t.p, pAdj, reject: stillRejecting }
+  })
+}
+
 // ─── Frequency table ──────────────────────────────────────────────────────
 
 export function freqTable<T extends string>(

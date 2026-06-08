@@ -4,6 +4,7 @@ import {
   wilsonCI, quantile, prevalenceRatio, chiSquareTest, cochranArmitage,
   mantelHaenszelRR, iccBinary, breslowDay, toCSV, compareSortable,
   fmtDate, fmtTimestamp, todayISO, dateTag, uuid, freqTable, groupSum, toCodebookCSV,
+  holmAdjust,
 } from './utils'
 import type { Survey } from '../types'
 
@@ -302,6 +303,39 @@ describe('freqTable', () => {
   })
   it('returns all-zero counts for an empty survey list', () => {
     expect(freqTable([], 'asSalud', ['Contributivo'] as const)).toEqual([{ name: 'Contributivo', n: 0 }])
+  })
+})
+
+describe('holmAdjust', () => {
+  it('returns [] for an empty family', () => {
+    expect(holmAdjust([])).toEqual([])
+  })
+
+  it('rejects a single test at its raw p', () => {
+    const [r] = holmAdjust([{ key: 'a', p: 0.04 }])
+    expect(r.pAdj).toBeCloseTo(0.04, 10)
+    expect(r.reject).toBe(true)
+  })
+
+  it('applies the step-down scaling and stops at the first non-significant test', () => {
+    // p = 0.01, 0.03, 0.04 over m=3 → adj 0.03, 0.06, 0.06; only the smallest passes.
+    const res = holmAdjust([
+      { key: 'x', p: 0.04 }, { key: 'y', p: 0.01 }, { key: 'z', p: 0.03 },
+    ])
+    expect(res.map(r => r.key)).toEqual(['y', 'z', 'x']) // ascending p
+    expect(res[0].pAdj).toBeCloseTo(0.03, 10)
+    expect(res[0].reject).toBe(true)
+    expect(res[1].pAdj).toBeCloseTo(0.06, 10)
+    expect(res[1].reject).toBe(false)
+    expect(res[2].reject).toBe(false) // monotone: never rejected after a failure
+  })
+
+  it('keeps adjusted p-values monotone and capped at 1', () => {
+    const res = holmAdjust([{ key: 'a', p: 0.5 }, { key: 'b', p: 0.5 }, { key: 'c', p: 0.9 }])
+    expect(res.every(r => r.pAdj <= 1)).toBe(true)
+    expect(res[0].pAdj).toBeLessThanOrEqual(res[1].pAdj)
+    expect(res[1].pAdj).toBeLessThanOrEqual(res[2].pAdj)
+    expect(res.every(r => r.reject === false)).toBe(true)
   })
 })
 

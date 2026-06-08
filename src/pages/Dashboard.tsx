@@ -7,7 +7,7 @@ import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
 import { useShallow } from 'zustand/react/shallow'
-import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2 } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
 
@@ -188,6 +188,25 @@ export default function DashboardPage() {
   const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
   const adjusted = useMemo(() => buildEstratoAdjusted(data), [data])
 
+  // Family of inferential contrasts shown on this panel, for a family-wise
+  // (Holm–Bonferroni) view that surfaces which survive multiple-comparison
+  // control. Breslow–Day and the expected-cell check are diagnostics, not part
+  // of the hypothesis family, so they're excluded here.
+  const inferentialTests = useMemo(() => {
+    const t: { key: string; label: string; p: number }[] = []
+    if (assoc) {
+      if (assoc.chi.df > 0) t.push({ key: 'estrato-chi', label: 'Estrato × vencidos (χ²)', p: assoc.chi.p })
+      if (assoc.trend)      t.push({ key: 'estrato-trend', label: 'Gradiente por estrato (Cochran–Armitage)', p: assoc.trend.p })
+    }
+    if (surveyorEffect) {
+      if (surveyorEffect.chi && surveyorEffect.chi.df > 0) t.push({ key: 'prog-chi', label: 'Programa del encuestador × vencidos (χ²)', p: surveyorEffect.chi.p })
+      if (surveyorEffect.trend) t.push({ key: 'sem-trend', label: 'Gradiente por semestre (Cochran–Armitage)', p: surveyorEffect.trend.p })
+    }
+    if (adjusted) t.push({ key: 'cmh', label: 'Asociación ajustada estrato→vencidos (CMH)', p: adjusted.mh.p })
+    return t
+  }, [assoc, surveyorEffect, adjusted])
+  const holm = useMemo(() => holmAdjust(inferentialTests), [inferentialTests])
+
   // No data at all (vs. "filters returned nothing", handled further down)
   if (surveys.length === 0) {
     return (
@@ -307,6 +326,9 @@ export default function DashboardPage() {
 
         {/* Tiempo de retención de vencidos */}
         {retention && <RetentionCard s={retention} />}
+
+        {/* Notas estadísticas: naturaleza exploratoria + control de multiplicidad */}
+        <StatNotesCard tests={inferentialTests} holm={holm} />
 
         {/* Distribuciones — 2 columnas en pantallas anchas para aprovechar el espacio */}
         <div className="chart-grid">
@@ -645,13 +667,21 @@ interface Association { groups: AssocGroup[]; chi: ChiSquare; trend: TrendTest |
 // stay large enough for the chi-square; the lowest present group is the PR
 // reference. Outcome base = all households in the group (a non-storing home has
 // zero expired stored meds by definition, so the denominator is valid).
+// Single socioeconomic banding reused by every estrato analysis so the cut is
+// consistent across cards (the gradient card uses the three bands; the adjusted
+// MH analysis uses the derived binary contrast below).
+const ESTRATO_BANDS = [
+  { label: 'bajo (1–2)',  min: 1, max: 2 },
+  { label: 'medio (3–4)', min: 3, max: 4 },
+  { label: 'alto (5–6)',  min: 5, max: 6 },
+] as const
+// Binary exposure derived from the same bands: "no bajo" (medio–alto, ≥3) vs
+// "bajo" (1–2). Aligning the dichotomy to the bottom band boundary keeps it
+// consistent with the gradient card and tends to keep the exposed cells larger.
+const isEstratoHigh = (e: number) => e >= 3
+
 function buildEstratoAssociation(surveys: Survey[]): Association | null {
-  const defs = [
-    { label: 'bajo (1–2)',  min: 1, max: 2 },
-    { label: 'medio (3–4)', min: 3, max: 4 },
-    { label: 'alto (5–6)',  min: 5, max: 6 },
-  ]
-  const acc = defs.map(d => ({ ...d, total: 0, cases: 0 }))
+  const acc = ESTRATO_BANDS.map(d => ({ ...d, total: 0, cases: 0 }))
   for (const s of surveys) {
     const e = s.estrato
     if (e == null) continue
@@ -867,6 +897,14 @@ function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
             Referencia: {ref} (programa con más registros). RP = razón de prevalencia vs. referencia (IC 95%).
           </div>
         )}
+        <div style={{ marginTop: 6, color: C.hint, fontSize: 11.5, lineHeight: 1.5 }}>
+          ⚠ Los contrastes por programa y por semestre no ajustan por el agrupamiento
+          de encuestas dentro de un mismo encuestador (que el ICC cuantifica): sus
+          valores p pueden ser <strong>anticonservadores</strong>. Además, las diferencias
+          entre encuestadores pueden reflejar que cada uno cubre <strong>zonas/poblaciones
+          distintas</strong> (case-mix), no necesariamente sesgo del observador, salvo
+          asignación aleatoria de encuestadores a zonas.
+        </div>
         {!flagged && (
           <div style={{ marginTop: 4, color: C.green }}>
             ✓ Sin señal de efecto del encuestador con los datos actuales.
@@ -898,7 +936,7 @@ function buildEstratoAdjusted(surveys: Survey[]): AdjustedAssoc | null {
   let aT = 0, bT = 0, cT = 0, dT = 0
   for (const s of surveys) {
     if (s.estrato == null || !s.etrPrograma) continue
-    const high = s.estrato >= 4
+    const high = isEstratoHigh(s.estrato)
     const isCase = s.vtoMedNc === 'Sí'
     const st = strataMap.get(s.etrPrograma) ?? { a: 0, b: 0, c: 0, d: 0 }
     if (high && isCase)       { st.a++; aT++ }
@@ -929,7 +967,7 @@ function AdjustedAssociationCard({ a }: { a: AdjustedAssoc }) {
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>Asociación ajustada por confusión (Mantel–Haenszel)</SectionLabel>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
-        Exposición: <strong>estrato alto (4–6)</strong> vs bajo (1–3). Desenlace:
+        Exposición: <strong>estrato medio–alto (3–6)</strong> vs bajo (1–2). Desenlace:
         <strong> vencidos confirmados en casa</strong>. Ajustada por el <strong>programa del
         encuestador</strong> ({mh.strata} estratos).
       </p>
@@ -963,6 +1001,51 @@ function AdjustedAssociationCard({ a }: { a: AdjustedAssoc }) {
           Estrato dicotomizado; con celdas pequeñas, interpretar con cautela.
         </div>
       </div>
+    </Card>
+  )
+}
+
+// Exploratory-analysis disclaimer + family-wise (Holm) control over the panel's
+// inferential contrasts, so multiple unadjusted p-values aren't over-read.
+function StatNotesCard({ tests, holm }: {
+  tests: { key: string; label: string; p: number }[]
+  holm: HolmResult[]
+}) {
+  if (tests.length === 0) return null
+  const labelOf = new Map(tests.map(t => [t.key, t.label]))
+  const anySurvive = holm.some(h => h.reject)
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Notas estadísticas — análisis exploratorio</SectionLabel>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Este panel es <strong>exploratorio / generador de hipótesis</strong>: con tamaños de
+        muestra de campo y múltiples contrastes, los valores p sin ajustar inflan el error
+        tipo I. La tabla aplica la corrección de <strong>Holm–Bonferroni</strong> (control del
+        error por familia, α = 0,05) sobre los {tests.length} contraste(s) mostrados.
+      </p>
+      {tests.length >= 2 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {holm.map(h => (
+            <div key={h.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 12 }}>
+              <span style={{ color: C.text, flex: 1, minWidth: 0 }}>{labelOf.get(h.key) ?? h.key}</span>
+              <span className="tnum" style={{ color: C.hint, flexShrink: 0 }}>p = {fmtP(h.p)}</span>
+              <span className="tnum" style={{ color: h.reject ? C.amber : C.muted, fontWeight: 600, minWidth: 110, textAlign: 'right', flexShrink: 0 }}>
+                Holm {fmtP(h.pAdj)} {h.reject ? '✓' : '·'}
+              </span>
+            </div>
+          ))}
+          <p style={{ margin: '4px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+            «✓» = sobrevive a la corrección por multiplicidad. Algunos contrastes son vistas
+            alternativas de la misma hipótesis (p. ej. χ² y tendencia de estrato), por lo que
+            Holm aquí es conservador.
+            {!anySurvive && ' Con los datos actuales, ningún contraste sobrevive a la corrección.'}
+          </p>
+        </div>
+      ) : (
+        <p style={{ margin: 0, fontSize: 11, color: C.hint }}>
+          Un solo contraste disponible: sin ajuste por multiplicidad necesario.
+        </p>
+      )}
     </Card>
   )
 }

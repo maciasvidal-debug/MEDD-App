@@ -34,5 +34,7 @@ describe('DashboardPage', () => {
     render(<DashboardPage />)
     // The populated header replaces the empty state.
     expect(screen.getAllByText(/Panel analítico|Análisis/i).length).toBeGreaterThan(0)
+    // The exploratory / multiplicity disclaimer is shown alongside the inference.
+    expect(screen.getByText(/análisis exploratorio/i)).toBeInTheDocument()
   })
 })
