@@ -91,17 +91,19 @@ El encuestador **no sabe** cuáles son las respuestas esperadas — de ahí el n
 
 **Paso 1 — Redactar la vigneta (investigador)**
 
-Preparar el perfil del paciente simulado usando la plantilla del [Anexo A](#anexo-a--vigneta-estándar-del-caso-simulado). El perfil debe:
-- Cubrir todas las preguntas del cuestionario, incluyendo las que se activan por saltos lógicos
-- Incluir una lista de medicamentos con nombre, dosis y fecha de vencimiento explícitas
-- Especificar las respuestas esperadas para cada ítem (columna privada del investigador — no compartir)
+Preparar el caso simulado usando la plantilla del [Anexo A](#anexo-a--vigneta-estándar-del-caso-simulado). El relato debe:
+- Estar escrito en **lenguaje natural de hogar** (como hablaría la persona), sin nombrar los campos técnicos ni adelantar las opciones — el encuestador clasifica, igual que en campo
+- Recorrer **todas las ramas lógicas** del asistente: enfermedad reciente → medicamento → prescripción (Paso 3) y medicamentos guardados → conoce disposición + observación de vencidos (Paso 4)
+- Describir lo que el encuestador **observaría físicamente** (número de unidades, cuáles vencidas, peso), ya que esos ítems son de observación directa
+- Incluir la lista de medicamentos guardados con nombre, concentración y fecha de vencimiento
+- Mantener aparte la **clave de respuestas esperadas** (Parte 2 del Anexo A — privada del investigador, no compartir)
 - Ser clínica y sociodemográficamente coherente (no inventar combinaciones imposibles)
 
 **Paso 2 — Distribuir la vigneta**
 
-Enviar el texto de la vigneta a cada encuestador por el canal habitual (correo, WhatsApp, campus virtual). Instrucción explícita:
+Enviar **solo la Parte 1 (guion del hogar)** a cada encuestador por el canal habitual (correo, WhatsApp, campus virtual). **No compartir la Parte 2** (clave de respuestas). Instrucción explícita:
 
-> "Lee el perfil con atención y completa la encuesta en la app como si estuvieras entrevistando a esta persona. No consultes con tus compañeros ni les preguntes qué respondieron. Cuando termines, avísame."
+> "Lee el guion con atención y diligencia la encuesta en la app como si estuvieras en la visita domiciliaria. Clasifica lo que escuchas y observas con tu propio criterio. No consultes con tus compañeros ni les preguntes qué respondieron. Cuando termines, avísame."
 
 **Paso 3 — Captura independiente (encuestadores)**
 
@@ -322,42 +324,97 @@ Antes de activar el modo producción, verificar que se cumplen **todos** los cri
 
 ### Anexo A — Vigneta estándar del caso simulado
 
-La vigneta debe completarse para cada ronda de caja negra. Usar el siguiente formato:
+La vigneta tiene **dos partes**:
+
+- **Parte 1 — Guion del hogar** (se entrega a cada encuestador): un relato en lenguaje natural, como hablaría una persona en una visita domiciliaria. No usa los nombres técnicos de los campos ni adelanta las opciones de respuesta — el encuestador debe interpretarlo y clasificarlo en la app, igual que en campo.
+- **Parte 2 — Clave de respuestas esperadas** (privada del investigador): el mapeo de cada dato del relato a la respuesta correcta en cada paso del asistente. Sirve para calcular la **exactitud individual** y para detectar qué pregunta se interpreta mal.
+
+El relato está diseñado para recorrer **todas las ramas lógicas** del asistente: enfermedad reciente → medicamento → prescripción, y medicamentos guardados → conoce disposición + observación de vencidos.
 
 ---
 
-**VIGNETA DE CAJA NEGRA — [fecha] — Versión [N]**
-*Documento privado del investigador — no distribuir la columna "Respuesta esperada"*
+#### Parte 1 — Guion del hogar (entregar al encuestador)
 
-**Perfil sociodemográfico**
+> **CASO SIMULADO 01 — versión [N]**
+>
+> *Lea el guion completo y diligencie la encuesta en la app como si estuviera en la visita. Capture lo que un encuestador observaría y escucharía. No consulte con sus compañeros.*
+>
+> Usted visita a **doña Rosa**, una señora de **62 años** (nació el **14 de marzo de 1964**). Vive en **Bogotá**, en el barrio Kennedy, en una casa de **estrato 3**; la dirección es **Calle 38 Sur # 78-20**. Cuando le pregunta cómo se identifica étnicamente, responde que **no se considera de ningún grupo étnico**. Está afiliada a la salud por la **EPS donde cotiza su hija** (régimen contributivo). Actualmente **se dedica a los oficios del hogar**. Calcula que en la casa entran **alrededor de dos salarios mínimos al mes**. Estudió hasta **quinto de primaria**.
+>
+> Sobre su salud, dice que **en general se siente regular**. Cuenta que **en las últimas semanas ha estado con dolor en las rodillas** ("la artrosis, mija"). Para eso **sí está tomando un medicamento**, que **se lo formuló el médico de la EPS** hace cosa de mes y medio (**la fórmula es del 24 de abril de 2026**) y lo reclamó en la farmacia **unos días después, el 28 de abril de 2026**. Dice que **se toma las pastillas como le indicó el médico**.
+>
+> Cuando le pregunta si guarda en la casa medicamentos que no se ha tomado, dice que **sí, tiene varios guardados en un cajón de la cocina**. Le pregunta si sabe qué se debe hacer con un medicamento vencido y responde que **sí: los lleva al punto azul de la droguería**.
+>
+> Le pide ver los medicamentos guardados. Al revisarlos usted **cuenta 10 unidades en total** (entre tabletas y un frasco), y de esas **observa que 2 tabletas ya están vencidas**. Los pesa en la balanza: el conjunto marca **45 gramos**.
+>
+> Los medicamentos guardados son:
+> - **Acetaminofén** (caja), 500 mg, vence **2025-11-30**
+> - **Losartán** 50 mg, vence **2027-09-01**
 
-| Campo | Valor para el encuestador | Respuesta esperada (investigador) |
-|---|---|---|
-| Nombre ficticio | Paciente Simulado 01 | — |
-| Edad | 58 años | `fNac` = calcular desde edad |
-| Ciudad | Bogotá | `ciudad` = Bogotá |
-| Estrato | 3 | `estrato` = 3 |
-| Fecha de la encuesta | Hoy | `fEta` = fecha actual |
+---
 
-**Condición de salud**
+#### Parte 2 — Clave de respuestas esperadas (privada del investigador)
 
-| Campo | Descripción para el encuestador | Respuesta esperada |
-|---|---|---|
-| Afiliación al sistema de salud | "Estoy afiliado al régimen contributivo" | `asSalud` = Contributivo |
-| ¿Tiene médico de cabecera? | "Sí, la doctora Torres en la EPS" | `medSob` = Sí |
-| ¿Vigencia del médico al corriente? | "Sí, está activo" | `vtoMedNc` = Sí |
+**Paso 1 — Identificación**
 
-**Medicamentos** *(completar con 2–4 medicamentos reales con nombre genérico, dosis, vencimiento)*
+| Pregunta en la app | Respuesta esperada |
+|---|---|
+| Fecha de la entrevista (`fEta`) | Fecha del ejercicio |
+| ID del encuestador (`nuiEtr`) | El propio del encuestador |
 
-| # | Nombre | Dosis | Fecha vencimiento | Respuesta esperada |
-|---|---|---|---|---|
-| 1 | Metformina | 850 mg c/12h | 2027-03-15 | `cantMed` ≥ 1; ítem específico |
-| 2 | Losartán | 50 mg c/24h | 2026-09-01 | — |
-| … | … | … | … | — |
+**Paso 2 — Demografía**
 
-**Notas para el investigador**
-- Este perfil activa el salto lógico de `vtoMedNc` → debe aparecer la pregunta de medicamentos vencidos
-- `cantMedVto` esperado: 1 (el Losartán vence en < 6 meses desde la fecha de la encuesta)
+| Pregunta en la app | Respuesta esperada |
+|---|---|
+| Fecha de nacimiento (`fNac`) | 1964-03-14 (edad calculada: 62) |
+| Ciudad / Municipio (`ciudad`) | Bogotá |
+| Dirección (`dir`) | Calle 38 Sur # 78-20 |
+| Estrato (`estrato`) | 3 |
+| Pertenencia étnica (`etnia`) | Ninguna |
+| Régimen de salud (`asSalud`) | Contributivo |
+| Ocupación actual (`estLab`) | Hogar |
+| Ingresos mensuales (`ingreso`) | 1-3 SMMLV |
+| Nivel educativo (`nvEstu`) | Primaria |
+
+**Paso 3 — Salud**
+
+| Pregunta en la app | Respuesta esperada |
+|---|---|
+| Percepción general de salud (`perSalud`) | Regular |
+| ¿Enfermedad/problema en las últimas 4 semanas? (`estSalud`) | Sí |
+| ¿Cuál es su principal problema de salud? (`prbSalud`) | Dolor de rodillas / artrosis |
+| ¿Consume medicamentos para este problema? (`conMed`) | Sí |
+| ¿Prescritos por un profesional de salud? (`medPrc`) | Sí |
+| Fecha de prescripción médica (`fPrc`) | 2026-04-24 |
+| Fecha de entrega en farmacia (`fDisp`) | 2026-04-28 |
+| ¿Sigue las indicaciones del profesional? (`indMed`) | Sí |
+
+**Paso 4 — Almacenamiento y disposición**
+
+| Pregunta en la app | Respuesta esperada |
+|---|---|
+| ¿Tiene medicamentos guardados sin consumir? (`medSob`) | Sí |
+| ¿Sabe qué hacer con los medicamentos vencidos? (`dispMedVc`) | Sí |
+| ¿Qué hace con los vencidos? (`ctoDispVc`) | Los lleva al punto azul de la droguería |
+| ¿Hay unidades vencidas entre los almacenados? (`vtoMedNc`) | Sí |
+| Cantidad sin consumir (`cantMed`) | 10 |
+| Cantidad vencidos (`cantMedVto`) | 2 |
+| Peso total en balanza, g (`pesoMedNc`) | 45 |
+
+**Paso 5 — Medicamentos almacenados (lista)**
+
+| `nmMed` | `dci` | `concMed` / `undConc` | `fVto` |
+|---|---|---|---|
+| Acetaminofén | Acetaminofén | 500 mg | 2025-11-30 |
+| Losartán | Losartán potásico | 50 mg | 2027-09-01 |
+
+**Notas de diseño del caso (para el investigador)**
+
+- El relato fuerza `estSalud=Sí` → `conMed=Sí` → `medPrc=Sí`, de modo que se evalúan las preguntas de prescripción, fechas e indicaciones (rama completa de salud).
+- `medSob=Sí` activa la rama de almacenamiento; `dispMedVc=Sí` activa la pregunta abierta de práctica de disposición.
+- **Ítems de observación directa** (`vtoMedNc`, `cantMed`, `cantMedVto`, `pesoMedNc`): en campo el encuestador inspecciona y pesa físicamente; en la vigneta los datos se dan en el relato. Por eso el **peso** (`pesoMedNc`) **no mide variabilidad de medición real** — solo verifica transcripción; interprete su concordancia con cautela.
+- `cantMedVto` (2) no puede superar `cantMed` (10): la app valida esta regla; si algún encuestador la viola, es un hallazgo de usabilidad, no de interpretación.
+- Punto de fricción a vigilar: clasificar "la EPS donde cotiza su hija" como **Contributivo** (no Subsidiado) suele generar desacuerdo — candidato natural a aclarar en la guía de campo.
 
 ---
 
