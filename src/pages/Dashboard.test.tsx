@@ -51,4 +51,18 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/Control de calidad por encuestador/i)).toBeInTheDocument()
     expect(screen.getByText(/#42/)).toBeInTheDocument()
   })
+
+  it('renders the back-check agreement card when a re-interview exists', () => {
+    useStore.setState({
+      userRole: 'investigador',
+      surveys: [
+        mkSurvey('orig', { vtoMedNc: 'Sí', medSob: 'Sí' }),
+        // back-check of 'orig' with one disagreement (medSob No vs Sí)
+        mkSurvey('bc', { backcheckOf: 'orig', vtoMedNc: 'Sí', medSob: 'No' }),
+      ],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Concordancia de back-check/i)).toBeInTheDocument()
+    expect(screen.getByText(/κ ítems Sí\/No/)).toBeInTheDocument()
+  })
 })

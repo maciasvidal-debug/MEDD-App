@@ -499,6 +499,36 @@ export function terminalDigitTest(values: number[]): DigitTest | null {
   return { chi2, df: 9, p: chiSquareP(chi2, 9), n }
 }
 
+export interface KappaResult { kappa: number; agree: number; n: number }
+
+/**
+ * Unweighted Cohen's κ for two raters over paired categorical labels — the
+ * standard inter-observer agreement measure, correcting observed agreement for
+ * agreement expected by chance from the marginals. Used to compare a back-check
+ * re-interview against the original. Returns `agree` (raw proportion) and `n`
+ * (pairs). κ = (po − pe)/(1 − pe); perfect observed agreement → 1. Null with no
+ * pairs.
+ */
+export function cohenKappa(pairs: [string, string][]): KappaResult | null {
+  const n = pairs.length
+  if (n === 0) return null
+  const cats = new Set<string>()
+  const rowA: Record<string, number> = {}
+  const rowB: Record<string, number> = {}
+  let agreeCount = 0
+  for (const [a, b] of pairs) {
+    cats.add(a); cats.add(b)
+    rowA[a] = (rowA[a] ?? 0) + 1
+    rowB[b] = (rowB[b] ?? 0) + 1
+    if (a === b) agreeCount++
+  }
+  const po = agreeCount / n
+  if (po === 1) return { kappa: 1, agree: 1, n }
+  let pe = 0
+  for (const c of cats) pe += ((rowA[c] ?? 0) / n) * ((rowB[c] ?? 0) / n)
+  return { kappa: pe >= 1 ? 0 : (po - pe) / (1 - pe), agree: po, n }
+}
+
 // ─── Frequency table ──────────────────────────────────────────────────────
 
 export function freqTable<T extends string>(

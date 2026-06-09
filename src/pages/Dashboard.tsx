@@ -7,7 +7,7 @@ import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
 import { useShallow } from 'zustand/react/shallow'
-import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, terminalDigitTest, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult, type DigitTest } from '../lib/utils'
+import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, terminalDigitTest, cohenKappa, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult, type DigitTest, type KappaResult } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import type { Survey } from '../types'
 
@@ -187,6 +187,7 @@ export default function DashboardPage() {
   const retention = useMemo(() => buildRetention(data), [data])
   const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
   const surveyorQC = useMemo(() => buildSurveyorQC(data), [data])
+  const backcheck = useMemo(() => buildBackcheckAgreement(data), [data])
   const adjusted = useMemo(() => buildEstratoAdjusted(data), [data])
 
   // Family of inferential contrasts shown on this panel, for a family-wise
@@ -324,6 +325,9 @@ export default function DashboardPage() {
 
         {/* Control de calidad operativo por encuestador (para-data / antifraude) */}
         {isInvestigador && surveyorQC && <SurveyorQCCard qc={surveyorQC} />}
+
+        {/* Concordancia de back-check (fiabilidad inter-observador) */}
+        {isInvestigador && backcheck && <BackcheckAgreementCard a={backcheck} />}
 
         {/* Asociación ajustada por confusión (Mantel–Haenszel) */}
         {adjusted && <AdjustedAssociationCard a={adjusted} />}
@@ -1041,6 +1045,112 @@ function SurveyorQCCard({ qc }: { qc: SurveyorQC }) {
           «Rápidas» = entrevistas &lt; {FAST_SECONDS}s (heurístico); la duración solo está disponible
           desde esta versión. Estas señales orientan auditoría, no son prueba por sí solas.
         </div>
+      </div>
+    </Card>
+  )
+}
+
+// ─── Back-check agreement (re-interview reliability / fraud check) ──────────
+
+const BACKCHECK_BIN: (keyof Survey)[] = [
+  'estSalud', 'conMed', 'medPrc', 'indMed', 'medSob', 'dispMedVc', 'vtoMedNc',
+]
+const BACKCHECK_CAT: (keyof Survey)[] = [
+  'etnia', 'asSalud', 'estLab', 'ingreso', 'nvEstu', 'perSalud',
+]
+
+interface BackcheckAgreement {
+  nPairs: number
+  kappaBin: KappaResult | null  // Cohen's κ over the pooled Sí/No items
+  catAgreement: number | null   // raw % agreement over all categorical items
+  pesoMAD: number | null        // mean absolute difference in measured weight (g)
+}
+
+// Pairs each back-check with its original survey and measures inter-observer
+// agreement: Cohen's κ over the Sí/No items, raw agreement over all categorical
+// items, and the mean absolute weight difference. Low agreement flags either
+// interpretation variability (training) or fabrication.
+function buildBackcheckAgreement(surveys: Survey[]): BackcheckAgreement | null {
+  const byId = new Map(surveys.map(s => [s.id, s]))
+  const pairs: [Survey, Survey][] = []
+  for (const s of surveys) {
+    if (!s.backcheckOf) continue
+    const orig = byId.get(s.backcheckOf)
+    if (orig) pairs.push([orig, s])
+  }
+  if (pairs.length === 0) return null
+
+  const binPairs: [string, string][] = []
+  let catMatch = 0, catTotal = 0
+  const pesoDiffs: number[] = []
+  for (const [o, b] of pairs) {
+    for (const f of BACKCHECK_BIN) {
+      const ov = o[f], bv = b[f]
+      if ((ov === 'Sí' || ov === 'No') && (bv === 'Sí' || bv === 'No')) {
+        binPairs.push([ov as string, bv as string])
+      }
+    }
+    for (const f of [...BACKCHECK_BIN, ...BACKCHECK_CAT]) {
+      const ov = String(o[f] ?? ''), bv = String(b[f] ?? '')
+      if (ov !== '' && bv !== '') { catTotal++; if (ov === bv) catMatch++ }
+    }
+    if (o.estrato != null && b.estrato != null) { catTotal++; if (o.estrato === b.estrato) catMatch++ }
+    if (o.pesoMedNc != null && b.pesoMedNc != null) pesoDiffs.push(Math.abs(o.pesoMedNc - b.pesoMedNc))
+  }
+  return {
+    nPairs: pairs.length,
+    kappaBin: cohenKappa(binPairs),
+    catAgreement: catTotal > 0 ? catMatch / catTotal : null,
+    pesoMAD: pesoDiffs.length ? pesoDiffs.reduce((a, c) => a + c, 0) / pesoDiffs.length : null,
+  }
+}
+
+// Landis–Koch bands for κ.
+function kappaBand(k: number): { label: string; color: string } {
+  if (k < 0.2) return { label: 'pobre', color: C.red }
+  if (k < 0.4) return { label: 'débil', color: C.amber }
+  if (k < 0.6) return { label: 'moderada', color: C.amber }
+  if (k < 0.8) return { label: 'buena', color: C.teal }
+  return { label: 'muy buena', color: C.green }
+}
+
+function BackcheckAgreementCard({ a }: { a: BackcheckAgreement }) {
+  const { nPairs, kappaBin, catAgreement, pesoMAD } = a
+  const band = kappaBin ? kappaBand(kappaBin.kappa) : null
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Concordancia de back-check (fiabilidad inter-observador)</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Compara las re-entrevistas de control con su encuesta original sobre{' '}
+        <strong>{nPairs}</strong> par(es). Baja concordancia indica variabilidad de
+        interpretación (capacitación) o, en casos extremos, fabricación.
+      </p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 120, textAlign: 'center', padding: '10px 8px', borderRadius: 10, background: C.bg, border: `1px solid ${band ? band.color : C.border}` }}>
+          <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>κ ítems Sí/No</div>
+          <div className="fd tnum" style={{ fontSize: 22, fontWeight: 600, color: band ? band.color : C.text, lineHeight: 1 }}>
+            {kappaBin ? kappaBin.kappa.toFixed(2) : '—'}
+          </div>
+          <div style={{ fontSize: 11, color: C.hint, marginTop: 3 }}>{band ? band.label : 'sin datos'}</div>
+        </div>
+        <div style={{ flex: 1, minWidth: 120, textAlign: 'center', padding: '10px 8px', borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Acuerdo categórico</div>
+          <div className="fd tnum" style={{ fontSize: 22, fontWeight: 600, color: C.text, lineHeight: 1 }}>
+            {catAgreement != null ? `${(catAgreement * 100).toFixed(0)}%` : '—'}
+          </div>
+          <div style={{ fontSize: 11, color: C.hint, marginTop: 3 }}>ítems coincidentes</div>
+        </div>
+        <div style={{ flex: 1, minWidth: 120, textAlign: 'center', padding: '10px 8px', borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Δ peso (MAD)</div>
+          <div className="fd tnum" style={{ fontSize: 22, fontWeight: 600, color: C.text, lineHeight: 1 }}>
+            {pesoMAD != null ? `${pesoMAD.toFixed(1)} g` : '—'}
+          </div>
+          <div style={{ fontSize: 11, color: C.hint, marginTop: 3 }}>dif. media abs.</div>
+        </div>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+        κ corregido por azar (bandas de Landis–Koch). Inicia un back-check desde
+        «Registros» (vista de tarjetas) con el botón de control. Con pocos pares, interpretar como orientativo.
       </div>
     </Card>
   )

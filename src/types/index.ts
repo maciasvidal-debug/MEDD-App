@@ -40,6 +40,9 @@ export interface Survey {
   // Data environment (pilot vs prod) on a single backend. Stamped server-side
   // from the account on insert; the client only reads it (never sends it).
   dataEnv?: DataEnv
+  // Back-check: if this survey is a quality-control re-interview, the id of the
+  // original survey it re-verifies (NULL/undefined = normal capture).
+  backcheckOf?: string
 
   // Identificación
   fEta:   string        // F_ETA   : Fecha de la entrevista YYYY-MM-DD
@@ -96,7 +99,7 @@ export type SyncStatus = 'local' | 'synced' | 'syncing' | 'error'
 export type UserRole   = 'encuestador' | 'investigador'
 export type DataEnv    = 'pilot' | 'prod'
 
-export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus' | 'startedAt' | 'dataEnv'>
+export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus' | 'startedAt' | 'dataEnv' | 'backcheckOf'>
 
 // ─── CUM-INVIMA ────────────────────────────────────────────────────────────
 export interface CUMRecord {
@@ -118,7 +121,8 @@ export interface WizardState {
   step: number
   draft: SurveyDraft
   editingId?: string
-  startedAt?: string  // para-data: when this capture session began
+  startedAt?: string   // para-data: when this capture session began
+  backcheckOf?: string // QC re-interview: id of the original survey being re-checked
 }
 
 export interface Settings {

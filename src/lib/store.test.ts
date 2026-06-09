@@ -234,6 +234,31 @@ describe('wizard navigation', () => {
   })
 })
 
+describe('openBackcheckWizard', () => {
+  it('opens a blind re-interview linked to the original', () => {
+    useStore.setState({
+      userRole: 'investigador', settings: completeSettings,
+      surveys: [mkSurvey('orig', { nui: 5 })],
+    })
+    useStore.getState().openBackcheckWizard(mkSurvey('orig', { nui: 5, ciudad: 'Cali', vtoMedNc: 'Sí' }))
+    const w = useStore.getState().wizard!
+    expect(w.backcheckOf).toBe('orig')
+    expect(useStore.getState().view).toBe('wizard')
+    // Blind: the original's answers are NOT pre-filled.
+    expect(w.draft.ciudad).toBe('')
+    expect(w.draft.vtoMedNc).toBe('')
+    expect(w.draft.nui).toBe(2) // surveys.length (1) + 1
+    expect(w.startedAt).toBeTruthy()
+  })
+
+  it('stamps backcheckOf onto the saved survey', async () => {
+    useStore.setState({ userRole: 'investigador', settings: completeSettings, surveys: [] })
+    useStore.getState().openBackcheckWizard(mkSurvey('orig', { nui: 9 }))
+    await useStore.getState().addSurvey({ nui: 1, medications: [] } as never)
+    expect(useStore.getState().surveys[0].backcheckOf).toBe('orig')
+  })
+})
+
 describe('draft resume / discard', () => {
   it('resumes a persisted draft into the wizard', () => {
     useStore.setState({ pendingDraft: { step: 2, draft: { nui: 1 } as never } })
