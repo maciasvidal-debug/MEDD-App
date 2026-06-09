@@ -4,7 +4,7 @@ import {
   wilsonCI, quantile, prevalenceRatio, chiSquareTest, cochranArmitage,
   mantelHaenszelRR, iccBinary, breslowDay, toCSV, compareSortable,
   fmtDate, fmtTimestamp, todayISO, dateTag, uuid, freqTable, groupSum, toCodebookCSV,
-  holmAdjust, terminalDigitTest,
+  holmAdjust, terminalDigitTest, cohenKappa,
 } from './utils'
 import type { Survey } from '../types'
 
@@ -371,6 +371,43 @@ describe('terminalDigitTest', () => {
     const vals = Array.from({ length: 50 }, (_, i) => (i + 1) * 10) // 10,20,…
     const r = terminalDigitTest(vals)!
     expect(r.p).toBeLessThan(0.001)
+  })
+})
+
+describe('cohenKappa', () => {
+  it('returns null with no pairs', () => {
+    expect(cohenKappa([])).toBeNull()
+  })
+
+  it('is 1 for perfect agreement', () => {
+    const r = cohenKappa([['Sí', 'Sí'], ['No', 'No'], ['Sí', 'Sí']])!
+    expect(r.kappa).toBe(1)
+    expect(r.agree).toBe(1)
+  })
+
+  it('is ~0 when one rater never varies (agreement is all chance)', () => {
+    // Rater A always "Sí" → 80% raw agreement but no better than chance.
+    const pairs: [string, string][] = [
+      ...Array(8).fill(['Sí', 'Sí']), ...Array(2).fill(['Sí', 'No']),
+    ]
+    const r = cohenKappa(pairs)!
+    expect(r.agree).toBeCloseTo(0.8, 10)
+    expect(r.kappa).toBeCloseTo(0, 10)
+  })
+
+  it('matches the textbook value for a balanced 2×2 (κ = 0.6)', () => {
+    const pairs: [string, string][] = [
+      ...Array(4).fill(['Sí', 'Sí']), ...Array(4).fill(['No', 'No']),
+      ['Sí', 'No'], ['No', 'Sí'],
+    ]
+    const r = cohenKappa(pairs)!
+    expect(r.agree).toBeCloseTo(0.8, 10)
+    expect(r.kappa).toBeCloseTo(0.6, 10)
+  })
+
+  it('goes negative for systematic disagreement', () => {
+    const r = cohenKappa([['Sí', 'No'], ['No', 'Sí'], ['Sí', 'No'], ['No', 'Sí']])!
+    expect(r.kappa).toBeLessThan(0)
   })
 })
 

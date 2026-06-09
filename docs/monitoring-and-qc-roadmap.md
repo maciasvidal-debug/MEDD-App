@@ -15,10 +15,18 @@ piloto; el aislamiento `data_env` se aplica en el cutover, ver
   terminal del peso (`terminalDigitTest`).
 - **Separación piloto/prod**: `data_env` por cuenta + trigger server-side
   (migración 010); aislamiento RLS en el cutover (011).
+- **Back-check (re-entrevista de control)** — ✅ **implementado** (ver §1):
+  `surveys.backcheck_of` (migración 012), captura ciega desde "Registros"
+  (`openBackcheckWizard`), y tarjeta "Concordancia de back-check" (κ de Cohen
+  sobre ítems Sí/No, % de acuerdo categórico, Δ peso). Pendiente: muestreo
+  aleatorio automático (P3) y consentimiento de recontacto a nivel de protocolo.
 
 ---
 
-## 1. Flujo de back-check (re-entrevista)
+## 1. Flujo de back-check (re-entrevista) — ✅ IMPLEMENTADO (P1–P2)
+
+**Estado.** P1 (modelo + captura ciega + enlace) y P2 (tarjeta de concordancia
+κ/acuerdo/Δpeso) implementados. P3 (muestreo aleatorio automático) pendiente.
 
 **Objetivo.** Detectar fabricación (*curbstoning*) y medir la fiabilidad
 inter-observador re-entrevistando una submuestra aleatoria (~10%) con un

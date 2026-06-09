@@ -90,6 +90,7 @@ interface AppStore {
 
   wizard: WizardState | null
   openWizard: (surveyCount: number) => void
+  openBackcheckWizard: (original: Survey) => void
   openEditWizard: (survey: Survey) => void
   closeWizard: () => void
   setWizardStep: (step: number) => void
@@ -339,6 +340,8 @@ export const useStore = create<AppStore>((set, get) => ({
       // Para-data: stamp when this capture session began (set in openWizard) so
       // interview duration = createdAt − startedAt is available for QC.
       startedAt: get().wizard?.startedAt,
+      // QC re-interview linkage (set in openBackcheckWizard), if any.
+      backcheckOf: get().wizard?.backcheckOf,
       syncStatus: 'local',
     }
     await saveSurvey(survey)
@@ -482,6 +485,28 @@ export const useStore = create<AppStore>((set, get) => ({
       etrInstitucion: settings.etrInstitucion,
     }
     const wizard: WizardState = { step: 1, draft, startedAt: new Date().toISOString() }
+    set({ wizard, view: 'wizard', pendingDraft: null })
+    saveDraft(wizard)
+  },
+  // Start a blind quality-control re-interview of `original`: a fresh empty draft
+  // (the original's answers are NOT copied, to avoid biasing the back-check),
+  // linked via backcheckOf so agreement (κ/ICC) can be computed later.
+  openBackcheckWizard(original) {
+    const { settings, surveys } = get()
+    const nuiEtr = settings.nuiEncuestador ? parseInt(settings.nuiEncuestador, 10) || null : null
+    const draft: SurveyDraft = {
+      ...EMPTY_DRAFT,
+      fEta:   todayISO(),
+      nuiEtr,
+      nui:    surveys.length + 1,
+      etrPrograma:    settings.etrPrograma,
+      etrTipoInst:    settings.etrTipoInst,
+      etrSemestre:    settings.etrSemestre ? parseInt(settings.etrSemestre, 10) || null : null,
+      etrInstitucion: settings.etrInstitucion,
+    }
+    const wizard: WizardState = {
+      step: 1, draft, startedAt: new Date().toISOString(), backcheckOf: original.id,
+    }
     set({ wizard, view: 'wizard', pendingDraft: null })
     saveDraft(wizard)
   },

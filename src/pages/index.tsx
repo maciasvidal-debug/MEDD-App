@@ -25,10 +25,11 @@ import type { SurveyDraft, Survey, Settings } from '../types'
 // ─── WIZARD PAGE ──────────────────────────────────────────────────────────
 
 export function WizardPage() {
-  const { wizard, setWizardStep, updateDraft, closeWizard, addSurvey, updateSurvey } = useStore()
+  const { wizard, setWizardStep, updateDraft, closeWizard, addSurvey, updateSurvey, surveys } = useStore()
   const [guideOpen, setGuideOpen] = useState(false)
   if (!wizard) return null
-  const { step, draft, editingId } = wizard
+  const { step, draft, editingId, backcheckOf } = wizard
+  const originalNui = backcheckOf ? surveys.find(s => s.id === backcheckOf)?.nui : undefined
 
   function handleNext(patch: Partial<SurveyDraft>) {
     updateDraft(patch)
@@ -50,7 +51,7 @@ export function WizardPage() {
   return (
     <div>
       <TopBar
-        title={editingId ? 'Editar encuesta' : 'Nueva encuesta'}
+        title={backcheckOf ? 'Back-check (control)' : editingId ? 'Editar encuesta' : 'Nueva encuesta'}
         actions={
           <>
             <IconButton icon="ti-help" label="Guía de campo" onClick={() => setGuideOpen(true)} />
@@ -59,6 +60,16 @@ export function WizardPage() {
         }
       />
       {guideOpen && <FieldGuideDialog onClose={() => setGuideOpen(false)} />}
+      {backcheckOf && (
+        <div role="status" style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: C.tealLight, color: C.teal, fontSize: 12.5, fontWeight: 500,
+          padding: '8px 16px', borderBottom: `0.5px solid ${C.teal}40`, lineHeight: 1.4,
+        }}>
+          <i className="ti ti-clipboard-check" style={{ fontSize: 16, flexShrink: 0 }} aria-hidden />
+          Re-entrevista de control{originalNui != null ? ` de la encuesta #${String(originalNui).padStart(3, '0')}` : ''} — captura sin mirar el original.
+        </div>
+      )}
       <StepBar currentStep={step} />
       <div className="page-content narrow" style={{ paddingBottom: 24 }}>
         {step === 1 && <Step1 {...stepProps} />}
@@ -121,10 +132,11 @@ interface SurveyCardItemProps {
   onRemove:       (id: string) => void
   onEdit:         (s: Survey) => void
   onDetail:       (s: Survey) => void
+  onBackcheck:    (s: Survey) => void
 }
 
 const SurveyCardItem = React.memo(function SurveyCardItem({
-  survey: sv, isInvestigador, confirming, onConfirm, onRemove, onEdit, onDetail,
+  survey: sv, isInvestigador, confirming, onConfirm, onRemove, onEdit, onDetail, onBackcheck,
 }: SurveyCardItemProps) {
   const edad = calcEdad(sv.fEta, sv.fNac)
   const expiredMeds = sv.medications?.filter(m => productMetrics(sv.fEta, sv.fDisp, m).isExpired).length ?? 0
@@ -142,6 +154,7 @@ const SurveyCardItem = React.memo(function SurveyCardItem({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {sv.backcheckOf && <Badge label="Back-check" variant="gray" />}
           {sv.medSob   === 'Sí' && <Badge label="Almacena"  variant="teal" />}
           {sv.vtoMedNc === 'Sí' && <Badge label="Vencidos"  variant="amber" />}
         </div>
@@ -179,6 +192,15 @@ const SurveyCardItem = React.memo(function SurveyCardItem({
         </button>
       )}
 
+      {/* Investigador (supervisor): start a blind QC re-interview of this record */}
+      {isInvestigador && !sv.backcheckOf && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: 2 }}>
+          <Button size="sm" variant="ghost" icon="ti-clipboard-check" onClick={() => onBackcheck(sv)}>
+            Back-check
+          </Button>
+        </div>
+      )}
+
       {/* Edit/delete only for the owner (encuestadores with their own surveys) */}
       {!isInvestigador && (
         confirming ? (
@@ -211,7 +233,7 @@ const SurveyCardItem = React.memo(function SurveyCardItem({
 })
 
 export function EncuestasPage() {
-  const { surveys, removeSurvey, openEditWizard, openWizard, userRole } = useStore()
+  const { surveys, removeSurvey, openEditWizard, openWizard, openBackcheckWizard, userRole } = useStore()
   const isInvestigador = userRole === 'investigador'
   const [filter, setFilter]     = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -287,6 +309,7 @@ export function EncuestasPage() {
               onRemove={removeSurvey}
               onEdit={openEditWizard}
               onDetail={setDetail}
+              onBackcheck={openBackcheckWizard}
             />
           ))}
           </div>

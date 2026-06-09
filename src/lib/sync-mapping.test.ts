@@ -82,6 +82,14 @@ describe('sync mapping toRow/fromRow', () => {
     expect(fromRow(toRow(survey, 'u')).dataEnv).toBeUndefined()
   })
 
+  it('round-trips the backcheck_of QC link (absent → null/undefined)', () => {
+    const bc = { ...survey, backcheckOf: 'orig-1' }
+    expect(toRow(bc, 'u').backcheck_of).toBe('orig-1')
+    expect(fromRow(toRow(bc, 'u')).backcheckOf).toBe('orig-1')
+    expect(toRow(survey, 'u').backcheck_of).toBeNull()
+    expect(fromRow(toRow(survey, 'u')).backcheckOf).toBeUndefined()
+  })
+
   it('preserves null numeric fields (not coerced to 0)', () => {
     const row = toRow({ ...survey, estrato: null, cantMed: null, pesoMedNc: null, nuiEtr: null, etrSemestre: null }, 'u')
     expect(row.estrato).toBeNull()
