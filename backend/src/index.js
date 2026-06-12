@@ -30,7 +30,7 @@ const allowedOrigins = (process.env.CORS_ORIGIN || '')
     .map((s) => s.trim())
     .filter(Boolean);
 app.use(cors({
-    origin: allowedOrigins.length ? allowedOrigins : false,
+    origin: allowedOrigins.length ? allowedOrigins : [],
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     maxAge: 86400,
