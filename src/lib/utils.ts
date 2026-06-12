@@ -338,20 +338,41 @@ export interface ChiSquare {
 export function chiSquareTest(table: number[][]): ChiSquare {
   const rows = table.length
   const cols = rows ? table[0].length : 0
-  const rowSums = table.map(r => r.reduce((s, v) => s + v, 0))
-  const colSums = Array.from({ length: cols }, (_, j) => table.reduce((s, r) => s + r[j], 0))
-  const total = rowSums.reduce((s, v) => s + v, 0)
+
+  // Single pass calculation of sums using typed arrays to avoid object allocation overhead
+  const rowSums = new Float64Array(rows)
+  const colSums = new Float64Array(cols)
+  let total = 0
+
+  for (let i = 0; i < rows; i++) {
+    const row = table[i]
+    let rowSum = 0
+    for (let j = 0; j < cols; j++) {
+      const val = row[j]
+      rowSum += val
+      colSums[j] += val
+    }
+    rowSums[i] = rowSum
+    total += rowSum
+  }
+
   if (total === 0 || rows < 2 || cols < 2) return { chi2: 0, df: 0, p: 1, minExpected: 0 }
 
   let chi2 = 0
   let minExpected = Infinity
   for (let i = 0; i < rows; i++) {
+    const rowSum = rowSums[i]
+    if (rowSum === 0) continue
+
+    const row = table[i]
     for (let j = 0; j < cols; j++) {
-      const expected = (rowSums[i] * colSums[j]) / total
-      minExpected = Math.min(minExpected, expected)
-      if (expected > 0) chi2 += (table[i][j] - expected) ** 2 / expected
+      const expected = (rowSum * colSums[j]) / total
+      // Avoid Math.min function call overhead
+      if (expected < minExpected) minExpected = expected
+      if (expected > 0) chi2 += (row[j] - expected) ** 2 / expected
     }
   }
+
   const df = (rows - 1) * (cols - 1)
   return { chi2, df, p: chiSquareP(chi2, df), minExpected }
 }

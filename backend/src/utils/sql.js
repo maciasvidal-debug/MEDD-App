@@ -8,13 +8,19 @@
 // identifier-escaping rules: validate the shape, wrap in double quotes, and
 // double any embedded quotes (the same logic pg.escapeIdentifier / pg-format's
 // %I use internally).
+//
+// For security, an explicit allowlist is required to prevent unauthorized
+// column access.
 // =====================================================================
 
 const SAFE_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-function quoteIdent(name) {
+function quoteIdent(name, allowlist) {
     if (typeof name !== 'string' || !SAFE_IDENT.test(name)) {
         throw new Error(`Invalid SQL identifier: ${JSON.stringify(name)}`);
+    }
+    if (!Array.isArray(allowlist) || !allowlist.includes(name)) {
+        throw new Error(`Unallowed SQL identifier: ${JSON.stringify(name)}`);
     }
     return `"${name.replace(/"/g, '""')}"`;
 }
