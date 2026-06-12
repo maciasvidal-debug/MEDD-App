@@ -102,7 +102,7 @@ router.post('/', asyncHandler(async (req, res) => {
         // from the request body — the client cannot spoof or even see it.
         const insertCols = [...SURVEY_COLS, 'user_id'];
         const params = [...SURVEY_COLS.map((c) => value[c]), req.user.id];
-        const surveyCols = insertCols.map(quoteIdent).join(', ');
+        const surveyCols = insertCols.map(col => quoteIdent(col, insertCols)).join(', ');
         const placeholders = insertCols.map((_, i) => `$${i + 1}`).join(', ');
         const surveyResult = await client.query(
             `INSERT INTO surveys (${surveyCols}) VALUES (${placeholders}) RETURNING *`,
@@ -113,7 +113,7 @@ router.post('/', asyncHandler(async (req, res) => {
         // Bulk insert all medications in a single query to avoid N+1.
         let insertedMeds = [];
         if (value.medications.length) {
-            const medCols = MED_COLS.map(quoteIdent).join(', ');
+            const medCols = MED_COLS.map(col => quoteIdent(col, MED_COLS)).join(', ');
             const colCount = MED_COLS.length;
             const medParams = [];
             const valueGroups = value.medications.map((med, i) => {

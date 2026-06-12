@@ -100,7 +100,7 @@ router.get('/socio', asyncHandler(async (req, res) => {
         nv_estu: 'nv_estu', nv_posg: 'nv_posg',
     };
     const dim = dimMap[req.query.by] || 'estrato';
-    const col = quoteIdent(dim);
+    const col = quoteIdent(dim, Object.values(dimMap));
     const result = await pool.query(`
         SELECT
             COALESCE(${col}::text, 'Sin dato')           AS segment,
