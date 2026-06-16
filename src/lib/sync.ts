@@ -63,6 +63,18 @@ export async function pushSurvey(survey: Survey, userId: string): Promise<boolea
   }
 }
 
+export async function pushSurveys(surveys: Survey[], userId: string): Promise<boolean> {
+  if (!surveys.length) return true
+  try {
+    const { error } = await supabase
+      .from('surveys')
+      .upsert(surveys.map(survey => toRow(survey, userId)), { onConflict: 'id' })
+    return !error
+  } catch {
+    return false
+  }
+}
+
 export async function deleteSurveyRemote(id: string): Promise<boolean> {
   try {
     const { error } = await supabase.from('surveys').delete().eq('id', id)
@@ -114,10 +126,8 @@ export async function fullSync(
   // 1. Push (encuestadores only) — all requests in parallel, then batch-save synced ones
   let pushed = 0
   if (role === 'encuestador') {
-    const results = await Promise.all(
-      local.map(survey => pushSurvey(survey, userId).then(ok => ({ survey, ok })))
-    )
-    const synced = results.filter(r => r.ok).map(r => ({ ...r.survey, syncStatus: 'synced' as const }))
+    const ok = await pushSurveys(local, userId)
+    const synced = ok ? local.map(survey => ({ ...survey, syncStatus: 'synced' as const })) : []
     await saveManySurveys(synced)
     pushed = synced.length
   }

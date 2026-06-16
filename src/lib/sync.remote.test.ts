@@ -27,9 +27,13 @@ vi.mock('./supabase', () => ({
             ? Promise.reject(new Error('network'))
             : Promise.resolve({ data: state.pullData, error: state.pullError }),
       }),
-      upsert: (row: Record<string, unknown>) => {
+      upsert: (rowOrRows: Record<string, unknown> | Record<string, unknown>[]) => {
         if (state.upsertThrow) throw new Error('network')
-        state.lastUpsert = row
+        if (Array.isArray(rowOrRows)) {
+          state.lastUpsert = rowOrRows[rowOrRows.length - 1] || null
+        } else {
+          state.lastUpsert = rowOrRows
+        }
         return Promise.resolve({ error: state.upsertError })
       },
       delete: () => ({
@@ -156,5 +160,22 @@ describe('pullSurveys', () => {
     state.pullData = []
     state.pullThrow = true
     expect(await pullSurveys()).toEqual([])
+  })
+})
+
+describe('pushSurveys', () => {
+  it('returns true on success and false on error/throw', async () => {
+    const { pushSurveys } = await import('./sync')
+    expect(await pushSurveys([mkSurvey('A'), mkSurvey('B')], 'owner')).toBe(true)
+    expect(state.lastUpsert).toMatchObject({ id: 'B', user_id: 'owner' })
+    state.upsertError = { message: 'net' }
+    expect(await pushSurveys([mkSurvey('A')], 'owner')).toBe(false)
+    state.upsertError = null
+    state.upsertThrow = true
+    expect(await pushSurveys([mkSurvey('A')], 'owner')).toBe(false)
+  })
+  it('returns true immediately if surveys array is empty', async () => {
+    const { pushSurveys } = await import('./sync')
+    expect(await pushSurveys([], 'owner')).toBe(true)
   })
 })
