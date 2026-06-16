@@ -13,8 +13,12 @@ const state = vi.hoisted(() => ({
 vi.mock('./supabase', () => ({
   supabase: {
     from: () => ({
-      upsert: (row: Record<string, unknown>) => {
-        state.pushed.push(row)
+      upsert: (rowOrRows: Record<string, unknown> | Record<string, unknown>[]) => {
+        if (Array.isArray(rowOrRows)) {
+          state.pushed.push(...rowOrRows)
+        } else {
+          state.pushed.push(rowOrRows)
+        }
         return Promise.resolve({ error: state.pushError })
       },
       delete: () => ({
