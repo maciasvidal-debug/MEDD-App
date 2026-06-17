@@ -26,6 +26,12 @@ vi.mock('./supabase', () => ({
           state.deleted.push(id)
           return Promise.resolve({ error: state.deleteFailIds.has(id) ? { message: 'net' } : null })
         },
+        in: (_col: string, ids: string[]) => {
+          state.deleted.push(...ids)
+          // Bulk delete is atomic: the whole call fails if any id can't be deleted.
+          const failed = ids.some(id => state.deleteFailIds.has(id))
+          return Promise.resolve({ error: failed ? { message: 'net' } : null })
+        },
       }),
       select: () => ({
         order: () => Promise.resolve({ data: state.remoteRows, error: null }),
