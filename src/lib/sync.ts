@@ -84,6 +84,16 @@ export async function deleteSurveyRemote(id: string): Promise<boolean> {
   }
 }
 
+export async function deleteSurveysRemote(ids: string[]): Promise<boolean> {
+  if (!ids.length) return true
+  try {
+    const { error } = await supabase.from('surveys').delete().in('id', ids)
+    return !error
+  } catch {
+    return false
+  }
+}
+
 export async function pullSurveys(): Promise<Survey[]> {
   try {
     const { data, error } = await supabase
@@ -115,12 +125,16 @@ export async function fullSync(
   //    pull below from resurrecting a row the user already deleted locally.
   const tombstoned = new Set<string>()
   const deletionIds = await getDeletionIds()
-  const deleteResults = await Promise.all(
-    deletionIds.map(id => deleteSurveyRemote(id).then(ok => ({ id, ok }))),
-  )
-  await Promise.all(deleteResults.filter(r => r.ok).map(r => removeDeletion(r.id)))
-  for (const { id, ok } of deleteResults) {
-    if (!ok) tombstoned.add(id)
+  if (deletionIds.length) {
+    // Single bulk delete instead of one request per id. The server applies it
+    // atomically, so either every tombstone is confirmed (drop them all) or the
+    // call failed (keep them all pending to retry and guard the pull below).
+    const ok = await deleteSurveysRemote(deletionIds)
+    if (ok) {
+      await Promise.all(deletionIds.map(id => removeDeletion(id)))
+    } else {
+      for (const id of deletionIds) tombstoned.add(id)
+    }
   }
 
   // 1. Push (encuestadores only) — all requests in parallel, then batch-save synced ones
