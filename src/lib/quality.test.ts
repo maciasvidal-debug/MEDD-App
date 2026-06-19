@@ -21,8 +21,34 @@ describe('validateDraft — hard errors', () => {
     expect(r.errors.some(e => e.includes('dispensación'))).toBe(true)
   })
   it('passes a coherent record with no errors', () => {
-    const r = validateDraft(draft({ fEta: '2026-01-10', fNac: '1990-01-01', cantMed: 5, cantMedVto: 2 }))
+    const r = validateDraft(draft({
+      fEta: '2026-01-10', fNac: '1990-01-01', cantMed: 5, cantMedVto: 2,
+      // Expired units are declared, so a past-dated product must back them up.
+      medications: [{ nmMed: 'X', dci: '', concMed: null, undConc: '', fVto: '2025-12-01' }],
+    }))
     expect(r.errors).toHaveLength(0)
+  })
+})
+
+describe('validateDraft — expired-without-detail integrity', () => {
+  const expiredMed = { nmMed: 'X', dci: '', concMed: null, undConc: '' as const, fVto: '2025-12-01' }
+  const liveMed    = { nmMed: 'Y', dci: '', concMed: null, undConc: '' as const, fVto: '2030-01-01' }
+
+  it('errors when vtoMedNc is Sí but no product is expired', () => {
+    const r = validateDraft(draft({ fEta: '2026-01-10', medSob: 'Sí', vtoMedNc: 'Sí' }))
+    expect(r.errors.some(e => e.includes('ningún producto del detalle'))).toBe(true)
+  })
+  it('errors when expired units are counted but no product is expired', () => {
+    const r = validateDraft(draft({ fEta: '2026-01-10', cantMed: 3, cantMedVto: 1, medications: [liveMed] }))
+    expect(r.errors.some(e => e.includes('ningún producto del detalle'))).toBe(true)
+  })
+  it('passes when a past-dated product backs the declared expired meds', () => {
+    const r = validateDraft(draft({ fEta: '2026-01-10', vtoMedNc: 'Sí', cantMedVto: 1, medications: [expiredMed] }))
+    expect(r.errors.some(e => e.includes('ningún producto del detalle'))).toBe(false)
+  })
+  it('does not fire when no expired meds are declared', () => {
+    const r = validateDraft(draft({ fEta: '2026-01-10', medSob: 'Sí', vtoMedNc: 'No', cantMedVto: 0 }))
+    expect(r.errors.some(e => e.includes('ningún producto del detalle'))).toBe(false)
   })
 })
 

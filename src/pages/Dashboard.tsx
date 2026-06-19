@@ -9,6 +9,7 @@ import { useStore } from '../lib/store'
 import { useShallow } from 'zustand/react/shallow'
 import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, terminalDigitTest, cohenKappa, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult, type DigitTest, type KappaResult } from '../lib/utils'
 import { OPT } from '../lib/constants'
+import { declaresExpiredWithoutDetail } from '../lib/quality'
 import type { Survey } from '../types'
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
@@ -187,6 +188,9 @@ export default function DashboardPage() {
   const retention = useMemo(() => buildRetention(data), [data])
   const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
   const surveyorQC = useMemo(() => buildSurveyorQC(data), [data])
+  // Records that declare expired meds in the home but carry no expired-product
+  // detail — the integrity gap surfaced for follow-up / back-check.
+  const integrityIssues = useMemo(() => data.filter(declaresExpiredWithoutDetail), [data])
   const backcheck = useMemo(() => buildBackcheckAgreement(data), [data])
   const adjusted = useMemo(() => buildEstratoAdjusted(data), [data])
 
@@ -325,6 +329,9 @@ export default function DashboardPage() {
 
         {/* Control de calidad operativo por encuestador (para-data / antifraude) */}
         {isInvestigador && surveyorQC && <SurveyorQCCard qc={surveyorQC} />}
+
+        {/* Integridad: vencidos declarados sin detalle de producto vencido */}
+        {isInvestigador && integrityIssues.length > 0 && <IntegrityCard issues={integrityIssues} />}
 
         {/* Concordancia de back-check (fiabilidad inter-observador) */}
         {isInvestigador && backcheck && <BackcheckAgreementCard a={backcheck} />}
@@ -1045,6 +1052,45 @@ function SurveyorQCCard({ qc }: { qc: SurveyorQC }) {
           «Rápidas» = entrevistas &lt; {FAST_SECONDS}s (heurístico); la duración solo está disponible
           desde esta versión. Estas señales orientan auditoría, no son prueba por sí solas.
         </div>
+      </div>
+    </Card>
+  )
+}
+
+// ─── Data integrity: declared expired meds without expired-product detail ───
+
+// Surfaces records flagged "has expired meds in the home" (vtoMedNc='Sí' or a
+// positive expired-unit count) that carry no medication entry with a past
+// expiry date. These can't be analysed at the product level and should be
+// re-captured or back-checked. Investigator-only, read-only.
+function IntegrityCard({ issues }: { issues: Survey[] }) {
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Integridad — vencidos declarados sin detalle</SectionLabel>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        <strong style={{ color: C.amber }}>{issues.length}</strong> encuesta(s) marcan medicamentos
+        vencidos en el hogar pero <strong>ningún producto</strong> tiene fecha de vencimiento pasada.
+        No pueden analizarse a nivel de producto: priorizar corrección o back-check.
+      </p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {issues.slice(0, 40).map(s => (
+          <span
+            key={s.id}
+            title={`${s.ciudad || 'Sin ciudad'} · ${s.cantMedVto ?? 0} unidad(es) vencida(s) declarada(s)`}
+            style={{
+              fontSize: 12, fontWeight: 600, color: C.amber,
+              background: C.amberLight, border: `1px solid ${C.amber}40`,
+              borderRadius: 7, padding: '3px 8px',
+            }}
+          >
+            #{String(s.nui).padStart(3, '0')}
+          </span>
+        ))}
+        {issues.length > 40 && (
+          <span style={{ fontSize: 12, color: C.hint, alignSelf: 'center' }}>
+            +{issues.length - 40} más
+          </span>
+        )}
       </div>
     </Card>
   )
