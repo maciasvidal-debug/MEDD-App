@@ -68,8 +68,9 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/Analítica de medicamentos/i)).toBeInTheDocument()
     // Plain-DOM KPIs (Recharts axes don't render under jsdom's zero-width layout).
     expect(screen.getByText('Princ. activos')).toBeInTheDocument()
-    // Therapeutic-group (ATC) section with its coverage indicator.
+    // Therapeutic-class sections (ATC level 1 and 2) with coverage indicator.
     expect(screen.getByText(/Grupo terapéutico \(ATC nivel 1\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Subgrupo terapéutico \(ATC nivel 2\)/i)).toBeInTheDocument()
   })
 
   it('renders the motives card scoped to v2 records (not asked v1 excluded)', () => {

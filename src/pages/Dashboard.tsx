@@ -10,7 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, terminalDigitTest, cohenKappa, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult, type DigitTest, type KappaResult } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import { declaresExpiredWithoutDetail } from '../lib/quality'
-import { therapeuticGroup, SIN_CLASIFICAR } from '../lib/atc'
+import { therapeuticGroup, therapeuticSubgroup, SIN_CLASIFICAR } from '../lib/atc'
 import type { Survey } from '../types'
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
@@ -1082,6 +1082,8 @@ interface MedStats {
   topProducts:     Array<{ name: string; n: number }>
   byGroup:         Array<{ name: string; n: number }>
   byGroupExpired:  Array<{ name: string; value: number }>
+  bySubgroup:      Array<{ name: string; n: number }>
+  bySubgroupExpired: Array<{ name: string; value: number }>
 }
 
 // Single pass over every stored product across all surveys, aggregating the
@@ -1093,6 +1095,7 @@ function buildMedicationStats(surveys: Survey[]): MedStats | null {
   const dciMap   = new Map<string, { n: number; expired: number }>()
   const prodMap  = new Map<string, number>()
   const groupMap = new Map<string, { n: number; expired: number }>()
+  const subgroupMap = new Map<string, { n: number; expired: number }>()
   let totalProducts = 0, expiredProducts = 0, withVto = 0, classified = 0
 
   for (const s of surveys) {
@@ -1111,12 +1114,17 @@ function buildMedicationStats(surveys: Survey[]): MedStats | null {
       const nm = (m.nmMed || '').trim()
       if (nm) prodMap.set(nm, (prodMap.get(nm) ?? 0) + 1)
 
-      // Therapeutic group (ATC level 1) derived from the active ingredient.
+      // Therapeutic class (ATC) derived from the active ingredient.
       const group = therapeuticGroup(m.dci || '')
       if (group !== SIN_CLASIFICAR) classified++
       const gg = groupMap.get(group) ?? { n: 0, expired: 0 }
       gg.n++; if (expired) gg.expired++
       groupMap.set(group, gg)
+
+      const sub = therapeuticSubgroup(m.dci || '')
+      const sg = subgroupMap.get(sub) ?? { n: 0, expired: 0 }
+      sg.n++; if (expired) sg.expired++
+      subgroupMap.set(sub, sg)
     }
   }
   if (totalProducts === 0) return null
@@ -1142,11 +1150,19 @@ function buildMedicationStats(surveys: Survey[]): MedStats | null {
     .filter(([name, g]) => name !== SIN_CLASIFICAR && g.expired > 0)
     .map(([name, g]) => ({ name, value: g.expired }))
     .sort((a, b) => b.value - a.value)
+  const bySubgroup = Array.from(subgroupMap.entries())
+    .filter(([name, g]) => name !== SIN_CLASIFICAR && g.n > 0)
+    .map(([name, g]) => ({ name, n: g.n }))
+    .sort((a, b) => b.n - a.n).slice(0, 12)
+  const bySubgroupExpired = Array.from(subgroupMap.entries())
+    .filter(([name, g]) => name !== SIN_CLASIFICAR && g.expired > 0)
+    .map(([name, g]) => ({ name, value: g.expired }))
+    .sort((a, b) => b.value - a.value).slice(0, 12)
   const classifiedPct = pct(classified, totalProducts)
 
   return {
     totalProducts, expiredProducts, distinctDci: dciMap.size, withVto, classifiedPct,
-    topDci, topExpiredDci, topProducts, byGroup, byGroupExpired,
+    topDci, topExpiredDci, topProducts, byGroup, byGroupExpired, bySubgroup, bySubgroupExpired,
   }
 }
 
@@ -1174,6 +1190,20 @@ function MedicationStatsCard({ s }: { s: MedStats }) {
         <div style={{ marginBottom: 14 }}>
           <SubLabel>Vencidos por grupo terapéutico</SubLabel>
           <DistBar data={s.byGroupExpired} dataKey="value" color={CHART.amber} yWidth={150} barName="Vencidos" />
+        </div>
+      )}
+
+      {s.bySubgroup.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Subgrupo terapéutico (ATC nivel 2)</SubLabel>
+          <DistBar data={s.bySubgroup} color={CHART.purple} yWidth={185} barName="Productos" />
+        </div>
+      )}
+
+      {s.bySubgroupExpired.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Vencidos por subgrupo (ATC nivel 2)</SubLabel>
+          <DistBar data={s.bySubgroupExpired} dataKey="value" color={CHART.amber} yWidth={185} barName="Vencidos" />
         </div>
       )}
 

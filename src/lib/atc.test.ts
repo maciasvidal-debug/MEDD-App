@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { therapeuticGroup, normalizeDci, SIN_CLASIFICAR } from './atc'
+import { therapeuticGroup, therapeuticSubgroup, normalizeDci, SIN_CLASIFICAR } from './atc'
 
 describe('normalizeDci', () => {
   it('lowercases, strips accents and collapses whitespace', () => {
@@ -52,5 +52,28 @@ describe('therapeuticGroup', () => {
   it('returns SIN_CLASIFICAR for unknown or empty input', () => {
     expect(therapeuticGroup('')).toBe(SIN_CLASIFICAR)
     expect(therapeuticGroup('xyz sustancia inexistente')).toBe(SIN_CLASIFICAR)
+  })
+})
+
+describe('therapeuticSubgroup (ATC level 2)', () => {
+  it('classifies into ATC level-2 subgroups', () => {
+    expect(therapeuticSubgroup('amoxicilina')).toBe('Antibacterianos (J01)')
+    expect(therapeuticSubgroup('meloxicam')).toBe('AINE / antirreumáticos (M01)')
+    expect(therapeuticSubgroup('amlodipino')).toBe('Calcioantagonistas (C08)')
+    expect(therapeuticSubgroup('losartan 50 mg potasico')).toBe('IECA / ARA-II (C09)')
+    expect(therapeuticSubgroup('acetaminofen')).toBe('Analgésicos (N02)')
+    expect(therapeuticSubgroup('omeprazol')).toBe('Antiácidos / antiulcerosos (A02)')
+  })
+
+  it('level 1 stays consistent with level 2 (same anatomical letter)', () => {
+    // empagliflozina → A10 (antidiabético) → grupo A
+    expect(therapeuticSubgroup('empagliflozina')).toBe('Antidiabéticos (A10)')
+    expect(therapeuticGroup('empagliflozina')).toBe('Digestivo y metabolismo')
+  })
+
+  it('routes herbal/homeopathic and unknowns coherently at both levels', () => {
+    expect(therapeuticSubgroup('chancapiedra')).toBe('Fitoterapéutico/homeopático')
+    expect(therapeuticSubgroup('')).toBe(SIN_CLASIFICAR)
+    expect(therapeuticSubgroup('xyz sustancia inexistente')).toBe(SIN_CLASIFICAR)
   })
 })
