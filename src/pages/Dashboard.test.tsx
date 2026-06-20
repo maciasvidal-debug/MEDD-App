@@ -68,6 +68,9 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/Analítica de medicamentos/i)).toBeInTheDocument()
     // Plain-DOM KPIs (Recharts axes don't render under jsdom's zero-width layout).
     expect(screen.getByText('Princ. activos')).toBeInTheDocument()
+    // Therapeutic-class sections (ATC level 1 and 2) with coverage indicator.
+    expect(screen.getByText(/Grupo terapéutico \(ATC nivel 1\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Subgrupo terapéutico \(ATC nivel 2\)/i)).toBeInTheDocument()
   })
 
   it('renders the motives card scoped to v2 records (not asked v1 excluded)', () => {
@@ -86,6 +89,24 @@ describe('DashboardPage', () => {
     // and the v1 record is reported separately as "not asked".
     expect(screen.getByText(/del instrumento v2 con medicamentos/i)).toBeInTheDocument()
     expect(screen.getByText(/no incluyen estas preguntas/i)).toBeInTheDocument()
+  })
+
+  it('renders the class × motive contingency for v2 records', () => {
+    useStore.setState({
+      userRole: 'investigador',
+      surveys: [
+        mkSurvey('a', {
+          instrumentVersion: 2, medSob: 'Sí',
+          medications: [{ nmMed: 'Amoxal', dci: 'Amoxicilina', concMed: 500, undConc: 'mg', fVto: '2030-01-01' }],
+          motNoConsumo: ['Mejoró / cedieron los síntomas'],
+        } as Partial<Survey>),
+      ],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Clase terapéutica × motivo de no consumo/i)).toBeInTheDocument()
+    // Table is plain DOM (no Recharts): the group row and motive column render.
+    expect(screen.getByText('Antiinfecciosos')).toBeInTheDocument()
+    expect(screen.getByText('Mejoró / cedieron los síntomas')).toBeInTheDocument()
   })
 
   it('renders the back-check agreement card when a re-interview exists', () => {

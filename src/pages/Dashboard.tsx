@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, terminalDigitTest, cohenKappa, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult, type DigitTest, type KappaResult } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import { declaresExpiredWithoutDetail } from '../lib/quality'
+import { therapeuticGroup, therapeuticSubgroup, SIN_CLASIFICAR } from '../lib/atc'
 import type { Survey } from '../types'
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
@@ -193,6 +194,8 @@ export default function DashboardPage() {
   // Motives battery (instrument v2) — denominator scoped to records that were
   // actually asked, keeping "not asked" (v1) out of the percentages.
   const motiveStats = useMemo(() => buildMotiveStats(data), [data])
+  // Therapeutic class × non-consumption motive contingency (hypothesis view).
+  const classMotive = useMemo(() => buildClassMotiveCross(data), [data])
   // Records that declare expired meds in the home but carry no expired-product
   // detail — the integrity gap surfaced for follow-up / back-check.
   const integrityIssues = useMemo(() => data.filter(declaresExpiredWithoutDetail), [data])
@@ -322,6 +325,9 @@ export default function DashboardPage() {
 
         {/* Motivos de no consumo / acumulación y disposición (instrumento v2) */}
         {motiveStats && <MotivesCard s={motiveStats} />}
+
+        {/* Cruce clase terapéutica × motivo de no consumo */}
+        {classMotive && <ClassMotiveCard c={classMotive} />}
 
         {/* Prevalencias con incertidumbre */}
         <PrevalenceCard
@@ -1075,9 +1081,14 @@ interface MedStats {
   expiredProducts: number
   distinctDci:     number
   withVto:         number                          // products carrying an expiry date
+  classifiedPct:   number                          // % of products mapped to a therapeutic group
   topDci:          Array<{ name: string; n: number }>
   topExpiredDci:   Array<{ name: string; value: number }>
   topProducts:     Array<{ name: string; n: number }>
+  byGroup:         Array<{ name: string; n: number }>
+  byGroupExpired:  Array<{ name: string; value: number }>
+  bySubgroup:      Array<{ name: string; n: number }>
+  bySubgroupExpired: Array<{ name: string; value: number }>
 }
 
 // Single pass over every stored product across all surveys, aggregating the
@@ -1086,9 +1097,11 @@ interface MedStats {
 // accumulate the most expired units. `isExpired` reuses the same product metric
 // as the rest of the app (F_VTO < F_ETA).
 function buildMedicationStats(surveys: Survey[]): MedStats | null {
-  const dciMap  = new Map<string, { n: number; expired: number }>()
-  const prodMap = new Map<string, number>()
-  let totalProducts = 0, expiredProducts = 0, withVto = 0
+  const dciMap   = new Map<string, { n: number; expired: number }>()
+  const prodMap  = new Map<string, number>()
+  const groupMap = new Map<string, { n: number; expired: number }>()
+  const subgroupMap = new Map<string, { n: number; expired: number }>()
+  let totalProducts = 0, expiredProducts = 0, withVto = 0, classified = 0
 
   for (const s of surveys) {
     for (const m of s.medications ?? []) {
@@ -1105,6 +1118,18 @@ function buildMedicationStats(surveys: Survey[]): MedStats | null {
       }
       const nm = (m.nmMed || '').trim()
       if (nm) prodMap.set(nm, (prodMap.get(nm) ?? 0) + 1)
+
+      // Therapeutic class (ATC) derived from the active ingredient.
+      const group = therapeuticGroup(m.dci || '')
+      if (group !== SIN_CLASIFICAR) classified++
+      const gg = groupMap.get(group) ?? { n: 0, expired: 0 }
+      gg.n++; if (expired) gg.expired++
+      groupMap.set(group, gg)
+
+      const sub = therapeuticSubgroup(m.dci || '')
+      const sg = subgroupMap.get(sub) ?? { n: 0, expired: 0 }
+      sg.n++; if (expired) sg.expired++
+      subgroupMap.set(sub, sg)
     }
   }
   if (totalProducts === 0) return null
@@ -1120,7 +1145,30 @@ function buildMedicationStats(surveys: Survey[]): MedStats | null {
     .map(([name, n]) => ({ name, n }))
     .sort((a, b) => b.n - a.n).slice(0, 8)
 
-  return { totalProducts, expiredProducts, distinctDci: dciMap.size, withVto, topDci, topExpiredDci, topProducts }
+  // Therapeutic-group distributions exclude the "Sin clasificar" bucket from the
+  // bars (it's summarised separately as the classified-coverage %).
+  const byGroup = Array.from(groupMap.entries())
+    .filter(([name, g]) => name !== SIN_CLASIFICAR && g.n > 0)
+    .map(([name, g]) => ({ name, n: g.n }))
+    .sort((a, b) => b.n - a.n)
+  const byGroupExpired = Array.from(groupMap.entries())
+    .filter(([name, g]) => name !== SIN_CLASIFICAR && g.expired > 0)
+    .map(([name, g]) => ({ name, value: g.expired }))
+    .sort((a, b) => b.value - a.value)
+  const bySubgroup = Array.from(subgroupMap.entries())
+    .filter(([name, g]) => name !== SIN_CLASIFICAR && g.n > 0)
+    .map(([name, g]) => ({ name, n: g.n }))
+    .sort((a, b) => b.n - a.n).slice(0, 12)
+  const bySubgroupExpired = Array.from(subgroupMap.entries())
+    .filter(([name, g]) => name !== SIN_CLASIFICAR && g.expired > 0)
+    .map(([name, g]) => ({ name, value: g.expired }))
+    .sort((a, b) => b.value - a.value).slice(0, 12)
+  const classifiedPct = pct(classified, totalProducts)
+
+  return {
+    totalProducts, expiredProducts, distinctDci: dciMap.size, withVto, classifiedPct,
+    topDci, topExpiredDci, topProducts, byGroup, byGroupExpired, bySubgroup, bySubgroupExpired,
+  }
 }
 
 function MedicationStatsCard({ s }: { s: MedStats }) {
@@ -1135,6 +1183,34 @@ function MedicationStatsCard({ s }: { s: MedStats }) {
         <MedKpi label="Vencidos" value={`${s.expiredProducts}`} sub={`${pct(s.expiredProducts, s.totalProducts)}%`} color={C.amber} />
         <MedKpi label="Con fecha vto." value={`${pct(s.withVto, s.totalProducts)}%`} sub={`${s.withVto}/${s.totalProducts}`} color={C.gray} />
       </div>
+
+      {s.byGroup.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Grupo terapéutico (ATC nivel 1) · {s.classifiedPct}% clasificado</SubLabel>
+          <DistBar data={s.byGroup} color={CHART.navy} yWidth={150} barName="Productos" />
+        </div>
+      )}
+
+      {s.byGroupExpired.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Vencidos por grupo terapéutico</SubLabel>
+          <DistBar data={s.byGroupExpired} dataKey="value" color={CHART.amber} yWidth={150} barName="Vencidos" />
+        </div>
+      )}
+
+      {s.bySubgroup.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Subgrupo terapéutico (ATC nivel 2)</SubLabel>
+          <DistBar data={s.bySubgroup} color={CHART.purple} yWidth={185} barName="Productos" />
+        </div>
+      )}
+
+      {s.bySubgroupExpired.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Vencidos por subgrupo (ATC nivel 2)</SubLabel>
+          <DistBar data={s.bySubgroupExpired} dataKey="value" color={CHART.amber} yWidth={185} barName="Vencidos" />
+        </div>
+      )}
 
       {s.topDci.length > 0 && (
         <div style={{ marginBottom: s.topExpiredDci.length > 0 ? 14 : 0 }}>
@@ -1160,6 +1236,8 @@ function MedicationStatsCard({ s }: { s: MedStats }) {
       <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
         Agregado sobre los {s.totalProducts} producto(s) almacenado(s). «Vencidos» se calcula por
         producto (F_VTO &lt; F_ETA); «con fecha vto.» indica la cobertura del dato de vencimiento.
+        El grupo terapéutico se deriva del principio activo (ATC nivel 1); {s.classifiedPct}% de los
+        productos quedó clasificado (el resto, «Sin clasificar», se excluye de esas barras).
       </p>
     </Card>
   )
@@ -1260,6 +1338,118 @@ function MotivesCard({ s }: { s: MotiveStats }) {
 
       <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
         Respuestas de selección múltiple: los porcentajes por opción pueden sumar más de 100%.
+      </p>
+    </Card>
+  )
+}
+
+// ─── Therapeutic class × non-consumption motive (contingency) ───────────────
+
+interface ClassMotiveCross {
+  motives: string[]                                              // motive columns present
+  rows: Array<{ group: string; base: number; counts: number[] }> // aligned to `motives`
+  nBase: number                                                  // households contributing
+}
+
+// Cross-tabulates, at the HOUSEHOLD level, the therapeutic groups a home stores
+// against the non-consumption motives it reported. Scoped to instrument v2 with
+// stored meds (the battery was asked) and to households with ≥1 classified
+// product. A household counts once per group it holds and once per motive it
+// selected, so a row's motive counts are over that group's household base —
+// e.g. "of homes keeping antibiotics, how many said 'symptoms improved'".
+function buildClassMotiveCross(surveys: Survey[]): ClassMotiveCross | null {
+  const asked = surveys.filter(s => (s.instrumentVersion ?? 1) >= 2 && s.medSob === 'Sí')
+  if (asked.length === 0) return null
+
+  const motiveTotals = new Map<string, number>()
+  const groupAgg = new Map<string, { base: number; counts: Map<string, number> }>()
+  let nBase = 0
+
+  for (const s of asked) {
+    const groups = new Set<string>()
+    for (const m of s.medications ?? []) {
+      const g = therapeuticGroup(m.dci || '')
+      if (g !== SIN_CLASIFICAR) groups.add(g)
+    }
+    if (groups.size === 0) continue
+    const motives = (s.motNoConsumo ?? []).filter(Boolean)
+    nBase++
+    for (const mo of motives) motiveTotals.set(mo, (motiveTotals.get(mo) ?? 0) + 1)
+    for (const g of groups) {
+      const agg = groupAgg.get(g) ?? { base: 0, counts: new Map<string, number>() }
+      agg.base++
+      for (const mo of motives) agg.counts.set(mo, (agg.counts.get(mo) ?? 0) + 1)
+      groupAgg.set(g, agg)
+    }
+  }
+
+  // Keep motive columns in codebook order, only those actually used.
+  const motives = OPT.motNoConsumo.filter(mo => (motiveTotals.get(mo) ?? 0) > 0)
+  if (nBase === 0 || motives.length === 0) return null
+
+  const rows = Array.from(groupAgg.entries())
+    .map(([group, agg]) => ({ group, base: agg.base, counts: motives.map(mo => agg.counts.get(mo) ?? 0) }))
+    .sort((a, b) => b.base - a.base)
+    .slice(0, 8)
+
+  return { motives, rows, nBase }
+}
+
+function ClassMotiveCard({ c }: { c: ClassMotiveCross }) {
+  const { motives, rows, nBase } = c
+  const th: React.CSSProperties = { padding: '6px 8px', fontSize: 11, color: C.muted, fontWeight: 600, whiteSpace: 'nowrap', textAlign: 'right', verticalAlign: 'bottom' }
+  const td: React.CSSProperties = { padding: '5px 8px', fontSize: 12, textAlign: 'right', borderTop: `0.5px solid ${C.border}` }
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Clase terapéutica × motivo de no consumo</SectionLabel>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Hogares (instrumento v2 con medicamentos) que <strong>almacenan</strong> cada grupo terapéutico,
+        según el <strong>motivo de no consumo</strong> declarado. Base: {nBase} hogar(es). Un hogar
+        cuenta en cada grupo que guarda; el sombreado es la proporción sobre la base del grupo (fila).
+      </p>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ ...th, textAlign: 'left' }}>Grupo</th>
+              <th style={th}>n</th>
+              {motives.map(mo => <th key={mo} style={th}>{mo}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => {
+              const max = Math.max(...r.counts, 0)
+              return (
+                <tr key={r.group}>
+                  <td style={{ ...td, textAlign: 'left', color: C.text, fontWeight: 600 }}>{r.group}</td>
+                  <td style={{ ...td, color: C.muted }} className="tnum">{r.base}</td>
+                  {r.counts.map((n, i) => {
+                    const share = r.base > 0 ? n / r.base : 0
+                    return (
+                      <td
+                        key={i}
+                        className="tnum"
+                        title={`${pct(n, r.base)}% de ${r.group} (n=${r.base})`}
+                        style={{
+                          ...td,
+                          background: n > 0 ? `color-mix(in srgb, ${C.teal} ${Math.round(share * 70)}%, transparent)` : 'transparent',
+                          color: n === 0 ? C.hint : C.text,
+                          fontWeight: n > 0 && n === max ? 700 : 400,
+                        }}
+                      >
+                        {n || '·'}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+        Exploratorio y de selección múltiple (las filas pueden sumar más del 100%). Celdas pequeñas:
+        interpretar con cautela. Pasa el cursor sobre una celda para ver el % sobre la base del grupo.
       </p>
     </Card>
   )
