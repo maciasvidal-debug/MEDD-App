@@ -109,6 +109,22 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Mejoró / cedieron los síntomas')).toBeInTheDocument()
   })
 
+  it('unifies disposal across v1 free-text and v2 structured records', () => {
+    useStore.setState({
+      userRole: 'investigador',
+      surveys: [
+        // v1: legacy free-text disposal, no structured field
+        mkSurvey('a', { medSob: 'Sí', ctoDispVc: 'lo boto a la basura' } as Partial<Survey>),
+        // v2: structured disposal
+        mkSurvey('b', { instrumentVersion: 2, medSob: 'Sí', dispFinal: ['Devuelve a farmacia / punto azul'] } as Partial<Survey>),
+      ],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Conducta de disposición \(v1 \+ v2 unificada\)/i)).toBeInTheDocument()
+    // Footnote reports the source split (plain DOM; Recharts bars don't render).
+    expect(screen.getByText(/de texto libre \(v1\)/i)).toBeInTheDocument()
+  })
+
   it('renders the back-check agreement card when a re-interview exists', () => {
     useStore.setState({
       userRole: 'investigador',

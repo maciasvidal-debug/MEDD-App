@@ -11,6 +11,7 @@ import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelH
 import { OPT } from '../lib/constants'
 import { declaresExpiredWithoutDetail } from '../lib/quality'
 import { therapeuticGroup, therapeuticSubgroup, SIN_CLASIFICAR } from '../lib/atc'
+import { disposalCategories } from '../lib/disposal'
 import type { Survey } from '../types'
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
@@ -196,6 +197,8 @@ export default function DashboardPage() {
   const motiveStats = useMemo(() => buildMotiveStats(data), [data])
   // Therapeutic class × non-consumption motive contingency (hypothesis view).
   const classMotive = useMemo(() => buildClassMotiveCross(data), [data])
+  // Disposal behaviour unified across v1 (free-text ctoDispVc) and v2 (dispFinal).
+  const disposal = useMemo(() => buildDisposalStats(data), [data])
   // Records that declare expired meds in the home but carry no expired-product
   // detail — the integrity gap surfaced for follow-up / back-check.
   const integrityIssues = useMemo(() => data.filter(declaresExpiredWithoutDetail), [data])
@@ -325,6 +328,9 @@ export default function DashboardPage() {
 
         {/* Motivos de no consumo / acumulación y disposición (instrumento v2) */}
         {motiveStats && <MotivesCard s={motiveStats} />}
+
+        {/* Conducta de disposición unificada (v1 texto libre + v2 estructurado) */}
+        {disposal && <DisposalCard d={disposal} />}
 
         {/* Cruce clase terapéutica × motivo de no consumo */}
         {classMotive && <ClassMotiveCard c={classMotive} />}
@@ -1267,7 +1273,6 @@ interface MotiveStats {
   nExpiredAsked: number   // subset also asked the expiry-reason block
   noConsumo:     Array<{ name: string; n: number }>
   vencimiento:   Array<{ name: string; n: number }>
-  dispFinal:     Array<{ name: string; n: number }>
   conoceSi:      number
   conoceBase:    number
 }
@@ -1294,7 +1299,6 @@ function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
     nExpiredAsked: expiredAsked.length,
     noConsumo:   count(asked, s => s.motNoConsumo, OPT.motNoConsumo),
     vencimiento: count(expiredAsked, s => s.motVencimiento, OPT.motVencimiento),
-    dispFinal:   count(asked, s => s.dispFinal, OPT.dispFinal),
     conoceSi:    asked.filter(s => s.conocePuntos === 'Sí').length,
     conoceBase:  asked.filter(s => s.conocePuntos === 'Sí' || s.conocePuntos === 'No').length,
   }
@@ -1329,15 +1333,75 @@ function MotivesCard({ s }: { s: MotiveStats }) {
         </div>
       )}
 
-      {s.dispFinal.length > 0 && (
-        <div>
-          <SubLabel>Conducta real de disposición</SubLabel>
-          <DistBar data={s.dispFinal} color={CHART.teal} yWidth={150} barName="Hogares" />
-        </div>
-      )}
-
       <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
         Respuestas de selección múltiple: los porcentajes por opción pueden sumar más de 100%.
+        La conducta de disposición se analiza aparte (v1 + v2 unificados).
+      </p>
+    </Card>
+  )
+}
+
+// ─── Disposal behaviour, unified across instrument versions ─────────────────
+
+interface DisposalStats {
+  base:             number   // homes (medSob=Sí) with disposal info (structured or text)
+  fromStructured:   number   // contributed via dispFinal[] (v2)
+  fromText:         number   // contributed via legacy free-text ctoDispVc (v1)
+  unclassifiedText: number   // had legacy text but no category could be derived
+  byCategory:       Array<{ name: string; n: number }>
+}
+
+// Unifies disposal practice across instrument versions: v2 records use the
+// structured dispFinal[]; v1 records derive categories from the legacy free-text
+// ctoDispVc via disposalCategories(). Nothing is mutated — the derivation is at
+// read time. Base = homes that store meds and carry any disposal info; coverage
+// is reported so the unclassified legacy tail is visible.
+function buildDisposalStats(surveys: Survey[]): DisposalStats | null {
+  const catCount = new Map<string, number>()
+  let base = 0, fromStructured = 0, fromText = 0, unclassifiedText = 0
+
+  for (const s of surveys) {
+    if (s.medSob !== 'Sí') continue
+    let cats: string[]
+    if (s.dispFinal?.length) {
+      cats = s.dispFinal
+      fromStructured++
+    } else if (s.ctoDispVc?.trim()) {
+      cats = disposalCategories(s.ctoDispVc)
+      fromText++
+      if (cats.length === 0) unclassifiedText++
+    } else {
+      continue // no disposal information at all
+    }
+    base++
+    for (const c of cats) catCount.set(c, (catCount.get(c) ?? 0) + 1)
+  }
+
+  if (base === 0) return null
+  const byCategory = OPT.dispFinal
+    .map(c => ({ name: c, n: catCount.get(c) ?? 0 }))
+    .filter(d => d.n > 0)
+    .sort((a, b) => b.n - a.n)
+
+  return { base, fromStructured, fromText, unclassifiedText, byCategory }
+}
+
+function DisposalCard({ d }: { d: DisposalStats }) {
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Conducta de disposición (v1 + v2 unificada)</SectionLabel>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Qué hacen los hogares con los medicamentos que ya no usan, combinando el dato estructurado
+        (v2) con el texto libre histórico (v1) reclasificado por palabras clave. Base: <strong>{d.base}</strong> hogar(es)
+        con información de disposición.
+      </p>
+      {d.byCategory.length > 0 && (
+        <DistBar data={d.byCategory} color={CHART.teal} yWidth={170} barName="Hogares" />
+      )}
+      <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+        Fuente: {d.fromStructured} estructurado(s) (v2) · {d.fromText} de texto libre (v1)
+        {d.unclassifiedText > 0 && <>, de los cuales {d.unclassifiedText} no pudo clasificarse</>}.
+        Selección múltiple: las barras pueden sumar más que la base.
       </p>
     </Card>
   )
