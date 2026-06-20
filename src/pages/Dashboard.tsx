@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, terminalDigitTest, cohenKappa, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult, type DigitTest, type KappaResult } from '../lib/utils'
 import { OPT } from '../lib/constants'
 import { declaresExpiredWithoutDetail } from '../lib/quality'
+import { therapeuticGroup, SIN_CLASIFICAR } from '../lib/atc'
 import type { Survey } from '../types'
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
@@ -1075,9 +1076,12 @@ interface MedStats {
   expiredProducts: number
   distinctDci:     number
   withVto:         number                          // products carrying an expiry date
+  classifiedPct:   number                          // % of products mapped to a therapeutic group
   topDci:          Array<{ name: string; n: number }>
   topExpiredDci:   Array<{ name: string; value: number }>
   topProducts:     Array<{ name: string; n: number }>
+  byGroup:         Array<{ name: string; n: number }>
+  byGroupExpired:  Array<{ name: string; value: number }>
 }
 
 // Single pass over every stored product across all surveys, aggregating the
@@ -1086,9 +1090,10 @@ interface MedStats {
 // accumulate the most expired units. `isExpired` reuses the same product metric
 // as the rest of the app (F_VTO < F_ETA).
 function buildMedicationStats(surveys: Survey[]): MedStats | null {
-  const dciMap  = new Map<string, { n: number; expired: number }>()
-  const prodMap = new Map<string, number>()
-  let totalProducts = 0, expiredProducts = 0, withVto = 0
+  const dciMap   = new Map<string, { n: number; expired: number }>()
+  const prodMap  = new Map<string, number>()
+  const groupMap = new Map<string, { n: number; expired: number }>()
+  let totalProducts = 0, expiredProducts = 0, withVto = 0, classified = 0
 
   for (const s of surveys) {
     for (const m of s.medications ?? []) {
@@ -1105,6 +1110,13 @@ function buildMedicationStats(surveys: Survey[]): MedStats | null {
       }
       const nm = (m.nmMed || '').trim()
       if (nm) prodMap.set(nm, (prodMap.get(nm) ?? 0) + 1)
+
+      // Therapeutic group (ATC level 1) derived from the active ingredient.
+      const group = therapeuticGroup(m.dci || '')
+      if (group !== SIN_CLASIFICAR) classified++
+      const gg = groupMap.get(group) ?? { n: 0, expired: 0 }
+      gg.n++; if (expired) gg.expired++
+      groupMap.set(group, gg)
     }
   }
   if (totalProducts === 0) return null
@@ -1120,7 +1132,22 @@ function buildMedicationStats(surveys: Survey[]): MedStats | null {
     .map(([name, n]) => ({ name, n }))
     .sort((a, b) => b.n - a.n).slice(0, 8)
 
-  return { totalProducts, expiredProducts, distinctDci: dciMap.size, withVto, topDci, topExpiredDci, topProducts }
+  // Therapeutic-group distributions exclude the "Sin clasificar" bucket from the
+  // bars (it's summarised separately as the classified-coverage %).
+  const byGroup = Array.from(groupMap.entries())
+    .filter(([name, g]) => name !== SIN_CLASIFICAR && g.n > 0)
+    .map(([name, g]) => ({ name, n: g.n }))
+    .sort((a, b) => b.n - a.n)
+  const byGroupExpired = Array.from(groupMap.entries())
+    .filter(([name, g]) => name !== SIN_CLASIFICAR && g.expired > 0)
+    .map(([name, g]) => ({ name, value: g.expired }))
+    .sort((a, b) => b.value - a.value)
+  const classifiedPct = pct(classified, totalProducts)
+
+  return {
+    totalProducts, expiredProducts, distinctDci: dciMap.size, withVto, classifiedPct,
+    topDci, topExpiredDci, topProducts, byGroup, byGroupExpired,
+  }
 }
 
 function MedicationStatsCard({ s }: { s: MedStats }) {
@@ -1135,6 +1162,20 @@ function MedicationStatsCard({ s }: { s: MedStats }) {
         <MedKpi label="Vencidos" value={`${s.expiredProducts}`} sub={`${pct(s.expiredProducts, s.totalProducts)}%`} color={C.amber} />
         <MedKpi label="Con fecha vto." value={`${pct(s.withVto, s.totalProducts)}%`} sub={`${s.withVto}/${s.totalProducts}`} color={C.gray} />
       </div>
+
+      {s.byGroup.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Grupo terapéutico (ATC nivel 1) · {s.classifiedPct}% clasificado</SubLabel>
+          <DistBar data={s.byGroup} color={CHART.navy} yWidth={150} barName="Productos" />
+        </div>
+      )}
+
+      {s.byGroupExpired.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Vencidos por grupo terapéutico</SubLabel>
+          <DistBar data={s.byGroupExpired} dataKey="value" color={CHART.amber} yWidth={150} barName="Vencidos" />
+        </div>
+      )}
 
       {s.topDci.length > 0 && (
         <div style={{ marginBottom: s.topExpiredDci.length > 0 ? 14 : 0 }}>
@@ -1160,6 +1201,8 @@ function MedicationStatsCard({ s }: { s: MedStats }) {
       <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
         Agregado sobre los {s.totalProducts} producto(s) almacenado(s). «Vencidos» se calcula por
         producto (F_VTO &lt; F_ETA); «con fecha vto.» indica la cobertura del dato de vencimiento.
+        El grupo terapéutico se deriva del principio activo (ATC nivel 1); {s.classifiedPct}% de los
+        productos quedó clasificado (el resto, «Sin clasificar», se excluye de esas barras).
       </p>
     </Card>
   )
