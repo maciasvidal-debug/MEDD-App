@@ -70,6 +70,24 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Princ. activos')).toBeInTheDocument()
   })
 
+  it('renders the motives card scoped to v2 records (not asked v1 excluded)', () => {
+    useStore.setState({
+      userRole: 'investigador',
+      surveys: [
+        // v2, asked the battery
+        mkSurvey('a', { instrumentVersion: 2, medSob: 'Sí', motNoConsumo: ['Sobró de la dosis'], dispFinal: ['Basura'], conocePuntos: 'No' } as Partial<Survey>),
+        // v1, battery not in the instrument → must not count toward the base
+        mkSurvey('b', { medSob: 'Sí' }),
+      ],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Motivos de acumulación y disposición/i)).toBeInTheDocument()
+    // Base text (count is in a separate <strong>, so match the surrounding node)
+    // and the v1 record is reported separately as "not asked".
+    expect(screen.getByText(/del instrumento v2 con medicamentos/i)).toBeInTheDocument()
+    expect(screen.getByText(/no incluyen estas preguntas/i)).toBeInTheDocument()
+  })
+
   it('renders the back-check agreement card when a re-interview exists', () => {
     useStore.setState({
       userRole: 'investigador',

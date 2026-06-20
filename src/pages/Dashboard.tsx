@@ -190,6 +190,9 @@ export default function DashboardPage() {
   const surveyorQC = useMemo(() => buildSurveyorQC(data), [data])
   // Product-level (medications[]) aggregation — the analytics that were missing.
   const medStats = useMemo(() => buildMedicationStats(data), [data])
+  // Motives battery (instrument v2) — denominator scoped to records that were
+  // actually asked, keeping "not asked" (v1) out of the percentages.
+  const motiveStats = useMemo(() => buildMotiveStats(data), [data])
   // Records that declare expired meds in the home but carry no expired-product
   // detail — the integrity gap surfaced for follow-up / back-check.
   const integrityIssues = useMemo(() => data.filter(declaresExpiredWithoutDetail), [data])
@@ -316,6 +319,9 @@ export default function DashboardPage() {
 
         {/* Analítica a nivel de medicamento (producto) */}
         {medStats && <MedicationStatsCard s={medStats} />}
+
+        {/* Motivos de no consumo / acumulación y disposición (instrumento v2) */}
+        {motiveStats && <MotivesCard s={motiveStats} />}
 
         {/* Prevalencias con incertidumbre */}
         <PrevalenceCard
@@ -1172,6 +1178,90 @@ function MedKpi({ label, value, sub, color }: { label: string; value: string; su
 function SubLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginBottom: 6 }}>{children}</div>
+  )
+}
+
+// ─── Motives battery analytics (instrument v2, version-aware denominators) ───
+
+interface MotiveStats {
+  nAsked:        number   // v2 surveys that store meds → shown the battery
+  nNotAsked:     number   // v1 surveys → battery not in the instrument
+  nExpiredAsked: number   // subset also asked the expiry-reason block
+  noConsumo:     Array<{ name: string; n: number }>
+  vencimiento:   Array<{ name: string; n: number }>
+  dispFinal:     Array<{ name: string; n: number }>
+  conoceSi:      number
+  conoceBase:    number
+}
+
+// Aggregates the multi-select motive answers. Crucially, the denominator is the
+// set of records that were actually ASKED — instrument v2 with stored meds — so
+// percentages aren't diluted by older "not asked" records (those are reported
+// separately as nNotAsked). A record is v1 when instrumentVersion is absent/<2.
+function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
+  const asked = surveys.filter(s => (s.instrumentVersion ?? 1) >= 2 && s.medSob === 'Sí')
+  const nNotAsked = surveys.filter(s => (s.instrumentVersion ?? 1) < 2).length
+  if (asked.length === 0) return null
+
+  const count = (rows: Survey[], pick: (s: Survey) => string[], opts: readonly string[]) =>
+    opts.map(o => ({ name: o, n: rows.filter(s => (pick(s) ?? []).includes(o)).length }))
+      .filter(d => d.n > 0)
+      .sort((a, b) => b.n - a.n)
+
+  const expiredAsked = asked.filter(s => s.vtoMedNc === 'Sí' || (s.cantMedVto ?? 0) > 0)
+
+  return {
+    nAsked: asked.length,
+    nNotAsked,
+    nExpiredAsked: expiredAsked.length,
+    noConsumo:   count(asked, s => s.motNoConsumo, OPT.motNoConsumo),
+    vencimiento: count(expiredAsked, s => s.motVencimiento, OPT.motVencimiento),
+    dispFinal:   count(asked, s => s.dispFinal, OPT.dispFinal),
+    conoceSi:    asked.filter(s => s.conocePuntos === 'Sí').length,
+    conoceBase:  asked.filter(s => s.conocePuntos === 'Sí' || s.conocePuntos === 'No').length,
+  }
+}
+
+function MotivesCard({ s }: { s: MotiveStats }) {
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Motivos de acumulación y disposición</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Base: <strong>{s.nAsked}</strong> encuesta(s) del instrumento v2 con medicamentos almacenados
+        (preguntadas).{s.nNotAsked > 0 && <> {s.nNotAsked} registro(s) previo(s) no incluyen estas preguntas (no preguntado).</>}
+      </p>
+
+      {s.conoceBase > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 12 }}>
+          <MiniDonut val={s.conoceSi} outOf={s.conoceBase} label="Conoce puntos de recolección" color={CHART.teal} />
+        </div>
+      )}
+
+      {s.noConsumo.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Motivos de no consumo</SubLabel>
+          <DistBar data={s.noConsumo} color={CHART.navy} yWidth={150} barName="Hogares" />
+        </div>
+      )}
+
+      {s.vencimiento.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Razones de acumulación / vencimiento (base: {s.nExpiredAsked} con vencidos)</SubLabel>
+          <DistBar data={s.vencimiento} color={CHART.amber} yWidth={150} barName="Hogares" />
+        </div>
+      )}
+
+      {s.dispFinal.length > 0 && (
+        <div>
+          <SubLabel>Conducta real de disposición</SubLabel>
+          <DistBar data={s.dispFinal} color={CHART.teal} yWidth={150} barName="Hogares" />
+        </div>
+      )}
+
+      <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+        Respuestas de selección múltiple: los porcentajes por opción pueden sumar más de 100%.
+      </p>
+    </Card>
   )
 }
 

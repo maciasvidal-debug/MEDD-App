@@ -574,6 +574,19 @@ function SurveyDetailModal({ survey: s, onClose }: { survey: Survey; onClose: ()
         {s.pesoMedNc != null && <DetailRow label="Peso total (g)" value={String(s.pesoMedNc)} />}
       </DetailSection>
 
+      {(s.motNoConsumo?.length > 0 || s.motVencimiento?.length > 0 || s.dispFinal?.length > 0 || !!s.conocePuntos) && (
+        <DetailSection icon="ti-help-circle" title="Motivos y disposición">
+          {s.motNoConsumo?.length > 0 && <DetailRow label="Motivo de no consumo" value={s.motNoConsumo.join(', ')} />}
+          {s.motNoConsumoOtro && <DetailRow label="— Otro" value={s.motNoConsumoOtro} />}
+          {s.motVencimiento?.length > 0 && <DetailRow label="Razón de acumulación/vto." value={s.motVencimiento.join(', ')} />}
+          {s.motVencimientoOtro && <DetailRow label="— Otro" value={s.motVencimientoOtro} />}
+          {s.dispFinal?.length > 0 && <DetailRow label="Conducta de disposición" value={s.dispFinal.join(', ')} />}
+          {s.dispFinalOtro && <DetailRow label="— Otro" value={s.dispFinalOtro} />}
+          {s.conocePuntos && <DetailRow label="Conoce puntos de recolección" value={s.conocePuntos} />}
+          {s.cualPunto && <DetailRow label="¿Cuál?" value={s.cualPunto} />}
+        </DetailSection>
+      )}
+
       <DetailSection icon="ti-pill" title={`Medicamentos — ${s.medications.length} producto(s)`}>
         {s.medications.length === 0 ? (
           <p style={{ color: C.hint, fontSize: 13, margin: '2px 0' }}>Sin productos registrados.</p>

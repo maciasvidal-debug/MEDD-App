@@ -39,6 +39,14 @@ const survey: Survey = {
   cantMedVto: 2,
   pesoMedNc: 12.5,
   medications: [{ nmMed: 'Acetaminofén', dci: 'Paracetamol' } as Survey['medications'][number]],
+  motNoConsumo: ['Sobró de la dosis'],
+  motNoConsumoOtro: '',
+  motVencimiento: ['Olvido'],
+  motVencimientoOtro: '',
+  dispFinal: ['Basura'],
+  dispFinalOtro: '',
+  conocePuntos: 'No',
+  cualPunto: '',
   obs: 'sin novedad',
   syncStatus: 'local',
 }
@@ -88,6 +96,25 @@ describe('sync mapping toRow/fromRow', () => {
     expect(fromRow(toRow(bc, 'u')).backcheckOf).toBe('orig-1')
     expect(toRow(survey, 'u').backcheck_of).toBeNull()
     expect(fromRow(toRow(survey, 'u')).backcheckOf).toBeUndefined()
+  })
+
+  it('round-trips the instrument version (absent → null/undefined)', () => {
+    const v2 = { ...survey, instrumentVersion: 2 }
+    expect(toRow(v2, 'u').instrument_version).toBe(2)
+    expect(fromRow(toRow(v2, 'u')).instrumentVersion).toBe(2)
+    expect(toRow(survey, 'u').instrument_version).toBeNull()
+    expect(fromRow(toRow(survey, 'u')).instrumentVersion).toBeUndefined()
+  })
+
+  it('round-trips the motive arrays and disposal fields', () => {
+    const back = fromRow(toRow(survey, 'u'))
+    expect(back.motNoConsumo).toEqual(['Sobró de la dosis'])
+    expect(back.dispFinal).toEqual(['Basura'])
+    expect(back.conocePuntos).toBe('No')
+    // Empty multi-selects round-trip as [] (never null) for safe rendering.
+    const empty = fromRow(toRow({ ...survey, motNoConsumo: [], dispFinal: [] }, 'u'))
+    expect(empty.motNoConsumo).toEqual([])
+    expect(empty.dispFinal).toEqual([])
   })
 
   it('preserves null numeric fields (not coerced to 0)', () => {

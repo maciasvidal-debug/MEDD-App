@@ -15,7 +15,16 @@ export const OPT = {
   estrato: [1, 2, 3, 4, 5, 6] as const,
   etrPrograma: ['Medicina', 'Enfermería', 'Regencia en Farmacia', 'Química Farmacéutica', 'Odontología', 'Bacteriología', 'Nutrición y Dietética', 'Otra'] as const,
   etrTipoInst: ['Pública', 'Privada'] as const,
+  // Motivos / disposición (instrumento v2). El valor «Otro» habilita un texto libre.
+  motNoConsumo: ['No terminó el tratamiento', 'Mejoró / cedieron los síntomas', 'Efectos adversos', 'Cambio de tratamiento médico', 'Sobró de la dosis', 'Automedicación', 'Fallecimiento de un familiar', 'Otro'] as const,
+  motVencimiento: ['Olvido', 'Acopio preventivo', 'Compró de más', 'Dosis sobrante', 'No sabía dónde desecharlos', 'Otro'] as const,
+  dispFinal: ['Basura', 'Inodoro / desagüe', 'Devuelve a farmacia / punto azul', 'Regala', 'Los guarda', 'Otro'] as const,
 } as const
+
+// Instrument version stamped on every new capture. Bump when adding/removing
+// survey questions so analytics can scope denominators to records that were
+// actually asked the question (see Survey.instrumentVersion).
+export const INSTRUMENT_VERSION = 2
 
 // Main Colombian cities (CIUDAD dropdown)
 export const CIUDADES = [
@@ -74,6 +83,14 @@ export const EMPTY_DRAFT: SurveyDraft = {
   cantMedVto: null,
   pesoMedNc:  null,
   medications:[],
+  motNoConsumo:       [],
+  motNoConsumoOtro:   '',
+  motVencimiento:     [],
+  motVencimientoOtro: '',
+  dispFinal:          [],
+  dispFinalOtro:      '',
+  conocePuntos:       '',
+  cualPunto:          '',
   obs:        '',
 }
 
@@ -152,6 +169,15 @@ export const CODEBOOK: CodebookEntry[] = [
   { variable: 'cantMed',       etiqueta: 'Cantidad de unidades sin consumir', tipo: 'entero', valores: '≥ 0' },
   { variable: 'cantMedVto',    etiqueta: 'Cantidad de unidades vencidas', tipo: 'entero', valores: '0 ≤ x ≤ cantMed' },
   { variable: 'pesoMedNc',     etiqueta: 'Peso de medicamentos no consumidos (gramos)', tipo: 'decimal', valores: '≥ 0' },
+  { variable: 'instrumentVersion', etiqueta: 'Versión del instrumento al capturar (1 = sin batería de motivos)', tipo: 'entero', valores: '1; 2 (vacío = 1)' },
+  { variable: 'motNoConsumo',      etiqueta: 'Motivos de no consumo (selección múltiple)', tipo: 'multivalor', valores: 'No terminó el tratamiento; Mejoró / cedieron los síntomas; Efectos adversos; Cambio de tratamiento médico; Sobró de la dosis; Automedicación; Fallecimiento de un familiar; Otro' },
+  { variable: 'motNoConsumoOtro',  etiqueta: 'Motivo de no consumo — otro (texto)', tipo: 'texto', valores: '—' },
+  { variable: 'motVencimiento',    etiqueta: 'Razones de acumulación/vencimiento (selección múltiple)', tipo: 'multivalor', valores: 'Olvido; Acopio preventivo; Compró de más; Dosis sobrante; No sabía dónde desecharlos; Otro' },
+  { variable: 'motVencimientoOtro',etiqueta: 'Razón de acumulación — otro (texto)', tipo: 'texto', valores: '—' },
+  { variable: 'dispFinal',         etiqueta: 'Conducta real de disposición (selección múltiple)', tipo: 'multivalor', valores: 'Basura; Inodoro / desagüe; Devuelve a farmacia / punto azul; Regala; Los guarda; Otro' },
+  { variable: 'dispFinalOtro',     etiqueta: 'Conducta de disposición — otro (texto)', tipo: 'texto', valores: '—' },
+  { variable: 'conocePuntos',      etiqueta: 'Conoce puntos de recolección posconsumo', tipo: 'binario', valores: 'Sí; No (vacío = no preguntado)' },
+  { variable: 'cualPunto',         etiqueta: 'Cuál punto de recolección conoce', tipo: 'texto', valores: '—' },
   { variable: 'obs',           etiqueta: 'Observaciones', tipo: 'texto', valores: '—' },
   { variable: 'createdAt',     etiqueta: 'Fecha de creación del registro (envío)', tipo: 'datetime ISO', valores: '—' },
   { variable: 'updatedAt',     etiqueta: 'Fecha de última modificación', tipo: 'datetime ISO', valores: '—' },

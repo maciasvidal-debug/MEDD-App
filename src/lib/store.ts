@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase'
 import { pushSurvey, deleteSurveyRemote, fullSync, fetchProfile, upsertProfile } from '../lib/sync'
 import { isProfileComplete, surveyMissingProfile } from '../lib/validators'
 import { uuid, todayISO } from '../lib/utils'
-import { EMPTY_DRAFT, DEFAULT_SETTINGS } from '../lib/constants'
+import { EMPTY_DRAFT, DEFAULT_SETTINGS, INSTRUMENT_VERSION } from '../lib/constants'
 
 // ─── Toast ────────────────────────────────────────────────────────────────
 
@@ -342,6 +342,9 @@ export const useStore = create<AppStore>((set, get) => ({
       startedAt: get().wizard?.startedAt,
       // QC re-interview linkage (set in openBackcheckWizard), if any.
       backcheckOf: get().wizard?.backcheckOf,
+      // Stamp the instrument version so analytics can scope the motives battery
+      // to records that were actually asked it (older records stay undefined).
+      instrumentVersion: INSTRUMENT_VERSION,
       syncStatus: 'local',
     }
     await saveSurvey(survey)
