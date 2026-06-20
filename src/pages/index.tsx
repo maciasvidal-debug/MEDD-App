@@ -12,11 +12,12 @@ import {
 import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
 import {
-  calcEdad, fmtDate, compareSortable,
+  calcEdad, fmtDate, fmtTimestamp, compareSortable,
   toCSV, toCodebookCSV, downloadBlob, dateTag, productMetrics,
 } from '../lib/utils'
 import { TOTAL_STEPS, FIELD_GUIDE } from '../lib/constants'
 import { isProfileComplete, surveyMissingProfile } from '../lib/validators'
+import { declaresExpiredWithoutDetail } from '../lib/quality'
 import type { SurveyDraft, Survey, Settings } from '../types'
 
 // DashboardPage lives in its own lazily-loaded chunk (pages/Dashboard.tsx) to
@@ -316,9 +317,9 @@ export function EncuestasPage() {
         )}
       </div>
 
-      {/* Medication detail modal */}
+      {/* Full survey inspector modal */}
       {detail && (
-        <MedDetailModal survey={detail} onClose={() => setDetail(null)} />
+        <SurveyDetailModal survey={detail} onClose={() => setDetail(null)} />
       )}
     </div>
   )
@@ -501,42 +502,156 @@ function Td({ children, numeric }: { children: React.ReactNode; numeric?: boolea
   )
 }
 
-function MedDetailModal({ survey, onClose }: { survey: Survey; onClose: () => void }) {
+// Full read-only survey inspector — every captured field, grouped by section,
+// plus per-product metrics and para-data. Lets an investigator do QC in-app
+// without exporting to an external tool. Empty fields are hidden to keep the
+// record scannable; always-relevant identifiers are shown even when blank.
+function SurveyDetailModal({ survey: s, onClose }: { survey: Survey; onClose: () => void }) {
+  const edad = calcEdad(s.fEta, s.fNac)
+  const inconsistent = declaresExpiredWithoutDetail(s)
+  const durSec = s.startedAt && s.createdAt
+    ? Math.round((new Date(s.createdAt).getTime() - new Date(s.startedAt).getTime()) / 1000)
+    : null
+  const fmtDur = (d: number | null) =>
+    d == null ? '—' : d >= 60 ? `${Math.floor(d / 60)}m ${d % 60}s` : `${d}s`
+
   return (
-    <Dialog
-      title={`Encuesta #${String(survey.nui).padStart(3, '0')} — Medicamentos`}
-      onClose={onClose}
-    >
-      {survey.medications.length === 0 ? (
-        <p style={{ color: C.hint, fontSize: 13 }}>Sin productos registrados.</p>
-      ) : (
-        survey.medications.map((m, i) => {
-          const mx = productMetrics(survey.fEta, survey.fDisp, m)
-          return (
-            <Card key={i} style={{ marginBottom: 10, background: mx.isExpired ? '#FEF3C7' : C.bg }}>
-              <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>
-                {m.nmMed || '—'}
-              </div>
-              {m.dci && <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Princ. activo: {m.dci}</div>}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                {m.concMed != null && m.undConc && (
-                  <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
-                )}
-                {m.fVto && (
-                  <Badge label={`Vence: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
-                )}
-              </div>
-              {/* Time metrics (Excel logic) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
-                <MetricCell label="Días vencido" value={mx.tVto} unit="d" highlight={mx.isExpired} />
-                <MetricCell label="En bodega" value={mx.tDisp} unit="d" />
-                <MetricCell label="Vida útil" value={mx.vUtil} unit="d" />
-              </div>
-            </Card>
-          )
-        })
+    <Dialog title={`Encuesta #${String(s.nui).padStart(3, '0')}`} onClose={onClose}>
+      {inconsistent && (
+        <div role="alert" style={{
+          display: 'flex', gap: 8, alignItems: 'flex-start',
+          background: C.amberLight, border: `1px solid ${C.amber}40`,
+          borderRadius: 10, padding: '9px 11px', marginBottom: 14,
+          fontSize: 12, color: C.amber, lineHeight: 1.45,
+        }}>
+          <i className="ti ti-alert-triangle" style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }} aria-hidden />
+          <span>Marca medicamentos vencidos en el hogar pero ningún producto tiene fecha de vencimiento pasada. Revisar / back-check.</span>
+        </div>
       )}
+
+      <DetailSection icon="ti-id-badge-2" title="Identificación">
+        <DetailRow label="N° registro" value={`#${String(s.nui).padStart(3, '0')}`} />
+        <DetailRow label="Fecha entrevista" value={fmtDate(s.fEta)} />
+        {s.nuiEtr != null && <DetailRow label="Encuestador (NUI)" value={`#${s.nuiEtr}`} />}
+        {s.etrPrograma && <DetailRow label="Programa" value={s.etrPrograma} />}
+        {s.etrInstitucion && <DetailRow label="Institución" value={s.etrInstitucion} />}
+        {s.etrTipoInst && <DetailRow label="Tipo institución" value={s.etrTipoInst} />}
+        {s.etrSemestre != null && <DetailRow label="Semestre" value={String(s.etrSemestre)} />}
+      </DetailSection>
+
+      <DetailSection icon="ti-user" title="Sociodemografía">
+        {edad != null && <DetailRow label="Edad" value={`${edad} años`} />}
+        {s.fNac && <DetailRow label="Fecha nacimiento" value={fmtDate(s.fNac)} />}
+        {s.ciudad && <DetailRow label="Ciudad" value={s.ciudad} />}
+        {s.dir && <DetailRow label="Dirección" value={s.dir} />}
+        {s.estrato != null && <DetailRow label="Estrato" value={String(s.estrato)} />}
+        {s.etnia && <DetailRow label="Etnia" value={s.etnia} />}
+        {s.asSalud && <DetailRow label="Régimen de salud" value={s.asSalud} />}
+        {s.estLab && <DetailRow label="Estado laboral" value={s.estLab} />}
+        {s.ingreso && <DetailRow label="Ingreso" value={s.ingreso} />}
+        {s.nvEstu && <DetailRow label="Nivel educativo" value={s.nvEstu} />}
+        {s.nvPosg && <DetailRow label="Posgrado" value={s.nvPosg} />}
+      </DetailSection>
+
+      <DetailSection icon="ti-stethoscope" title="Estado de salud">
+        {s.perSalud && <DetailRow label="Percepción de salud" value={s.perSalud} />}
+        {s.estSalud && <DetailRow label="Enfermo últimas 4 sem." value={s.estSalud} />}
+        {s.prbSalud && <DetailRow label="Problema de salud" value={s.prbSalud} />}
+        {s.conMed && <DetailRow label="Consultó por el problema" value={s.conMed} />}
+        {s.medPrc && <DetailRow label="Medicamentos prescritos" value={s.medPrc} />}
+        {s.fPrc && <DetailRow label="Fecha prescripción" value={fmtDate(s.fPrc)} />}
+        {s.fDisp && <DetailRow label="Fecha dispensación" value={fmtDate(s.fDisp)} />}
+        {s.indMed && <DetailRow label="Sigue indicaciones" value={s.indMed} />}
+      </DetailSection>
+
+      <DetailSection icon="ti-package" title="Almacenamiento y disposición">
+        {s.medSob && <DetailRow label="Almacena sin consumir" value={s.medSob} />}
+        {s.dispMedVc && <DetailRow label="Sabe qué hacer con vencidos" value={s.dispMedVc} />}
+        {s.ctoDispVc && <DetailRow label="Conducta de disposición" value={s.ctoDispVc} />}
+        {s.vtoMedNc && <DetailRow label="Vencidos observados" value={s.vtoMedNc} accent={s.vtoMedNc === 'Sí' ? C.amber : undefined} />}
+        {s.cantMed != null && <DetailRow label="Unidades sin consumir" value={String(s.cantMed)} />}
+        {s.cantMedVto != null && <DetailRow label="Unidades vencidas" value={String(s.cantMedVto)} accent={s.cantMedVto > 0 ? C.amber : undefined} />}
+        {s.pesoMedNc != null && <DetailRow label="Peso total (g)" value={String(s.pesoMedNc)} />}
+      </DetailSection>
+
+      <DetailSection icon="ti-pill" title={`Medicamentos — ${s.medications.length} producto(s)`}>
+        {s.medications.length === 0 ? (
+          <p style={{ color: C.hint, fontSize: 13, margin: '2px 0' }}>Sin productos registrados.</p>
+        ) : (
+          s.medications.map((m, i) => {
+            const mx = productMetrics(s.fEta, s.fDisp, m)
+            return (
+              <Card key={i} style={{ marginBottom: 10, background: mx.isExpired ? C.amberLight : C.bg }}>
+                <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>
+                  {m.nmMed || '—'}
+                </div>
+                {m.dci && <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Princ. activo: {m.dci}</div>}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {m.concMed != null && m.undConc && (
+                    <Badge label={`${m.concMed} ${m.undConc}`} variant="gray" />
+                  )}
+                  {m.fVto && (
+                    <Badge label={`Vence: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
+                  )}
+                </div>
+                {/* Time metrics (Excel logic) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
+                  <MetricCell label="Días vencido" value={mx.tVto} unit="d" highlight={mx.isExpired} />
+                  <MetricCell label="En bodega" value={mx.tDisp} unit="d" />
+                  <MetricCell label="Vida útil" value={mx.vUtil} unit="d" />
+                </div>
+              </Card>
+            )
+          })
+        )}
+      </DetailSection>
+
+      {s.obs && (
+        <DetailSection icon="ti-note" title="Observaciones">
+          <p style={{ fontSize: 13, color: C.text, lineHeight: 1.5, margin: '2px 0', whiteSpace: 'pre-wrap' }}>{s.obs}</p>
+        </DetailSection>
+      )}
+
+      <DetailSection icon="ti-clipboard-data" title="Para-data / control de calidad">
+        {s.backcheckOf && <DetailRow label="Back-check" value="Re-entrevista de control" accent={C.teal} />}
+        {s.startedAt && <DetailRow label="Inicio de captura" value={fmtTimestamp(s.startedAt)} />}
+        {s.createdAt && <DetailRow label="Guardada" value={fmtTimestamp(s.createdAt)} />}
+        {durSec != null && <DetailRow label="Duración" value={fmtDur(durSec)} accent={durSec < 120 ? C.amber : undefined} />}
+        {s.updatedAt && s.updatedAt !== s.createdAt && <DetailRow label="Última edición" value={fmtTimestamp(s.updatedAt)} />}
+        {s.dataEnv && <DetailRow label="Ambiente" value={s.dataEnv === 'prod' ? 'Producción' : 'Piloto'} />}
+        {s.syncStatus && <DetailRow label="Sincronización" value={s.syncStatus} />}
+      </DetailSection>
     </Dialog>
+  )
+}
+
+// Label/value row for the survey inspector — quiet label, ink value.
+function DetailRow({ label, value, accent }: { label: string; value: React.ReactNode; accent?: string }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', gap: 12,
+      padding: '5px 0', borderBottom: `0.5px solid ${C.border}`,
+    }}>
+      <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: accent ?? C.text, fontWeight: 500, textAlign: 'right', minWidth: 0, wordBreak: 'break-word' }}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+// Titled group of rows in the survey inspector.
+function DetailSection({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+        <i className={`ti ${icon}`} style={{ fontSize: 15, color: C.teal }} aria-hidden />
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.text, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+          {title}
+        </span>
+      </div>
+      {children}
+    </div>
   )
 }
 

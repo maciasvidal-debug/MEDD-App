@@ -26,6 +26,26 @@ function completenessOf(d: SurveyDraft): number {
 }
 
 /**
+ * True when the record declares expired medicines in the home — either the
+ * direct-observation flag (vtoMedNc='Sí') or a positive expired-unit count
+ * (cantMedVto>0) — yet no medication entry carries a past expiry date, so the
+ * expired product(s) were never detailed. This is the data-integrity gap that
+ * lets "has expired meds" surveys exist with no expired-product evidence.
+ * Reused by the wizard's pre-save check (hard error) and the investigator QC
+ * report, so both flag the exact same condition.
+ */
+export function declaresExpiredWithoutDetail(
+  d: Pick<SurveyDraft, 'fEta' | 'fDisp' | 'vtoMedNc' | 'cantMedVto' | 'medications'>,
+): boolean {
+  const declaresExpired = d.vtoMedNc === 'Sí' || (d.cantMedVto ?? 0) > 0
+  if (!declaresExpired) return false
+  const hasExpiredDetail = (d.medications ?? []).some(
+    m => productMetrics(d.fEta, d.fDisp, m).isExpired,
+  )
+  return !hasExpiredDetail
+}
+
+/**
  * Cross-field data-quality check run before a survey is saved. `errors` are
  * logical impossibilities that should block the save; `warnings` are
  * plausibility flags that are surfaced but don't block. `duplicate` is a likely
@@ -50,6 +70,9 @@ export function validateDraft(
   }
   if (d.cantMed != null && d.cantMedVto != null && d.cantMedVto > d.cantMed) {
     errors.push('Las unidades vencidas no pueden superar las unidades sin consumir.')
+  }
+  if (declaresExpiredWithoutDetail(d)) {
+    errors.push('Indicó medicamentos vencidos en casa, pero ningún producto del detalle tiene fecha de vencimiento pasada. Agregue el/los producto(s) vencido(s) con su fecha de vencimiento en el paso de Medicamentos.')
   }
 
   // — Soft plausibility —
