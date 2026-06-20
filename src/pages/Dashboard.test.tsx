@@ -91,6 +91,24 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/no incluyen estas preguntas/i)).toBeInTheDocument()
   })
 
+  it('renders the class × motive contingency for v2 records', () => {
+    useStore.setState({
+      userRole: 'investigador',
+      surveys: [
+        mkSurvey('a', {
+          instrumentVersion: 2, medSob: 'Sí',
+          medications: [{ nmMed: 'Amoxal', dci: 'Amoxicilina', concMed: 500, undConc: 'mg', fVto: '2030-01-01' }],
+          motNoConsumo: ['Mejoró / cedieron los síntomas'],
+        } as Partial<Survey>),
+      ],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Clase terapéutica × motivo de no consumo/i)).toBeInTheDocument()
+    // Table is plain DOM (no Recharts): the group row and motive column render.
+    expect(screen.getByText('Antiinfecciosos')).toBeInTheDocument()
+    expect(screen.getByText('Mejoró / cedieron los síntomas')).toBeInTheDocument()
+  })
+
   it('renders the back-check agreement card when a re-interview exists', () => {
     useStore.setState({
       userRole: 'investigador',

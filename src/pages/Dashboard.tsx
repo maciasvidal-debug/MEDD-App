@@ -194,6 +194,8 @@ export default function DashboardPage() {
   // Motives battery (instrument v2) — denominator scoped to records that were
   // actually asked, keeping "not asked" (v1) out of the percentages.
   const motiveStats = useMemo(() => buildMotiveStats(data), [data])
+  // Therapeutic class × non-consumption motive contingency (hypothesis view).
+  const classMotive = useMemo(() => buildClassMotiveCross(data), [data])
   // Records that declare expired meds in the home but carry no expired-product
   // detail — the integrity gap surfaced for follow-up / back-check.
   const integrityIssues = useMemo(() => data.filter(declaresExpiredWithoutDetail), [data])
@@ -323,6 +325,9 @@ export default function DashboardPage() {
 
         {/* Motivos de no consumo / acumulación y disposición (instrumento v2) */}
         {motiveStats && <MotivesCard s={motiveStats} />}
+
+        {/* Cruce clase terapéutica × motivo de no consumo */}
+        {classMotive && <ClassMotiveCard c={classMotive} />}
 
         {/* Prevalencias con incertidumbre */}
         <PrevalenceCard
@@ -1333,6 +1338,118 @@ function MotivesCard({ s }: { s: MotiveStats }) {
 
       <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
         Respuestas de selección múltiple: los porcentajes por opción pueden sumar más de 100%.
+      </p>
+    </Card>
+  )
+}
+
+// ─── Therapeutic class × non-consumption motive (contingency) ───────────────
+
+interface ClassMotiveCross {
+  motives: string[]                                              // motive columns present
+  rows: Array<{ group: string; base: number; counts: number[] }> // aligned to `motives`
+  nBase: number                                                  // households contributing
+}
+
+// Cross-tabulates, at the HOUSEHOLD level, the therapeutic groups a home stores
+// against the non-consumption motives it reported. Scoped to instrument v2 with
+// stored meds (the battery was asked) and to households with ≥1 classified
+// product. A household counts once per group it holds and once per motive it
+// selected, so a row's motive counts are over that group's household base —
+// e.g. "of homes keeping antibiotics, how many said 'symptoms improved'".
+function buildClassMotiveCross(surveys: Survey[]): ClassMotiveCross | null {
+  const asked = surveys.filter(s => (s.instrumentVersion ?? 1) >= 2 && s.medSob === 'Sí')
+  if (asked.length === 0) return null
+
+  const motiveTotals = new Map<string, number>()
+  const groupAgg = new Map<string, { base: number; counts: Map<string, number> }>()
+  let nBase = 0
+
+  for (const s of asked) {
+    const groups = new Set<string>()
+    for (const m of s.medications ?? []) {
+      const g = therapeuticGroup(m.dci || '')
+      if (g !== SIN_CLASIFICAR) groups.add(g)
+    }
+    if (groups.size === 0) continue
+    const motives = (s.motNoConsumo ?? []).filter(Boolean)
+    nBase++
+    for (const mo of motives) motiveTotals.set(mo, (motiveTotals.get(mo) ?? 0) + 1)
+    for (const g of groups) {
+      const agg = groupAgg.get(g) ?? { base: 0, counts: new Map<string, number>() }
+      agg.base++
+      for (const mo of motives) agg.counts.set(mo, (agg.counts.get(mo) ?? 0) + 1)
+      groupAgg.set(g, agg)
+    }
+  }
+
+  // Keep motive columns in codebook order, only those actually used.
+  const motives = OPT.motNoConsumo.filter(mo => (motiveTotals.get(mo) ?? 0) > 0)
+  if (nBase === 0 || motives.length === 0) return null
+
+  const rows = Array.from(groupAgg.entries())
+    .map(([group, agg]) => ({ group, base: agg.base, counts: motives.map(mo => agg.counts.get(mo) ?? 0) }))
+    .sort((a, b) => b.base - a.base)
+    .slice(0, 8)
+
+  return { motives, rows, nBase }
+}
+
+function ClassMotiveCard({ c }: { c: ClassMotiveCross }) {
+  const { motives, rows, nBase } = c
+  const th: React.CSSProperties = { padding: '6px 8px', fontSize: 11, color: C.muted, fontWeight: 600, whiteSpace: 'nowrap', textAlign: 'right', verticalAlign: 'bottom' }
+  const td: React.CSSProperties = { padding: '5px 8px', fontSize: 12, textAlign: 'right', borderTop: `0.5px solid ${C.border}` }
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Clase terapéutica × motivo de no consumo</SectionLabel>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Hogares (instrumento v2 con medicamentos) que <strong>almacenan</strong> cada grupo terapéutico,
+        según el <strong>motivo de no consumo</strong> declarado. Base: {nBase} hogar(es). Un hogar
+        cuenta en cada grupo que guarda; el sombreado es la proporción sobre la base del grupo (fila).
+      </p>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ ...th, textAlign: 'left' }}>Grupo</th>
+              <th style={th}>n</th>
+              {motives.map(mo => <th key={mo} style={th}>{mo}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => {
+              const max = Math.max(...r.counts, 0)
+              return (
+                <tr key={r.group}>
+                  <td style={{ ...td, textAlign: 'left', color: C.text, fontWeight: 600 }}>{r.group}</td>
+                  <td style={{ ...td, color: C.muted }} className="tnum">{r.base}</td>
+                  {r.counts.map((n, i) => {
+                    const share = r.base > 0 ? n / r.base : 0
+                    return (
+                      <td
+                        key={i}
+                        className="tnum"
+                        title={`${pct(n, r.base)}% de ${r.group} (n=${r.base})`}
+                        style={{
+                          ...td,
+                          background: n > 0 ? `color-mix(in srgb, ${C.teal} ${Math.round(share * 70)}%, transparent)` : 'transparent',
+                          color: n === 0 ? C.hint : C.text,
+                          fontWeight: n > 0 && n === max ? 700 : 400,
+                        }}
+                      >
+                        {n || '·'}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+        Exploratorio y de selección múltiple (las filas pueden sumar más del 100%). Celdas pequeñas:
+        interpretar con cautela. Pasa el cursor sobre una celda para ver el % sobre la base del grupo.
       </p>
     </Card>
   )
