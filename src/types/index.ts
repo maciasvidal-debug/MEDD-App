@@ -43,6 +43,10 @@ export interface Survey {
   // Back-check: if this survey is a quality-control re-interview, the id of the
   // original survey it re-verifies (NULL/undefined = normal capture).
   backcheckOf?: string
+  // Instrument version stamped at capture. Lets analytics tell "not asked"
+  // (older instrument, undefined/<2) apart from "asked but blank" for fields
+  // introduced mid-study (the motives battery below). Stamped on new captures.
+  instrumentVersion?: number
 
   // Identificación
   fEta:   string        // F_ETA   : Fecha de la entrevista YYYY-MM-DD
@@ -90,6 +94,18 @@ export interface Survey {
   // 1:N medicamentos (sub-formulario)
   medications: Medication[]
 
+  // ─── Motivos y disposición (instrumento v2, añadido a mitad de estudio) ─────
+  // Campos opcionales por diseño: en registros del instrumento v1 quedan
+  // vacíos/[] y se interpretan como «No preguntado» vía instrumentVersion.
+  motNoConsumo:       string[] // MOT_NO_CONSUMO  : por qué no se consumieron (multi)
+  motNoConsumoOtro:   string   // texto libre cuando incluye «Otro»
+  motVencimiento:     string[] // MOT_VENC        : por qué se acumularon/vencieron (multi)
+  motVencimientoOtro: string
+  dispFinal:          string[] // DISP_FINAL      : conducta real de disposición (multi)
+  dispFinalOtro:      string
+  conocePuntos:       SiNo     // CONOCE_PUNTOS    : conoce puntos de recolección posconsumo
+  cualPunto:          string   // CUAL_PUNTO       : cuál, si conoce
+
   obs: string // OBS: Observaciones (opcional)
 
   syncStatus?: SyncStatus
@@ -99,7 +115,7 @@ export type SyncStatus = 'local' | 'synced' | 'syncing' | 'error'
 export type UserRole   = 'encuestador' | 'investigador'
 export type DataEnv    = 'pilot' | 'prod'
 
-export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus' | 'startedAt' | 'dataEnv' | 'backcheckOf'>
+export type SurveyDraft = Omit<Survey, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus' | 'startedAt' | 'dataEnv' | 'backcheckOf' | 'instrumentVersion'>
 
 // ─── CUM-INVIMA ────────────────────────────────────────────────────────────
 export interface CUMRecord {

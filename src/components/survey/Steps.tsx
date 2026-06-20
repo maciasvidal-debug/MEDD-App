@@ -9,7 +9,7 @@ import {
   Field, ChipGroup, SectionHead, Divider,
   Card, Button, Spinner, C, Badge,
 } from '../ui'
-import { ChipField, YesNoField } from '../form'
+import { ChipField, YesNoField, MultiChipField } from '../form'
 import { useCUM } from '../../hooks/useCUM'
 import { useMunicipios } from '../../hooks/useMunicipios'
 import { OPT, FIELD_HELP } from '../../lib/constants'
@@ -494,16 +494,38 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
       cantMed:    draft.cantMed,
       cantMedVto: draft.cantMedVto,
       pesoMedNc:  draft.pesoMedNc,
+      motNoConsumo:       draft.motNoConsumo,
+      motNoConsumoOtro:   draft.motNoConsumoOtro,
+      motVencimiento:     draft.motVencimiento,
+      motVencimientoOtro: draft.motVencimientoOtro,
+      dispFinal:          draft.dispFinal,
+      dispFinalOtro:      draft.dispFinalOtro,
+      conocePuntos:       draft.conocePuntos,
+      cualPunto:          draft.cualPunto,
     },
   })
 
   const medSob    = watch('medSob')
   const dispMedVc = watch('dispMedVc')
   const cantMed   = watch('cantMed')
+  const vtoMedNc  = watch('vtoMedNc')
+  const cantMedVto = watch('cantMedVto')
+  const motNoConsumo = watch('motNoConsumo')
+  const motVencimiento = watch('motVencimiento')
+  const dispFinal = watch('dispFinal')
+  const conocePuntos = watch('conocePuntos')
+  // Reasons for expiry only make sense once expired meds are declared.
+  const hasExpired = vtoMedNc === 'Sí' || (cantMedVto ?? 0) > 0
 
   function handleNext(data: Step4Data) {
     const patch: Partial<SurveyDraft> = { ...data } as Partial<SurveyDraft>
     if (data.dispMedVc !== 'Sí') patch.ctoDispVc = ''
+    // Drop free-text / sub-answers that no longer apply, so a back-and-forth in
+    // the wizard can't leave orphaned values.
+    if (!data.motNoConsumo?.includes('Otro')) patch.motNoConsumoOtro = ''
+    if (!data.motVencimiento?.includes('Otro')) patch.motVencimientoOtro = ''
+    if (!data.dispFinal?.includes('Otro')) patch.dispFinalOtro = ''
+    if (data.conocePuntos !== 'Sí') patch.cualPunto = ''
     onNext(patch)
   }
 
@@ -563,6 +585,52 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
               {...register('pesoMedNc', { valueAsNumber: true })}
             />
           </Field>
+
+          {/* ─── Motivos y disposición (instrumento v2) ─── */}
+          <Divider label="Motivos y disposición" />
+
+          <MultiChipField control={control} name="motNoConsumo"
+            label="¿Por qué no se consumieron? (puede elegir varias)"
+            options={OPT.motNoConsumo} />
+          {motNoConsumo?.includes('Otro') && (
+            <Field label="Otro motivo de no consumo">
+              <Controller name="motNoConsumoOtro" control={control}
+                render={({ field }) => <input placeholder="Especifique…" {...field} />} />
+            </Field>
+          )}
+
+          {hasExpired && (
+            <div className="fade-in">
+              <MultiChipField control={control} name="motVencimiento"
+                label="¿Por qué llegaron a acumularse o vencerse? (puede elegir varias)"
+                options={OPT.motVencimiento} />
+              {motVencimiento?.includes('Otro') && (
+                <Field label="Otra razón de acumulación/vencimiento">
+                  <Controller name="motVencimientoOtro" control={control}
+                    render={({ field }) => <input placeholder="Especifique…" {...field} />} />
+                </Field>
+              )}
+            </div>
+          )}
+
+          <MultiChipField control={control} name="dispFinal"
+            label="¿Qué hace realmente con los medicamentos que ya no usa? (puede elegir varias)"
+            options={OPT.dispFinal} />
+          {dispFinal?.includes('Otro') && (
+            <Field label="Otra conducta de disposición">
+              <Controller name="dispFinalOtro" control={control}
+                render={({ field }) => <input placeholder="Especifique…" {...field} />} />
+            </Field>
+          )}
+
+          <YesNoField control={control} name="conocePuntos"
+            label="¿Conoce puntos de recolección de medicamentos (punto azul, farmacia)?" />
+          {conocePuntos === 'Sí' && (
+            <Field label="¿Cuál(es) conoce?">
+              <Controller name="cualPunto" control={control}
+                render={({ field }) => <input placeholder="Nombre del punto / lugar…" {...field} />} />
+            </Field>
+          )}
         </div>
       )}
 
@@ -947,6 +1015,14 @@ function AlmacenamientoCard({ draft }: { draft: SurveyDraft }) {
         <Row label="Cantidad sin consumir"  value={draft.cantMed} />
         <Row label="Cantidad vencidos"      value={draft.cantMedVto} />
         {draft.pesoMedNc != null && <Row label="Peso (g)" value={draft.pesoMedNc} />}
+        {draft.motNoConsumo.length > 0 && <Row label="Motivo de no consumo" value={draft.motNoConsumo.join(', ')} />}
+        {draft.motNoConsumoOtro && <Row label="— Otro" value={draft.motNoConsumoOtro} />}
+        {draft.motVencimiento.length > 0 && <Row label="Razón de acumulación/vto." value={draft.motVencimiento.join(', ')} />}
+        {draft.motVencimientoOtro && <Row label="— Otro" value={draft.motVencimientoOtro} />}
+        {draft.dispFinal.length > 0 && <Row label="Conducta de disposición" value={draft.dispFinal.join(', ')} />}
+        {draft.dispFinalOtro && <Row label="— Otro" value={draft.dispFinalOtro} />}
+        {draft.conocePuntos && <Row label="Conoce puntos de recolección" value={draft.conocePuntos} />}
+        {draft.cualPunto && <Row label="¿Cuál?" value={draft.cualPunto} />}
       </>}
     </Card>
   )

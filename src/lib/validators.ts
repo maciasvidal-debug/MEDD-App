@@ -82,6 +82,8 @@ export const step3Schema = z.object({
 })
 
 // ─── Step 4 — Almacenamiento & disposición ────────────────────────────────
+// Motive fields are additive (instrument v2): optional, with array defaults, so
+// they never block a save and v1 records validate unchanged.
 export const step4Schema = z.object({
   medSob:    siNo.refine(v => v !== '', 'Responda esta pregunta'),
   dispMedVc: siNo,
@@ -90,6 +92,14 @@ export const step4Schema = z.object({
   cantMed:    z.number().int().min(0).nullable(),
   cantMedVto: z.number().int().min(0).nullable(),
   pesoMedNc:  z.number().min(0).nullable(),
+  motNoConsumo:       z.array(z.string()),
+  motNoConsumoOtro:   optStr,
+  motVencimiento:     z.array(z.string()),
+  motVencimientoOtro: optStr,
+  dispFinal:          z.array(z.string()),
+  dispFinalOtro:      optStr,
+  conocePuntos:       siNo,
+  cualPunto:          optStr,
 })
 
 // ─── Step 5 — Medicamentos (managed outside RHF, no schema needed) ────────

@@ -244,6 +244,20 @@ describe('toCSV', () => {
     expect(r2.split(',')[di]).toBe('')    // no para-data → blank duration
   })
 
+  it('exports the motive columns and flattens multi-selects into one cell', () => {
+    const surveys = [
+      { id: 'a', nui: 1, medications: [], instrumentVersion: 2,
+        motNoConsumo: ['Mejoró / cedieron los síntomas', 'Sobró de la dosis'],
+        dispFinal: ['Basura'], conocePuntos: 'Sí', cualPunto: 'Farmacia X' },
+    ] as unknown as Survey[]
+    const [header, row] = toCSV(surveys).trim().split('\n')
+    expect(header).toContain('instrumentVersion,motNoConsumo,motNoConsumoOtro')
+    // Multi-select flattened with '; ' so it stays a single, unquoted cell.
+    expect(row).toContain('Mejoró / cedieron los síntomas; Sobró de la dosis')
+    const ci = header.split(',').indexOf('conocePuntos')
+    expect(row.split(',')[ci]).toBe('Sí')
+  })
+
   it('serialises multiple medications with ; field and | record separators', () => {
     const surveys = [
       { id: 'a', nui: 1, medications: [

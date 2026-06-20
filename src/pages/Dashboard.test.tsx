@@ -52,6 +52,42 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/#42/)).toBeInTheDocument()
   })
 
+  it('renders the per-product medication analytics when surveys carry medications', () => {
+    useStore.setState({
+      userRole: 'investigador',
+      surveys: [
+        mkSurvey('a', {
+          medications: [
+            { nmMed: 'Dolex', dci: 'Acetaminofén', concMed: 500, undConc: 'mg', fVto: '2020-01-01' },
+            { nmMed: 'Advil', dci: 'Ibuprofeno', concMed: 400, undConc: 'mg', fVto: '2030-01-01' },
+          ],
+        } as Partial<Survey>),
+      ],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Analítica de medicamentos/i)).toBeInTheDocument()
+    // Plain-DOM KPIs (Recharts axes don't render under jsdom's zero-width layout).
+    expect(screen.getByText('Princ. activos')).toBeInTheDocument()
+  })
+
+  it('renders the motives card scoped to v2 records (not asked v1 excluded)', () => {
+    useStore.setState({
+      userRole: 'investigador',
+      surveys: [
+        // v2, asked the battery
+        mkSurvey('a', { instrumentVersion: 2, medSob: 'Sí', motNoConsumo: ['Sobró de la dosis'], dispFinal: ['Basura'], conocePuntos: 'No' } as Partial<Survey>),
+        // v1, battery not in the instrument → must not count toward the base
+        mkSurvey('b', { medSob: 'Sí' }),
+      ],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Motivos de acumulación y disposición/i)).toBeInTheDocument()
+    // Base text (count is in a separate <strong>, so match the surrounding node)
+    // and the v1 record is reported separately as "not asked".
+    expect(screen.getByText(/del instrumento v2 con medicamentos/i)).toBeInTheDocument()
+    expect(screen.getByText(/no incluyen estas preguntas/i)).toBeInTheDocument()
+  })
+
   it('renders the back-check agreement card when a re-interview exists', () => {
     useStore.setState({
       userRole: 'investigador',

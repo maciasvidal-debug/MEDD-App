@@ -283,6 +283,25 @@ export function ChipGroup({ options, value, onChange, disabled }: ChipGroupProps
   )
 }
 
+// Multi-select variant: toggles membership in a string[] (order preserved).
+interface CheckChipGroupProps {
+  options: readonly string[]
+  value: string[]
+  onChange: (v: string[]) => void
+  disabled?: boolean
+}
+export function CheckChipGroup({ options, value, onChange, disabled }: CheckChipGroupProps) {
+  const toggle = (o: string) =>
+    onChange(value.includes(o) ? value.filter(v => v !== o) : [...value, o])
+  return (
+    <div role="group" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {options.map(o => (
+        <Chip key={o} label={o} active={value.includes(o)} onClick={() => toggle(o)} disabled={disabled} />
+      ))}
+    </div>
+  )
+}
+
 // ─── YesNo toggle ─────────────────────────────────────────────────────────────
 
 interface YesNoProps {

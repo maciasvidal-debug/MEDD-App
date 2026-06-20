@@ -188,6 +188,11 @@ export default function DashboardPage() {
   const retention = useMemo(() => buildRetention(data), [data])
   const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
   const surveyorQC = useMemo(() => buildSurveyorQC(data), [data])
+  // Product-level (medications[]) aggregation — the analytics that were missing.
+  const medStats = useMemo(() => buildMedicationStats(data), [data])
+  // Motives battery (instrument v2) — denominator scoped to records that were
+  // actually asked, keeping "not asked" (v1) out of the percentages.
+  const motiveStats = useMemo(() => buildMotiveStats(data), [data])
   // Records that declare expired meds in the home but carry no expired-product
   // detail — the integrity gap surfaced for follow-up / back-check.
   const integrityIssues = useMemo(() => data.filter(declaresExpiredWithoutDetail), [data])
@@ -311,6 +316,12 @@ export default function DashboardPage() {
             <br />*«Conoce disposición» se calcula solo sobre los {nSob} hogares que almacenan medicamentos.
           </p>
         </Card>
+
+        {/* Analítica a nivel de medicamento (producto) */}
+        {medStats && <MedicationStatsCard s={medStats} />}
+
+        {/* Motivos de no consumo / acumulación y disposición (instrumento v2) */}
+        {motiveStats && <MotivesCard s={motiveStats} />}
 
         {/* Prevalencias con incertidumbre */}
         <PrevalenceCard
@@ -1053,6 +1064,203 @@ function SurveyorQCCard({ qc }: { qc: SurveyorQC }) {
           desde esta versión. Estas señales orientan auditoría, no son prueba por sí solas.
         </div>
       </div>
+    </Card>
+  )
+}
+
+// ─── Product-level analytics (medications[]) ────────────────────────────────
+
+interface MedStats {
+  totalProducts:   number
+  expiredProducts: number
+  distinctDci:     number
+  withVto:         number                          // products carrying an expiry date
+  topDci:          Array<{ name: string; n: number }>
+  topExpiredDci:   Array<{ name: string; value: number }>
+  topProducts:     Array<{ name: string; n: number }>
+}
+
+// Single pass over every stored product across all surveys, aggregating the
+// medication detail the household-level KPIs ignored: most frequent active
+// ingredients (DCI) and commercial products, and which active ingredients
+// accumulate the most expired units. `isExpired` reuses the same product metric
+// as the rest of the app (F_VTO < F_ETA).
+function buildMedicationStats(surveys: Survey[]): MedStats | null {
+  const dciMap  = new Map<string, { n: number; expired: number }>()
+  const prodMap = new Map<string, number>()
+  let totalProducts = 0, expiredProducts = 0, withVto = 0
+
+  for (const s of surveys) {
+    for (const m of s.medications ?? []) {
+      totalProducts++
+      const expired = productMetrics(s.fEta, s.fDisp, m).isExpired
+      if (expired) expiredProducts++
+      if (m.fVto) withVto++
+
+      const dci = (m.dci || '').trim()
+      if (dci) {
+        const g = dciMap.get(dci) ?? { n: 0, expired: 0 }
+        g.n++; if (expired) g.expired++
+        dciMap.set(dci, g)
+      }
+      const nm = (m.nmMed || '').trim()
+      if (nm) prodMap.set(nm, (prodMap.get(nm) ?? 0) + 1)
+    }
+  }
+  if (totalProducts === 0) return null
+
+  const topDci = Array.from(dciMap.entries())
+    .map(([name, g]) => ({ name, n: g.n }))
+    .sort((a, b) => b.n - a.n).slice(0, 8)
+  const topExpiredDci = Array.from(dciMap.entries())
+    .filter(([, g]) => g.expired > 0)
+    .map(([name, g]) => ({ name, value: g.expired }))
+    .sort((a, b) => b.value - a.value).slice(0, 8)
+  const topProducts = Array.from(prodMap.entries())
+    .map(([name, n]) => ({ name, n }))
+    .sort((a, b) => b.n - a.n).slice(0, 8)
+
+  return { totalProducts, expiredProducts, distinctDci: dciMap.size, withVto, topDci, topExpiredDci, topProducts }
+}
+
+function MedicationStatsCard({ s }: { s: MedStats }) {
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Analítica de medicamentos (por producto)</SectionLabel>
+
+      {/* Compact product-level KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+        <MedKpi label="Productos" value={String(s.totalProducts)} color={C.teal} />
+        <MedKpi label="Princ. activos" value={String(s.distinctDci)} color={C.navy} />
+        <MedKpi label="Vencidos" value={`${s.expiredProducts}`} sub={`${pct(s.expiredProducts, s.totalProducts)}%`} color={C.amber} />
+        <MedKpi label="Con fecha vto." value={`${pct(s.withVto, s.totalProducts)}%`} sub={`${s.withVto}/${s.totalProducts}`} color={C.gray} />
+      </div>
+
+      {s.topDci.length > 0 && (
+        <div style={{ marginBottom: s.topExpiredDci.length > 0 ? 14 : 0 }}>
+          <SubLabel>Principios activos (DCI) más frecuentes</SubLabel>
+          <DistBar data={s.topDci} color={CHART.teal} yWidth={120} barName="Productos" />
+        </div>
+      )}
+
+      {s.topExpiredDci.length > 0 && (
+        <div style={{ marginBottom: s.topProducts.length > 0 ? 14 : 0 }}>
+          <SubLabel>Principios activos con más productos vencidos</SubLabel>
+          <DistBar data={s.topExpiredDci} dataKey="value" color={CHART.amber} yWidth={120} barName="Vencidos" />
+        </div>
+      )}
+
+      {s.topProducts.length > 0 && (
+        <div>
+          <SubLabel>Productos (nombre comercial) más frecuentes</SubLabel>
+          <DistBar data={s.topProducts} color={CHART.navy} yWidth={120} barName="Productos" />
+        </div>
+      )}
+
+      <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+        Agregado sobre los {s.totalProducts} producto(s) almacenado(s). «Vencidos» se calcula por
+        producto (F_VTO &lt; F_ETA); «con fecha vto.» indica la cobertura del dato de vencimiento.
+      </p>
+    </Card>
+  )
+}
+
+function MedKpi({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: C.bg }}>
+      <div className="fd tnum" style={{ fontSize: 20, fontWeight: 600, color, lineHeight: 1 }}>{value}</div>
+      {sub && <div className="tnum" style={{ fontSize: 10.5, color: C.hint, marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontSize: 10.5, color: C.muted, marginTop: 3 }}>{label}</div>
+    </div>
+  )
+}
+
+function SubLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginBottom: 6 }}>{children}</div>
+  )
+}
+
+// ─── Motives battery analytics (instrument v2, version-aware denominators) ───
+
+interface MotiveStats {
+  nAsked:        number   // v2 surveys that store meds → shown the battery
+  nNotAsked:     number   // v1 surveys → battery not in the instrument
+  nExpiredAsked: number   // subset also asked the expiry-reason block
+  noConsumo:     Array<{ name: string; n: number }>
+  vencimiento:   Array<{ name: string; n: number }>
+  dispFinal:     Array<{ name: string; n: number }>
+  conoceSi:      number
+  conoceBase:    number
+}
+
+// Aggregates the multi-select motive answers. Crucially, the denominator is the
+// set of records that were actually ASKED — instrument v2 with stored meds — so
+// percentages aren't diluted by older "not asked" records (those are reported
+// separately as nNotAsked). A record is v1 when instrumentVersion is absent/<2.
+function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
+  const asked = surveys.filter(s => (s.instrumentVersion ?? 1) >= 2 && s.medSob === 'Sí')
+  const nNotAsked = surveys.filter(s => (s.instrumentVersion ?? 1) < 2).length
+  if (asked.length === 0) return null
+
+  const count = (rows: Survey[], pick: (s: Survey) => string[], opts: readonly string[]) =>
+    opts.map(o => ({ name: o, n: rows.filter(s => (pick(s) ?? []).includes(o)).length }))
+      .filter(d => d.n > 0)
+      .sort((a, b) => b.n - a.n)
+
+  const expiredAsked = asked.filter(s => s.vtoMedNc === 'Sí' || (s.cantMedVto ?? 0) > 0)
+
+  return {
+    nAsked: asked.length,
+    nNotAsked,
+    nExpiredAsked: expiredAsked.length,
+    noConsumo:   count(asked, s => s.motNoConsumo, OPT.motNoConsumo),
+    vencimiento: count(expiredAsked, s => s.motVencimiento, OPT.motVencimiento),
+    dispFinal:   count(asked, s => s.dispFinal, OPT.dispFinal),
+    conoceSi:    asked.filter(s => s.conocePuntos === 'Sí').length,
+    conoceBase:  asked.filter(s => s.conocePuntos === 'Sí' || s.conocePuntos === 'No').length,
+  }
+}
+
+function MotivesCard({ s }: { s: MotiveStats }) {
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Motivos de acumulación y disposición</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Base: <strong>{s.nAsked}</strong> encuesta(s) del instrumento v2 con medicamentos almacenados
+        (preguntadas).{s.nNotAsked > 0 && <> {s.nNotAsked} registro(s) previo(s) no incluyen estas preguntas (no preguntado).</>}
+      </p>
+
+      {s.conoceBase > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 12 }}>
+          <MiniDonut val={s.conoceSi} outOf={s.conoceBase} label="Conoce puntos de recolección" color={CHART.teal} />
+        </div>
+      )}
+
+      {s.noConsumo.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Motivos de no consumo</SubLabel>
+          <DistBar data={s.noConsumo} color={CHART.navy} yWidth={150} barName="Hogares" />
+        </div>
+      )}
+
+      {s.vencimiento.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <SubLabel>Razones de acumulación / vencimiento (base: {s.nExpiredAsked} con vencidos)</SubLabel>
+          <DistBar data={s.vencimiento} color={CHART.amber} yWidth={150} barName="Hogares" />
+        </div>
+      )}
+
+      {s.dispFinal.length > 0 && (
+        <div>
+          <SubLabel>Conducta real de disposición</SubLabel>
+          <DistBar data={s.dispFinal} color={CHART.teal} yWidth={150} barName="Hogares" />
+        </div>
+      )}
+
+      <p style={{ margin: '10px 0 0', fontSize: 11, color: C.hint, lineHeight: 1.5 }}>
+        Respuestas de selección múltiple: los porcentajes por opción pueden sumar más de 100%.
+      </p>
     </Card>
   )
 }

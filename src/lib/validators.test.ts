@@ -141,6 +141,8 @@ describe('step4Schema', () => {
   const valid = {
     medSob: 'No', dispMedVc: '', ctoDispVc: '', vtoMedNc: '',
     cantMed: null, cantMedVto: null, pesoMedNc: null,
+    motNoConsumo: [], motNoConsumoOtro: '', motVencimiento: [], motVencimientoOtro: '',
+    dispFinal: [], dispFinalOtro: '', conocePuntos: '', cualPunto: '',
   }
 
   it('accepts a valid step and rejects an unanswered medSob', () => {

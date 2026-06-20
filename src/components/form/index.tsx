@@ -1,5 +1,5 @@
 import { Controller, type Control, type FieldValues, type Path } from 'react-hook-form'
-import { Field, ChipGroup, YesNo } from '../ui'
+import { Field, ChipGroup, CheckChipGroup, YesNo } from '../ui'
 
 // Reusable react-hook-form field adapters. They bind the RHF Controller to the
 // presentational `ui` primitives (which stay framework-agnostic), collapsing the
@@ -29,6 +29,31 @@ export function ChipField<T extends FieldValues>({
             options={options}
             value={(field.value as string) ?? ''}
             onChange={val => { field.onChange(val); onAfterChange?.(val) }}
+          />
+        )} />
+    </Field>
+  )
+}
+
+// Multi-select chip question backed by a string[] field.
+export function MultiChipField<T extends FieldValues>({
+  control, name, label, options, help, error,
+}: {
+  control:  Control<T>
+  name:     Path<T>
+  label:    string
+  options:  readonly string[]
+  help?:    string
+  error?:   string
+}) {
+  return (
+    <Field label={label} help={help} error={error}>
+      <Controller name={name} control={control}
+        render={({ field }) => (
+          <CheckChipGroup
+            options={options}
+            value={(field.value as string[]) ?? []}
+            onChange={field.onChange}
           />
         )} />
     </Field>
