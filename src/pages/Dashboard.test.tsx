@@ -125,6 +125,16 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/de texto libre \(v1\)/i)).toBeInTheDocument()
   })
 
+  it('renders the "Lectura rápida" auto-insights card with data', () => {
+    useStore.setState({
+      surveys: [mkSurvey('a'), mkSurvey('b', { ciudad: 'Cali', estrato: 2, medSob: 'No', vtoMedNc: 'No' })],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Lectura rápida/i)).toBeInTheDocument()
+    // The exploratory framing + downstream-tooling pointer is present.
+    expect(screen.getByText(/SPSS, Stata o R/i)).toBeInTheDocument()
+  })
+
   it('renders the back-check agreement card when a re-interview exists', () => {
     useStore.setState({
       userRole: 'investigador',
