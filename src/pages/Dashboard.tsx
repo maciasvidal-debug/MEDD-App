@@ -9,6 +9,7 @@ import { useStore } from '../lib/store'
 import { useShallow } from 'zustand/react/shallow'
 import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, terminalDigitTest, cohenKappa, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult, type DigitTest, type KappaResult } from '../lib/utils'
 import { buildInsights, type Insight, type InsightTone } from '../lib/insights'
+import { normalizeCiudad, fold } from '../lib/ciudad'
 import { OPT } from '../lib/constants'
 import { declaresExpiredWithoutDetail } from '../lib/quality'
 import { therapeuticGroup, therapeuticSubgroup, SIN_CLASIFICAR } from '../lib/atc'
@@ -229,7 +230,7 @@ export default function DashboardPage() {
     const nvPosgCounts: Record<string, number> = {}
     const etniaCounts: Record<string, number> = {}
     const estratoCounts: Record<number, number> = {}
-    const ciudadVencMap = new Map<string, number>()
+    const ciudadVencMap = new Map<string, { label: string; value: number }>()
 
     // ⚡ Bolt: Single pass for scalar KPIs and distributions (reduces 21+ array passes to 1)
     for (let i = 0; i < data.length; i++) {
@@ -248,8 +249,15 @@ export default function DashboardPage() {
       if (s.etnia) etniaCounts[s.etnia] = (etniaCounts[s.etnia] || 0) + 1
       if (s.estrato !== null && s.estrato !== undefined) estratoCounts[s.estrato] = (estratoCounts[s.estrato] || 0) + 1
 
-      const ciudadKey = String(s.ciudad ?? 'Sin dato') || 'Sin dato'
-      ciudadVencMap.set(ciudadKey, (ciudadVencMap.get(ciudadKey) ?? 0) + (s.cantMedVto ?? 0))
+      // Group by the canonical municipality key so casing/accents/appended
+      // department don't split one city into several false "hotspots".
+      const { municipio } = normalizeCiudad(s.ciudad)
+      const key = fold(municipio)
+      if (key) {
+        const cur = ciudadVencMap.get(key) ?? { label: municipio, value: 0 }
+        cur.value += (s.cantMedVto ?? 0)
+        ciudadVencMap.set(key, cur)
+      }
     }
 
     const barAsSalud = OPT.asSalud.map(v => ({ name: v, n: asSaludCounts[v] || 0 })).filter(d => d.n > 0)
@@ -258,10 +266,9 @@ export default function DashboardPage() {
     const barEtnia   = OPT.etnia.map(v => ({ name: v, n: etniaCounts[v] || 0 })).filter(d => d.n > 0)
     const barEstrato = OPT.estrato.map(e => ({ name: `Estrato ${e}`, n: estratoCounts[e] || 0 })).filter(d => d.n > 0)
 
-    const ciudadVenc = Array.from(ciudadVencMap.entries())
-      .map(([name, value]) => ({ name, value }))
+    const ciudadVenc = Array.from(ciudadVencMap.values())
+      .map(({ label, value }) => ({ name: label, value }))
       .sort((a, b) => b.value - a.value)
-      .filter(d => d.name && d.name !== 'Sin dato')
       .slice(0, 8)
 
     return {

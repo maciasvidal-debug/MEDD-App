@@ -12,6 +12,7 @@ import {
 import { ChipField, YesNoField, MultiChipField } from '../form'
 import { useCUM } from '../../hooks/useCUM'
 import { useMunicipios } from '../../hooks/useMunicipios'
+import { normalizeCiudad } from '../../lib/ciudad'
 import { OPT, FIELD_HELP } from '../../lib/constants'
 import { calcEdad, fmtDate, productMetrics } from '../../lib/utils'
 import { validateDraft } from '../../lib/quality'
@@ -73,6 +74,20 @@ function MunicipioCombobox({ value, onChange }: MunicipioComboboxProps) {
     clear()
   }
 
+  // Canonicalise free text on blur so values typed without picking a suggestion
+  // (the only path when offline) don't accumulate as casing/accent/department
+  // variants of the same municipality. Picking a suggestion already stores a
+  // clean name, so re-normalising it here is a harmless no-op.
+  function handleBlur() {
+    setTimeout(() => setOpen(false), 160)
+    const norm = normalizeCiudad(text).municipio
+    if (norm && norm !== text) {
+      skipSearch.current = true
+      setText(norm)
+      onChange(norm)
+    }
+  }
+
   const showDropdown = open && (results.length > 0 || (error !== '' && text.trim().length >= 2) || loading)
 
   return (
@@ -82,7 +97,7 @@ function MunicipioCombobox({ value, onChange }: MunicipioComboboxProps) {
           value={text}
           onChange={handleChange}
           onFocus={() => { if (text.trim().length >= 2 && results.length > 0) setOpen(true) }}
-          onBlur={() => setTimeout(() => setOpen(false), 160)}
+          onBlur={handleBlur}
           placeholder="Escriba para buscar municipio…"
           autoComplete="off"
         />
