@@ -4,10 +4,11 @@ import {
   XAxis, YAxis, Tooltip,
 } from 'recharts'
 import { TopBar } from '../components/layout'
-import { StatCard, Card, Button, EmptyState, Chip, C, CHART } from '../components/ui'
+import { StatCard, Card, Button, EmptyState, Chip, HelpTip, C, CHART } from '../components/ui'
 import { useStore } from '../lib/store'
 import { useShallow } from 'zustand/react/shallow'
 import { pct, wilsonCI, prevalenceRatio, chiSquareTest, cochranArmitage, mantelHaenszelRR, iccBinary, breslowDay, quantile, productMetrics, toCSV, downloadBlob, dateTag, holmAdjust, terminalDigitTest, cohenKappa, type Proportion, type RiskRatio, type ChiSquare, type TrendTest, type MHResult, type ICCResult, type Stratum2x2, type HolmResult, type DigitTest, type KappaResult } from '../lib/utils'
+import { buildInsights, type Insight, type InsightTone } from '../lib/insights'
 import { OPT } from '../lib/constants'
 import { declaresExpiredWithoutDetail } from '../lib/quality'
 import { therapeuticGroup, therapeuticSubgroup, SIN_CLASIFICAR } from '../lib/atc'
@@ -30,6 +31,26 @@ const CustomTip = ({ active, payload }: { active?: boolean; payload?: Array<{ va
   active && payload?.length
     ? <div style={tipStyle}><strong>{payload[0].payload.name}</strong>: {payload[0].value}</div>
     : null
+
+// Single-line, width-aware Y-axis tick for the horizontal distribution bars.
+// Recharts' default category tick word-wraps long labels (e.g. full commercial
+// drug names / DCI strings) into several lines that overflow the ~30px row and
+// collide with their neighbours. We truncate to one line that fits `width`
+// (≈6.2px per char) and expose the full label via the native SVG <title>
+// (hover) — the chart Tooltip also shows it on bar hover, so nothing is lost.
+const DistBarYTick = (props: {
+  x?: number; y?: number; width?: number; payload?: { value: string | number }
+}) => {
+  const { x = 0, y = 0, width = 80, payload } = props
+  const label = String(payload?.value ?? '')
+  const maxChars = Math.max(6, Math.round(width / 6.2))
+  const short = label.length > maxChars ? `${label.slice(0, maxChars - 1).trimEnd()}…` : label
+  return (
+    <text x={x} y={y} dy={4} textAnchor="end" fontSize={11} fill={CHART.axis}>
+      <title>{label}</title>{short}
+    </text>
+  )
+}
 
 const MiniDonut = ({ val, outOf, label, color }: { val: number; outOf: number; label: string; color: string }) => {
   const data = [{ v: val }, { v: Math.max(0, outOf - val) }]
@@ -60,7 +81,7 @@ function DistBar({ data, dataKey = 'n', color, yWidth = 80, barName }: {
 }) {
   const gid = `bar-${color.replace('#', '')}`
   return (
-    <div style={{ height: Math.max(80, data.length * 30) }}>
+    <div style={{ height: Math.max(80, data.length * 34) }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }} barCategoryGap="22%">
           <defs>
@@ -70,12 +91,75 @@ function DistBar({ data, dataKey = 'n', color, yWidth = 80, barName }: {
             </linearGradient>
           </defs>
           <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} axisLine={false} tickLine={false} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART.axis }} width={yWidth} axisLine={false} tickLine={false} />
+          <YAxis type="category" dataKey="name" tick={<DistBarYTick width={yWidth} />} width={yWidth} axisLine={false} tickLine={false} interval={0} />
           <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
           <Bar dataKey={dataKey} fill={`url(#${gid})`} radius={[0, 5, 5, 0]} maxBarSize={26} name={barName} />
         </BarChart>
       </ResponsiveContainer>
     </div>
+  )
+}
+
+// ─── Plain-language glossary for the inline "¿Qué significa?" help ──────────
+// Centralised so the same wording explains a statistic wherever it appears.
+// Kept short and jargon-light: the investigator gets the gist here, the formal
+// detail lives in the cards' own footnotes.
+const STAT_GLOSSARY = {
+  lecturaRapida:
+    'Síntesis automática (offline, basada en reglas) de los indicadores y pruebas del panel, en lenguaje sencillo. Es una lectura exploratoria de primer vistazo; los números completos están en cada tarjeta y la confirmación estadística se hace en SPSS/Stata/R.',
+  prevalencia:
+    'Prevalencia: proporción de la muestra con la característica, con su intervalo de confianza al 95% (método de Wilson, fiable con muestras pequeñas o proporciones extremas). El IC marca el rango plausible del valor real: cuanto más estrecho, más preciso.',
+  asociacion:
+    'Ji-cuadrado (χ²): evalúa si el desenlace difiere entre grupos; p<0,05 sugiere que la diferencia difícilmente sea por azar. RP (razón de prevalencia): cuántas veces más frecuente es el desenlace frente al grupo de referencia (RP=1 = sin diferencia; el IC95% que no cruza 1 indica asociación). Cochran–Armitage añade una prueba de tendencia para una exposición ordenada (p. ej. estrato).',
+  icc:
+    'ICC (correlación intraclase): qué parte de la variación del desenlace se explica por el agrupamiento (p. ej. encuestas del mismo encuestador). Un ICC alto infla la imprecisión real (efecto de diseño) y puede hacer que los valores p sin ajustar parezcan más fuertes de lo que son.',
+  mh:
+    'Mantel–Haenszel: estima la asociación ajustando por una variable de confusión (combina los estratos). Si la estimación ajustada cambia >10% frente a la cruda, hay confusión y se reporta la ajustada. Breslow–Day comprueba que el efecto sea homogéneo entre estratos.',
+  kappa:
+    'κ de Cohen: concordancia entre dos mediciones corregida por el azar. Bandas de Landis–Koch: <0,2 pobre · 0,2–0,4 débil · 0,4–0,6 moderada · 0,6–0,8 buena · >0,8 muy buena. Concordancia baja sugiere variabilidad de medición o, en casos extremos, fabricación.',
+  holm:
+    'Holm–Bonferroni: cuando se hacen varias pruebas a la vez, ajusta los valores p para controlar la probabilidad de falsos positivos por familia. «Sobrevive» = sigue siendo significativo tras el ajuste; lo que no sobrevive se trata como hipótesis a confirmar.',
+  retencion:
+    'Resumen de la distribución de días vencido: mediana (valor central), RIC (rango intercuartílico Q1–Q3, la dispersión central) y percentil 90 (la cola). Son medidas robustas, poco sensibles a valores extremos.',
+  digit:
+    'Prueba de dígito terminal: la última cifra de una medición debería repartirse de forma uniforme (0–9). Un sesgo marcado hacia ciertos dígitos sugiere redondeo sistemático o datos inventados.',
+} as const
+
+// "Lectura rápida" auto-insights: the rule-based read-out lives in lib/insights
+// (a non-component module) so this file stays Fast-Refresh-friendly; here we only
+// render it.
+const INSIGHT_TONE: Record<InsightTone, { color: string; icon: string }> = {
+  good: { color: C.green, icon: 'ti-circle-check' },
+  warn: { color: C.amber, icon: 'ti-alert-triangle' },
+  info: { color: C.teal,  icon: 'ti-info-circle' },
+}
+
+function QuickReadCard({ insights }: { insights: Insight[] }) {
+  if (insights.length === 0) return null
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel help={STAT_GLOSSARY.lecturaRapida}>Lectura rápida — primeros insights</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Síntesis automática, en lenguaje sencillo, de lo que muestran los indicadores y las pruebas de abajo.
+        Es una <strong>lectura exploratoria</strong> para orientar la mirada, no un resultado confirmatorio.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {insights.map(i => {
+          const t = INSIGHT_TONE[i.tone]
+          return (
+            <div key={i.id} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+              <i className={`ti ${t.icon}`} style={{ fontSize: 16, color: t.color, marginTop: 1, flexShrink: 0 }} aria-hidden />
+              <span style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>{i.text}</span>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ marginTop: 12, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 11, color: C.hint, lineHeight: 1.55 }}>
+        <strong style={{ color: C.muted }}>Próximos pasos (análisis fino):</strong> confirma estas señales en SPSS, Stata o R —
+        p. ej. regresión log-binomial o de Poisson para razones de prevalencia ajustadas, modelos multinivel (mixtos)
+        para el agrupamiento por encuestador, y pruebas exactas cuando haya celdas pequeñas. Exporta el CSV desde los filtros.
+      </div>
+    </Card>
   )
 }
 
@@ -224,6 +308,13 @@ export default function DashboardPage() {
   }, [assoc, surveyorEffect, adjusted])
   const holm = useMemo(() => holmAdjust(inferentialTests), [inferentialTests])
 
+  // Plain-language read-out: synthesises the above into first-pass insights.
+  const insights = useMemo(() => buildInsights({
+    n, nSob, nVenc, nDisp, unidTotal, vencTotal,
+    assoc, surveyorEffect, adjusted, backcheck, retention, medStats,
+    integrityCount: integrityIssues.length, tests: inferentialTests, holm,
+  }), [n, nSob, nVenc, nDisp, unidTotal, vencTotal, assoc, surveyorEffect, adjusted, backcheck, retention, medStats, integrityIssues, inferentialTests, holm])
+
   // No data at all (vs. "filters returned nothing", handled further down)
   if (surveys.length === 0) {
     return (
@@ -322,6 +413,9 @@ export default function DashboardPage() {
             <br />*«Conoce disposición» se calcula solo sobre los {nSob} hogares que almacenan medicamentos.
           </p>
         </Card>
+
+        {/* Lectura rápida — interpretación automática (primeros insights) */}
+        <QuickReadCard insights={insights} />
 
         {/* Analítica a nivel de medicamento (producto) */}
         {medStats && <MedicationStatsCard s={medStats} />}
@@ -592,13 +686,14 @@ function FilterBar({
   )
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children, help }: { children: React.ReactNode; help?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
       <span style={{ width: 3, height: 14, borderRadius: 2, background: C.teal, flexShrink: 0 }} aria-hidden />
       <span style={{ fontSize: 13, fontWeight: 600, color: C.text, letterSpacing: '-0.005em' }}>
         {children}
       </span>
+      {help && <HelpTip text={help} label={typeof children === 'string' ? children : undefined} />}
     </div>
   )
 }
@@ -608,7 +703,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function PrevalenceCard({ rows }: { rows: { label: string; ci: Proportion }[] }) {
   return (
     <Card style={{ marginBottom: 14 }}>
-      <SectionLabel>Prevalencias estimadas · IC 95% (Wilson)</SectionLabel>
+      <SectionLabel help={STAT_GLOSSARY.prevalencia}>Prevalencias estimadas · IC 95% (Wilson)</SectionLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {rows.map(({ label, ci }) => <PrevalenceRow key={label} label={label} ci={ci} />)}
       </div>
@@ -657,7 +752,7 @@ function RetentionCard({ s }: { s: DaysSummary }) {
   const x = (v: number) => `${Math.min(100, (v / scale) * 100)}%`
   return (
     <Card style={{ marginBottom: 14 }}>
-      <SectionLabel>Tiempo de retención de medicamentos vencidos</SectionLabel>
+      <SectionLabel help={STAT_GLOSSARY.retencion}>Tiempo de retención de medicamentos vencidos</SectionLabel>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
         <span style={{ fontSize: 13, color: C.muted }}>Mediana de días vencido</span>
         <span className="fd tnum" style={{ fontSize: 24, fontWeight: 600, color: C.amber }}>{Math.round(s.median)} d</span>
@@ -756,7 +851,7 @@ function AssociationCard({ assoc }: { assoc: Association }) {
   const trendSig = trend !== null && trend.p < 0.05
   return (
     <Card style={{ marginBottom: 14 }}>
-      <SectionLabel>Asociación: vencidos en casa según estrato</SectionLabel>
+      <SectionLabel help={STAT_GLOSSARY.asociacion}>Asociación: vencidos en casa según estrato</SectionLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
         {groups.map(g => <AssocRow key={g.label} g={g} />)}
       </div>
@@ -879,7 +974,7 @@ function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
   const flagged = progSig || trendSig || iccHigh
   return (
     <Card style={{ marginBottom: 14 }}>
-      <SectionLabel>Control de calidad — efecto del encuestador</SectionLabel>
+      <SectionLabel help={STAT_GLOSSARY.icc}>Control de calidad — efecto del encuestador</SectionLabel>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
         Prevalencia de <strong>vencidos confirmados en casa</strong> según el perfil de quien
         recolectó. El desenlace no debería depender del encuestador: una diferencia marcada es
@@ -1028,7 +1123,7 @@ function SurveyorQCCard({ qc }: { qc: SurveyorQC }) {
   const td: React.CSSProperties = { padding: '5px 6px' }
   return (
     <Card style={{ marginBottom: 14 }}>
-      <SectionLabel>Control de calidad por encuestador (para-data / antifraude)</SectionLabel>
+      <SectionLabel help={STAT_GLOSSARY.digit}>Control de calidad por encuestador (para-data / antifraude)</SectionLabel>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
         Señales operativas por encuestador para priorizar <strong>back-checks</strong>: completitud
         baja, exceso de respuestas planas (straightlining), entrevistas demasiado rápidas o
@@ -1259,9 +1354,12 @@ function MedKpi({ label, value, sub, color }: { label: string; value: string; su
   )
 }
 
-function SubLabel({ children }: { children: React.ReactNode }) {
+function SubLabel({ children, help }: { children: React.ReactNode; help?: string }) {
   return (
-    <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginBottom: 6 }}>{children}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+      <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{children}</span>
+      {help && <HelpTip text={help} label={typeof children === 'string' ? children : undefined} />}
+    </div>
   )
 }
 
@@ -1627,7 +1725,7 @@ function BackcheckAgreementCard({ a }: { a: BackcheckAgreement }) {
   const band = kappaBin ? kappaBand(kappaBin.kappa) : null
   return (
     <Card style={{ marginBottom: 14 }}>
-      <SectionLabel>Concordancia de back-check (fiabilidad inter-observador)</SectionLabel>
+      <SectionLabel help={STAT_GLOSSARY.kappa}>Concordancia de back-check (fiabilidad inter-observador)</SectionLabel>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
         Compara las re-entrevistas de control con su encuesta original sobre{' '}
         <strong>{nPairs}</strong> par(es). Baja concordancia indica variabilidad de
@@ -1714,7 +1812,7 @@ function AdjustedAssociationCard({ a }: { a: AdjustedAssoc }) {
   const fmt = (x: number) => x.toFixed(2)
   return (
     <Card style={{ marginBottom: 14 }}>
-      <SectionLabel>Asociación ajustada por confusión (Mantel–Haenszel)</SectionLabel>
+      <SectionLabel help={STAT_GLOSSARY.mh}>Asociación ajustada por confusión (Mantel–Haenszel)</SectionLabel>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
         Exposición: <strong>estrato medio–alto (3–6)</strong> vs bajo (1–2). Desenlace:
         <strong> vencidos confirmados en casa</strong>. Ajustada por el <strong>programa del
@@ -1765,7 +1863,7 @@ function StatNotesCard({ tests, holm }: {
   const anySurvive = holm.some(h => h.reject)
   return (
     <Card style={{ marginBottom: 14 }}>
-      <SectionLabel>Notas estadísticas — análisis exploratorio</SectionLabel>
+      <SectionLabel help={STAT_GLOSSARY.holm}>Notas estadísticas — análisis exploratorio</SectionLabel>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
         Este panel es <strong>exploratorio / generador de hipótesis</strong>: con tamaños de
         muestra de campo y múltiples contrastes, los valores p sin ajustar inflan el error
