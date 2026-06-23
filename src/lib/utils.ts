@@ -585,7 +585,7 @@ const CSV_COLUMNS: (keyof Survey)[] = [
   'id', 'fEta', 'nui', 'nuiEtr',
   'etrPrograma', 'etrTipoInst', 'etrSemestre', 'etrInstitucion',
   'fNac',
-  'ciudad', 'dir', 'estrato',
+  'ciudad', 'departamento', 'dir', 'estrato',
   'etnia', 'asSalud', 'estLab', 'ingreso', 'nvEstu', 'nvPosg',
   'perSalud', 'estSalud', 'prbSalud', 'conMed', 'medPrc',
   'fPrc', 'fDisp', 'indMed',

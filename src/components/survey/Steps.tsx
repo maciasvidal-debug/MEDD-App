@@ -37,9 +37,10 @@ function toTitleCase(s: string): string {
 interface MunicipioComboboxProps {
   value: string
   onChange: (v: string) => void
+  onDepartamento?: (d: string) => void
 }
 
-function MunicipioCombobox({ value, onChange }: MunicipioComboboxProps) {
+function MunicipioCombobox({ value, onChange, onDepartamento }: MunicipioComboboxProps) {
   const [text, setText] = useState(value)
   const [open, setOpen] = useState(false)
   const { results, loading, error, search, clear } = useMunicipios()
@@ -58,11 +59,12 @@ function MunicipioCombobox({ value, onChange }: MunicipioComboboxProps) {
     search(v)
   }
 
-  function handleSelect(municipio: string) {
-    const name = toTitleCase(municipio)
+  function handleSelect(r: { municipio: string; departamento?: string }) {
+    const name = toTitleCase(r.municipio)
     skipSearch.current = true
     setText(name)
     onChange(name)
+    if (r.departamento) onDepartamento?.(toTitleCase(r.departamento))
     setOpen(false)
     clear()
   }
@@ -80,12 +82,15 @@ function MunicipioCombobox({ value, onChange }: MunicipioComboboxProps) {
   // clean name, so re-normalising it here is a harmless no-op.
   function handleBlur() {
     setTimeout(() => setOpen(false), 160)
-    const norm = normalizeCiudad(text).municipio
-    if (norm && norm !== text) {
+    const { municipio, departamento } = normalizeCiudad(text)
+    if (municipio && municipio !== text) {
       skipSearch.current = true
-      setText(norm)
-      onChange(norm)
+      setText(municipio)
+      onChange(municipio)
     }
+    // If the surveyor typed the department into the city box, lift it out into
+    // its own field instead of leaving it glued to the municipality.
+    if (departamento) onDepartamento?.(departamento)
   }
 
   const showDropdown = open && (results.length > 0 || (error !== '' && text.trim().length >= 2) || loading)
@@ -134,7 +139,7 @@ function MunicipioCombobox({ value, onChange }: MunicipioComboboxProps) {
             <button
               key={i}
               type="button"
-              onMouseDown={e => { e.preventDefault(); handleSelect(r.municipio) }}
+              onMouseDown={e => { e.preventDefault(); handleSelect(r) }}
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
                 padding: '9px 12px', border: 'none', cursor: 'pointer',
@@ -326,6 +331,7 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
     defaultValues: {
       fNac:    draft.fNac,
       ciudad:  draft.ciudad,
+      departamento: draft.departamento ?? '',
       dir:     draft.dir,
       estrato: draft.estrato,
       etnia:   draft.etnia,
@@ -355,7 +361,11 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
       <Field label="Ciudad / Municipio" error={errors.ciudad?.message}>
         <Controller name="ciudad" control={control}
           render={({ field }) => (
-            <MunicipioCombobox value={field.value ?? ''} onChange={field.onChange} />
+            <MunicipioCombobox
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              onDepartamento={d => setValue('departamento', d)}
+            />
           )} />
       </Field>
 
@@ -982,6 +992,7 @@ function DemografiaCard({ draft, edad }: { draft: SurveyDraft; edad: number | nu
       <Row label="Fecha de nacimiento"      value={fmtDate(draft.fNac)} />
       {edad !== null && <Row label="Edad"   value={`${edad} años`} />}
       <Row label="Ciudad"                   value={draft.ciudad} />
+      {draft.departamento && <Row label="Departamento" value={draft.departamento} />}
       {draft.dir && <Row label="Dirección"  value={draft.dir} />}
       {draft.estrato && <Row label="Estrato" value={draft.estrato} />}
       <Row label="Pertenencia étnica"       value={draft.etnia} />

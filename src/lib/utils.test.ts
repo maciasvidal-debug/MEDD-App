@@ -269,6 +269,10 @@ describe('toCSV', () => {
     expect(dataRow).toContain('A;x;500;mg;2027-01-01|B;y;250;mg;2027-02-01')
   })
 
+  it('exports departamento as its own column right after ciudad', () => {
+    expect(toCSV([]).trim().split('\n')[0]).toContain('ciudad,departamento,dir')
+  })
+
   it('packs all stored products into the single "medications" column', () => {
     const header = toCSV([]).trim().split('\n')[0].split(',')
     // Exactly one medications column — not five flat sub-field columns.
