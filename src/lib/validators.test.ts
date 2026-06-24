@@ -124,6 +124,31 @@ describe('step2Schema', () => {
   })
 })
 
+describe('step4Schema — "Otro" requires its free text', () => {
+  const valid = {
+    medSob: 'Sí', dispMedVc: '', ctoDispVc: '', vtoMedNc: 'No',
+    cantMed: 0, cantMedVto: 0, pesoMedNc: null,
+    motNoConsumo: [] as string[], motNoConsumoOtro: '',
+    motVencimiento: [] as string[], motVencimientoOtro: '',
+    dispFinal: [] as string[], dispFinalOtro: '',
+    conocePuntos: '', cualPunto: '',
+  }
+
+  it('accepts when no "Otro" is selected', () => {
+    expect(step4Schema.safeParse(valid).success).toBe(true)
+  })
+
+  it('rejects "Otro" without its specification, across the three batteries', () => {
+    expect(step4Schema.safeParse({ ...valid, motNoConsumo: ['Otro'] }).success).toBe(false)
+    expect(step4Schema.safeParse({ ...valid, motVencimiento: ['Otro'] }).success).toBe(false)
+    expect(step4Schema.safeParse({ ...valid, dispFinal: ['Otro'] }).success).toBe(false)
+  })
+
+  it('accepts "Otro" once specified', () => {
+    expect(step4Schema.safeParse({ ...valid, motNoConsumo: ['Otro'], motNoConsumoOtro: 'donación' }).success).toBe(true)
+  })
+})
+
 describe('step3Schema', () => {
   const valid = {
     perSalud: 'Buena', estSalud: 'No', prbSalud: '', conMed: '',

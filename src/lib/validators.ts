@@ -85,7 +85,7 @@ export const step3Schema = z.object({
 // ─── Step 4 — Almacenamiento & disposición ────────────────────────────────
 // Motive fields are additive (instrument v2): optional, with array defaults, so
 // they never block a save and v1 records validate unchanged.
-export const step4Schema = z.object({
+const step4Object = z.object({
   medSob:    siNo.refine(v => v !== '', 'Responda esta pregunta'),
   dispMedVc: siNo,
   ctoDispVc: optStr,
@@ -103,6 +103,21 @@ export const step4Schema = z.object({
   cualPunto:          optStr,
 })
 
+// Picking "Otro" in a multi-select makes its free-text field required — the
+// just-in-time rule the wizard surfaces inline when the "Otro" box reveals.
+const step4Refine = (d: z.infer<typeof step4Object>, ctx: z.RefinementCtx) => {
+  const reqOtro = (selected: string[], text: string, path: string, msg: string) => {
+    if (selected?.includes('Otro') && !text?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message: msg })
+    }
+  }
+  reqOtro(d.motNoConsumo, d.motNoConsumoOtro, 'motNoConsumoOtro', 'Especifique el otro motivo de no consumo')
+  reqOtro(d.motVencimiento, d.motVencimientoOtro, 'motVencimientoOtro', 'Especifique la otra razón de acumulación/vencimiento')
+  reqOtro(d.dispFinal, d.dispFinalOtro, 'dispFinalOtro', 'Especifique la otra conducta de disposición')
+}
+
+export const step4Schema = step4Object.superRefine(step4Refine)
+
 // ─── Step 5 — Medicamentos (managed outside RHF, no schema needed) ────────
 // The medication list is managed via local state in Step5 and merged into draft.
 
@@ -116,6 +131,7 @@ export type Step4Data = z.infer<typeof step4Schema>
 export const surveySchema = step1Schema
   .merge(step2Object)
   .merge(step3Schema)
-  .merge(step4Schema)
+  .merge(step4Object)
   .extend({ obs: optStr })
   .superRefine(nvPosgRefine)
+  .superRefine(step4Refine)

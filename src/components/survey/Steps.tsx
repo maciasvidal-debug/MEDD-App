@@ -7,8 +7,9 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Field, ChipGroup, SectionHead, Divider,
-  Card, Button, Spinner, C, Badge,
+  Card, Button, Spinner, C, Badge, RevealNote,
 } from '../ui'
+import { useFocusOnReveal } from '../ui/useFocusOnReveal'
 import { ChipField, YesNoField, MultiChipField } from '../form'
 import { useCUM } from '../../hooks/useCUM'
 import { useMunicipios } from '../../hooks/useMunicipios'
@@ -299,6 +300,7 @@ function EducationFields({ control, nvEstu, setValue, errors }: {
   setValue: UseFormSetValue<Step2Data>
   errors:   FieldErrors<Step2Data>
 }) {
+  const posgRef = useFocusOnReveal<HTMLDivElement>(nvEstu === 'Posgrado')
   return (
     <>
       <ChipField
@@ -307,10 +309,13 @@ function EducationFields({ control, nvEstu, setValue, errors }: {
         onAfterChange={val => { if (val !== 'Posgrado') setValue('nvPosg', '') }}
       />
       {nvEstu === 'Posgrado' && (
-        <ChipField
-          control={control} name="nvPosg" label="Nivel de posgrado" required
-          options={OPT.nvPosg} error={errors.nvPosg?.message}
-        />
+        <div className="fade-in" ref={posgRef}>
+          <RevealNote>Indicó <strong>posgrado</strong>: seleccione el nivel alcanzado.</RevealNote>
+          <ChipField
+            control={control} name="nvPosg" label="Nivel de posgrado" required
+            options={OPT.nvPosg} error={errors.nvPosg?.message}
+          />
+        </div>
       )}
     </>
   )
@@ -429,6 +434,11 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
   const medPrc   = watch('medPrc')
   const fPrc     = watch('fPrc')
 
+  // Reveal guidance + focus/scroll down the health chain.
+  const estSaludRef = useFocusOnReveal<HTMLDivElement>(estSalud === 'Sí', true)
+  const conMedRef   = useFocusOnReveal<HTMLDivElement>(conMed === 'Sí')
+  const medPrcRef   = useFocusOnReveal<HTMLDivElement>(medPrc === 'Sí')
+
   function handleNext(data: Step3Data) {
     const patch: Partial<SurveyDraft> = { ...data } as Partial<SurveyDraft>
     if (data.estSalud !== 'Sí') {
@@ -459,7 +469,11 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
       />
 
       {estSalud === 'Sí' && (
-        <div className="fade-in">
+        <div className="fade-in" ref={estSaludRef}>
+          <RevealNote>
+            Indicó un <strong>problema de salud reciente</strong>: describa cuál e indique si toma
+            medicamentos para tratarlo.
+          </RevealNote>
           <Field label="¿Cuál es su principal problema de salud?">
             <Controller name="prbSalud" control={control}
               render={({ field }) => (
@@ -470,12 +484,16 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
           <YesNoField control={control} name="conMed" label="¿Consume medicamentos para este problema?" />
 
           {conMed === 'Sí' && (
-            <div className="fade-in">
+            <div className="fade-in" ref={conMedRef}>
               <YesNoField control={control} name="medPrc"
                 label="¿Los medicamentos fueron prescritos por un profesional de salud?" />
 
               {medPrc === 'Sí' && (
-                <div className="fade-in">
+                <div className="fade-in" ref={medPrcRef}>
+                  <RevealNote>
+                    Medicamento <strong>prescrito</strong>: registre la fecha de prescripción y la de
+                    entrega en farmacia (ambas entre el nacimiento y la entrevista).
+                  </RevealNote>
                   <Field label="Fecha de prescripción médica">
                     <input
                       type="date"
@@ -551,6 +569,17 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
   // Reasons for expiry only make sense once expired meds are declared.
   const hasExpired = vtoMedNc === 'Sí' || (cantMedVto ?? 0) > 0
 
+  // Just-in-time focus/scroll when an answer reveals a follow-up block: big
+  // blocks scroll into view; the small "Otro" boxes also grab focus so the
+  // surveyor lands right on the field to fill.
+  const medSobRef   = useFocusOnReveal<HTMLDivElement>(medSob === 'Sí')
+  const dispVcRef   = useFocusOnReveal<HTMLDivElement>(dispMedVc === 'Sí', true)
+  const expiredRef  = useFocusOnReveal<HTMLDivElement>(hasExpired)
+  const otroNoConRef  = useFocusOnReveal<HTMLDivElement>(!!motNoConsumo?.includes('Otro'), true)
+  const otroVencRef   = useFocusOnReveal<HTMLDivElement>(!!motVencimiento?.includes('Otro'), true)
+  const otroDispRef   = useFocusOnReveal<HTMLDivElement>(!!dispFinal?.includes('Otro'), true)
+  const conocePuntosRef = useFocusOnReveal<HTMLDivElement>(conocePuntos === 'Sí', true)
+
   function handleNext(data: Step4Data) {
     const patch: Partial<SurveyDraft> = { ...data } as Partial<SurveyDraft>
     if (data.dispMedVc !== 'Sí') patch.ctoDispVc = ''
@@ -571,15 +600,20 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
         label="¿Tiene medicamentos guardados sin consumir?" error={errors.medSob?.message} />
 
       {medSob === 'Sí' && (
-        <div className="fade-in">
+        <div className="fade-in" ref={medSobRef}>
+          <RevealNote>
+            Como el hogar <strong>guarda medicamentos sin consumir</strong>, complete las cantidades y,
+            si observa vencidos, regístrelos uno a uno en el paso de <strong>Medicamentos</strong>.
+          </RevealNote>
           <Divider label="Conocimiento del entrevistado" />
 
           <YesNoField control={control} name="dispMedVc" help={FIELD_HELP.dispMedVc}
             label="¿Sabe qué hacer con los medicamentos vencidos?" />
 
           {dispMedVc === 'Sí' && (
-            <div className="fade-in">
-              <Field label="¿Qué hace con los medicamentos vencidos?">
+            <div className="fade-in" ref={dispVcRef}>
+              <Field label="¿Qué hace con los medicamentos vencidos?"
+                hint="En palabras del entrevistado: qué hace hoy con ellos.">
                 <Controller name="ctoDispVc" control={control}
                   render={({ field }) => (
                     <textarea placeholder="Describa la práctica actual…" rows={3} {...field} />
@@ -627,22 +661,33 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
             label="¿Por qué no se consumieron? (puede elegir varias)"
             options={OPT.motNoConsumo} />
           {motNoConsumo?.includes('Otro') && (
-            <Field label="Otro motivo de no consumo">
-              <Controller name="motNoConsumoOtro" control={control}
-                render={({ field }) => <input placeholder="Especifique…" {...field} />} />
-            </Field>
+            <div ref={otroNoConRef}>
+              <Field label="Otro motivo de no consumo" hint="Seleccionó «Otro»: especifique cuál."
+                error={errors.motNoConsumoOtro?.message}>
+                <Controller name="motNoConsumoOtro" control={control}
+                  render={({ field }) => <input placeholder="Especifique…" {...field} />} />
+              </Field>
+            </div>
           )}
 
           {hasExpired && (
-            <div className="fade-in">
+            <div className="fade-in" ref={expiredRef}>
+              <RevealNote icon="ti-alert-triangle">
+                Marcó <strong>medicamentos vencidos</strong> en el hogar: registre cada producto vencido
+                con su <strong>fecha de vencimiento</strong> en el paso de Medicamentos — es lo que habilita
+                el análisis por producto.
+              </RevealNote>
               <MultiChipField control={control} name="motVencimiento"
                 label="¿Por qué llegaron a acumularse o vencerse? (puede elegir varias)"
                 options={OPT.motVencimiento} />
               {motVencimiento?.includes('Otro') && (
-                <Field label="Otra razón de acumulación/vencimiento">
-                  <Controller name="motVencimientoOtro" control={control}
-                    render={({ field }) => <input placeholder="Especifique…" {...field} />} />
-                </Field>
+                <div ref={otroVencRef}>
+                  <Field label="Otra razón de acumulación/vencimiento" hint="Seleccionó «Otro»: especifique cuál."
+                    error={errors.motVencimientoOtro?.message}>
+                    <Controller name="motVencimientoOtro" control={control}
+                      render={({ field }) => <input placeholder="Especifique…" {...field} />} />
+                  </Field>
+                </div>
               )}
             </div>
           )}
@@ -651,19 +696,24 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
             label="¿Qué hace realmente con los medicamentos que ya no usa? (puede elegir varias)"
             options={OPT.dispFinal} />
           {dispFinal?.includes('Otro') && (
-            <Field label="Otra conducta de disposición">
-              <Controller name="dispFinalOtro" control={control}
-                render={({ field }) => <input placeholder="Especifique…" {...field} />} />
-            </Field>
+            <div ref={otroDispRef}>
+              <Field label="Otra conducta de disposición" hint="Seleccionó «Otro»: especifique cuál."
+                error={errors.dispFinalOtro?.message}>
+                <Controller name="dispFinalOtro" control={control}
+                  render={({ field }) => <input placeholder="Especifique…" {...field} />} />
+              </Field>
+            </div>
           )}
 
           <YesNoField control={control} name="conocePuntos"
             label="¿Conoce puntos de recolección de medicamentos (punto azul, farmacia)?" />
           {conocePuntos === 'Sí' && (
-            <Field label="¿Cuál(es) conoce?">
-              <Controller name="cualPunto" control={control}
-                render={({ field }) => <input placeholder="Nombre del punto / lugar…" {...field} />} />
-            </Field>
+            <div ref={conocePuntosRef}>
+              <Field label="¿Cuál(es) conoce?" hint="Nombre del punto azul, farmacia o lugar de recolección.">
+                <Controller name="cualPunto" control={control}
+                  render={({ field }) => <input placeholder="Nombre del punto / lugar…" {...field} />} />
+              </Field>
+            </div>
           )}
         </div>
       )}
