@@ -1,0 +1,32 @@
+import { DIVIPOLA } from './divipola.data'
+import { fold } from './ciudad'
+
+// Offline search over the bundled DIVIPOLA catalogue. Replaces the previous
+// network (datos.gov.co) lookup so the city autocomplete works without
+// connectivity and always returns a canonical municipality + department — the
+// field is offline-first, so a network-only catalogue forced free text in the
+// field, which was the root of the city heterogeneity.
+
+export interface MunicipioRecord { municipio: string; departamento: string; codigo: string }
+
+// Fold every name once up front so each keystroke is a cheap substring scan.
+const INDEX = DIVIPOLA.map(([municipio, departamento, codigo]) => ({
+  municipio, departamento, codigo, key: fold(municipio),
+}))
+
+/**
+ * Returns up to `limit` municipalities matching `term` (accent/case-insensitive),
+ * prefix matches first, then internal matches. Empty for terms under 2 chars.
+ */
+export function searchMunicipios(term: string, limit = 10): MunicipioRecord[] {
+  const q = fold(term)
+  if (q.length < 2) return []
+  const starts: MunicipioRecord[] = []
+  const contains: MunicipioRecord[] = []
+  for (const e of INDEX) {
+    const i = e.key.indexOf(q)
+    if (i === 0) starts.push(e)
+    else if (i > 0) contains.push(e)
+  }
+  return [...starts, ...contains].slice(0, limit)
+}
