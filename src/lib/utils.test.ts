@@ -268,6 +268,44 @@ describe('toCSV', () => {
     const dataRow = toCSV(surveys).trim().split('\n')[1]
     expect(dataRow).toContain('A;x;500;mg;2027-01-01|B;y;250;mg;2027-02-01')
   })
+
+  it('exports departamento as its own column right after ciudad', () => {
+    expect(toCSV([]).trim().split('\n')[0]).toContain('ciudad,departamento,dir')
+  })
+
+  it('packs all stored products into the single "medications" column', () => {
+    const header = toCSV([]).trim().split('\n')[0].split(',')
+    // Exactly one medications column — not five flat sub-field columns.
+    expect(header.filter(h => h === 'medications')).toHaveLength(1)
+    expect(header).not.toContain('nmMed')
+    expect(header[header.length - 1]).toBe('medications')
+  })
+
+  it('keeps every data row aligned with the header (no shifted columns)', () => {
+    // Quote-aware field count so escaped commas/quotes don't inflate the tally.
+    const fieldCount = (line: string) => {
+      let count = 1, inQ = false
+      for (const ch of line) {
+        if (ch === '"') inQ = !inQ
+        else if (ch === ',' && !inQ) count++
+      }
+      return count
+    }
+    const surveys = [
+      // multiple meds + a multi-select
+      { id: 'a', nui: 1, motNoConsumo: ['Sobró de la dosis', 'Automedicación'], medications: [
+        { nmMed: 'A', dci: 'x', concMed: 500, undConc: 'mg', fVto: '2027-01-01' },
+        { nmMed: 'B', dci: 'y', concMed: 250, undConc: 'mg', fVto: '2027-02-01' },
+      ] },
+      // no meds at all
+      { id: 'b', nui: 2, medications: [] },
+      // free text with commas and quotes (no newline, so naive line split is safe)
+      { id: 'c', nui: 3, dir: 'Calle 1, #2', obs: 'dijo "hola"', medications: [] },
+    ] as unknown as Survey[]
+    const [header, ...rows] = toCSV(surveys).trim().split('\n')
+    const cols = fieldCount(header)
+    for (const r of rows) expect(fieldCount(r)).toBe(cols)
+  })
 })
 
 describe('toCodebookCSV', () => {

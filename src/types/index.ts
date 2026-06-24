@@ -62,7 +62,8 @@ export interface Survey {
   // Datos sociodemográficos
   fNac:    string        // F_NAC   : Fecha de nacimiento YYYY-MM-DD (< F_ETA)
   // EDAD: calculada F_ETA - F_NAC, no almacenada
-  ciudad:  string        // CIUDAD
+  ciudad:  string        // CIUDAD  : municipio (canónico, sin departamento)
+  departamento?: string  // DEPARTAMENTO : captado aparte para no contaminar CIUDAD
   dir:     string        // DIR     : Dirección de residencia
   estrato: number | null // ESTRATO : 1–6
   etnia:   Etnia         // ETNIA
