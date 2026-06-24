@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { DIVIPOLA } from './divipola.data'
-import { searchMunicipios } from './divipola'
+import { searchMunicipios, DEPARTAMENTOS } from './divipola'
 
 describe('DIVIPOLA catalogue', () => {
   it('bundles the full DANE catalogue (1,122 entries) with clean fields', () => {
@@ -33,5 +33,27 @@ describe('searchMunicipios', () => {
   it('returns nothing under 2 chars and caps the result count', () => {
     expect(searchMunicipios('a')).toEqual([])
     expect(searchMunicipios('san', 5).length).toBeLessThanOrEqual(5)
+  })
+})
+
+describe('cascade (department-scoped) search', () => {
+  it('exposes the 33 departments, alphabetically', () => {
+    expect(DEPARTAMENTOS.length).toBe(33)
+    expect(DEPARTAMENTOS[0]).toBe('Amazonas')
+    expect(DEPARTAMENTOS).toContain('Atlántico')
+  })
+
+  it('scoped to a department, an empty term lists only that department', () => {
+    const atl = searchMunicipios('', 200, 'Atlántico')
+    expect(atl.length).toBeGreaterThan(20)
+    expect(atl.every(r => r.departamento === 'Atlántico')).toBe(true)
+    expect(atl.map(r => r.municipio)).toContain('Barranquilla')
+  })
+
+  it('scoping prevents picking a same-named municipality from another department', () => {
+    const inAtl = searchMunicipios('sabanalarga', 50, 'Atlántico')
+    expect(inAtl.every(r => r.departamento === 'Atlántico')).toBe(true)
+    const inCas = searchMunicipios('sabanalarga', 50, 'Casanare')
+    expect(inCas.every(r => r.departamento === 'Casanare')).toBe(true)
   })
 })

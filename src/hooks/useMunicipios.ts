@@ -14,8 +14,11 @@ export interface MunicipioRecord {
 export function useMunicipios() {
   const [results, setResults] = useState<MunicipioRecord[]>([])
 
-  const search = useCallback((term: string) => {
-    setResults(searchMunicipios(term, 10))
+  // When a department is given, results are scoped to it and an empty term lists
+  // the whole department (browsable); a higher cap lets the larger departments
+  // (Antioquia, Cundinamarca…) show in full.
+  const search = useCallback((term: string, departamento?: string) => {
+    setResults(searchMunicipios(term, departamento ? 200 : 10, departamento))
   }, [])
 
   const clear = useCallback(() => setResults([]), [])

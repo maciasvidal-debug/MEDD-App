@@ -13,7 +13,7 @@ import { ChipField, YesNoField, MultiChipField } from '../form'
 import { useCUM } from '../../hooks/useCUM'
 import { useMunicipios } from '../../hooks/useMunicipios'
 import { normalizeCiudad } from '../../lib/ciudad'
-import { lookupDepartamento } from '../../lib/divipola'
+import { DEPARTAMENTOS, lookupDepartamento } from '../../lib/divipola'
 import { OPT, FIELD_HELP } from '../../lib/constants'
 import { calcEdad, fmtDate, productMetrics } from '../../lib/utils'
 import { validateDraft } from '../../lib/quality'
@@ -38,14 +38,18 @@ function toTitleCase(s: string): string {
 interface MunicipioComboboxProps {
   value: string
   onChange: (v: string) => void
-  onDepartamento?: (d: string) => void
+  departamento: string   // chosen department; '' disables the field
 }
 
-function MunicipioCombobox({ value, onChange, onDepartamento }: MunicipioComboboxProps) {
+// Municipio picker, scoped to the department chosen first in the cascade. With a
+// department set, focusing lists its whole municipality set (browsable) and
+// typing narrows it — so a homonym from another department can't be picked.
+function MunicipioCombobox({ value, onChange, departamento }: MunicipioComboboxProps) {
   const [text, setText] = useState(value)
   const [open, setOpen] = useState(false)
-  const { results, loading, error, search, clear } = useMunicipios()
+  const { results, search, clear } = useMunicipios()
   const skipSearch = useRef(false)
+  const disabled = !departamento
 
   useEffect(() => {
     if (skipSearch.current) { skipSearch.current = false; return }
@@ -57,15 +61,14 @@ function MunicipioCombobox({ value, onChange, onDepartamento }: MunicipioCombobo
     setText(v)
     onChange(v)
     setOpen(true)
-    search(v)
+    search(v, departamento)
   }
 
-  function handleSelect(r: { municipio: string; departamento?: string }) {
+  function handleSelect(r: { municipio: string }) {
     const name = toTitleCase(r.municipio)
     skipSearch.current = true
     setText(name)
     onChange(name)
-    if (r.departamento) onDepartamento?.(toTitleCase(r.departamento))
     setOpen(false)
     clear()
   }
@@ -77,26 +80,24 @@ function MunicipioCombobox({ value, onChange, onDepartamento }: MunicipioCombobo
     clear()
   }
 
-  // Canonicalise free text on blur so values typed without picking a suggestion
-  // (the only path when offline) don't accumulate as casing/accent/department
-  // variants of the same municipality. Picking a suggestion already stores a
-  // clean name, so re-normalising it here is a harmless no-op.
-  function handleBlur() {
-    setTimeout(() => setOpen(false), 160)
-    const { municipio, departamento } = normalizeCiudad(text)
-    if (municipio && municipio !== text) {
-      skipSearch.current = true
-      setText(municipio)
-      onChange(municipio)
-    }
-    // Lift the department out of the city box: prefer one typed alongside the
-    // municipality, else auto-resolve it from the catalogue when the name is
-    // unambiguous (ambiguous names stay empty so the surveyor picks from the list).
-    const dep = departamento || lookupDepartamento(municipio)
-    if (dep) onDepartamento?.(dep)
+  function handleFocus() {
+    if (disabled) return
+    search(text, departamento) // empty text → lists the whole department
+    setOpen(true)
   }
 
-  const showDropdown = open && (results.length > 0 || (error !== '' && text.trim().length >= 2) || loading)
+  // Title-case free text on blur so a value typed without picking from the list
+  // is still stored cleanly. The department is fixed by the cascade, so we leave
+  // it alone here.
+  function handleBlur() {
+    setTimeout(() => setOpen(false), 160)
+    const muni = normalizeCiudad(text).municipio
+    if (muni && muni !== text) {
+      skipSearch.current = true
+      setText(muni)
+      onChange(muni)
+    }
+  }
 
   return (
     <div style={{ position: 'relative' }}>
@@ -104,40 +105,32 @@ function MunicipioCombobox({ value, onChange, onDepartamento }: MunicipioCombobo
         <input
           value={text}
           onChange={handleChange}
-          onFocus={() => { if (text.trim().length >= 2 && results.length > 0) setOpen(true) }}
+          onFocus={handleFocus}
           onBlur={handleBlur}
-          placeholder="Escriba para buscar municipio…"
+          disabled={disabled}
+          placeholder={disabled ? 'Elige primero el departamento' : 'Escriba o elija el municipio…'}
           autoComplete="off"
+          style={disabled ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
         />
-        <div style={{
-          position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-          display: 'flex', alignItems: 'center', gap: 4,
-        }}>
-          {loading && <Spinner size={14} color={C.teal} />}
-          {text && !loading && (
+        {text && !disabled && (
+          <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }}>
             <button
               type="button"
               onMouseDown={e => { e.preventDefault(); handleClear() }}
               aria-label="Limpiar"
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.hint, fontSize: 18, lineHeight: 1, padding: 0 }}
             >×</button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {showDropdown && (
+      {open && !disabled && (results.length > 0 || text.trim().length >= 1) && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 3px)', left: 0, right: 0, zIndex: 30,
           background: C.surface, border: `0.5px solid ${C.border}`,
           borderRadius: 8, boxShadow: '0 4px 14px rgba(0,0,0,0.10)',
           maxHeight: 220, overflowY: 'auto',
         }}>
-          {error && (
-            <div style={{ padding: '8px 12px', fontSize: 12, color: C.amber, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <i className="ti ti-wifi-off" style={{ fontSize: 14 }} aria-hidden />
-              {error} — el texto ingresado se guardará tal cual
-            </div>
-          )}
           {results.map((r, i) => (
             <button
               key={i}
@@ -152,19 +145,14 @@ function MunicipioCombobox({ value, onChange, onDepartamento }: MunicipioCombobo
               onMouseEnter={e => (e.currentTarget.style.background = C.bg)}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: C.text }}>
                 {toTitleCase(r.municipio)}
-              </div>
-              {r.departamento && (
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
-                  {toTitleCase(r.departamento)}
-                </div>
-              )}
+              </span>
             </button>
           ))}
-          {!loading && !error && results.length === 0 && text.trim().length >= 2 && (
+          {results.length === 0 && text.trim().length >= 1 && (
             <div style={{ padding: '10px 12px', fontSize: 12, color: C.muted }}>
-              Sin resultados — el texto ingresado se guardará tal cual
+              Sin coincidencias en {departamento}
             </div>
           )}
         </div>
@@ -363,14 +351,29 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
         error={errors.fNac?.message}
       />
 
-      <Field label="Ciudad / Municipio" required
-        error={errors.ciudad?.message ?? errors.departamento?.message}>
+      {/* Cascade: department first, then its municipalities — guarantees a
+          municipality can't be recorded under the wrong department. */}
+      <Field label="Departamento" required error={errors.departamento?.message}>
+        <Controller name="departamento" control={control}
+          render={({ field }) => (
+            <select
+              value={field.value ?? ''}
+              onChange={e => { field.onChange(e.target.value); setValue('ciudad', '') }}
+              aria-label="Departamento"
+            >
+              <option value="">Selecciona un departamento…</option>
+              {DEPARTAMENTOS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          )} />
+      </Field>
+
+      <Field label="Municipio" required error={errors.ciudad?.message}>
         <Controller name="ciudad" control={control}
           render={({ field }) => (
             <MunicipioCombobox
               value={field.value ?? ''}
               onChange={field.onChange}
-              onDepartamento={d => setValue('departamento', d, { shouldValidate: true })}
+              departamento={watch('departamento') ?? ''}
             />
           )} />
       </Field>
