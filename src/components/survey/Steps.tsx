@@ -13,6 +13,7 @@ import { ChipField, YesNoField, MultiChipField } from '../form'
 import { useCUM } from '../../hooks/useCUM'
 import { useMunicipios } from '../../hooks/useMunicipios'
 import { normalizeCiudad } from '../../lib/ciudad'
+import { lookupDepartamento } from '../../lib/divipola'
 import { OPT, FIELD_HELP } from '../../lib/constants'
 import { calcEdad, fmtDate, productMetrics } from '../../lib/utils'
 import { validateDraft } from '../../lib/quality'
@@ -88,9 +89,11 @@ function MunicipioCombobox({ value, onChange, onDepartamento }: MunicipioCombobo
       setText(municipio)
       onChange(municipio)
     }
-    // If the surveyor typed the department into the city box, lift it out into
-    // its own field instead of leaving it glued to the municipality.
-    if (departamento) onDepartamento?.(departamento)
+    // Lift the department out of the city box: prefer one typed alongside the
+    // municipality, else auto-resolve it from the catalogue when the name is
+    // unambiguous (ambiguous names stay empty so the surveyor picks from the list).
+    const dep = departamento || lookupDepartamento(municipio)
+    if (dep) onDepartamento?.(dep)
   }
 
   const showDropdown = open && (results.length > 0 || (error !== '' && text.trim().length >= 2) || loading)
@@ -331,7 +334,9 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
     defaultValues: {
       fNac:    draft.fNac,
       ciudad:  draft.ciudad,
-      departamento: draft.departamento ?? '',
+      // Backfill the department for legacy/edited records that only carry ciudad,
+      // so a clean existing municipality isn't blocked by the new required field.
+      departamento: draft.departamento || lookupDepartamento(draft.ciudad),
       dir:     draft.dir,
       estrato: draft.estrato,
       etnia:   draft.etnia,
@@ -358,13 +363,14 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
         error={errors.fNac?.message}
       />
 
-      <Field label="Ciudad / Municipio" error={errors.ciudad?.message}>
+      <Field label="Ciudad / Municipio" required
+        error={errors.ciudad?.message ?? errors.departamento?.message}>
         <Controller name="ciudad" control={control}
           render={({ field }) => (
             <MunicipioCombobox
               value={field.value ?? ''}
               onChange={field.onChange}
-              onDepartamento={d => setValue('departamento', d)}
+              onDepartamento={d => setValue('departamento', d, { shouldValidate: true })}
             />
           )} />
       </Field>

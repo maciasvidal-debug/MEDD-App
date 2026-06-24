@@ -1,7 +1,8 @@
 // Catálogo DIVIPOLA (DANE) de municipios de Colombia — 1.122 entradas.
-// Generado desde el PDF oficial 'DIVIPOLA- Códigos municipios'. Bundle local
-// para que el autocompletado de ciudad funcione OFFLINE y sea canónico, sin
-// depender de la red. Tuplas [municipio, departamento, códigoDANE].
+// Fuente: archivo oficial XLSX de datos.gov.co ('DIVIPOLA- Códigos municipios').
+// Verificado 1:1 (código y nombre, acento-exacto) en src/lib/divipola.test.ts.
+// Bundle local para que el autocompletado de ciudad funcione OFFLINE y canónico.
+// Tuplas [municipio, departamento, códigoDANE].
 export type MunicipioTuple = readonly [string, string, string]
 
 export const DIVIPOLA: readonly MunicipioTuple[] = [
@@ -148,6 +149,8 @@ export const DIVIPOLA: readonly MunicipioTuple[] = [
   ['Puerto Rondón', 'Arauca', '81591'],
   ['Saravena', 'Arauca', '81736'],
   ['Tame', 'Arauca', '81794'],
+  ['Providencia', 'Archipiélago de San Andrés, Providencia y Santa Catalina', '88564'],
+  ['San Andrés', 'Archipiélago de San Andrés, Providencia y Santa Catalina', '88001'],
   ['Baranoa', 'Atlántico', '08078'],
   ['Barranquilla', 'Atlántico', '08001'],
   ['Campo de la Cruz', 'Atlántico', '08137'],
@@ -171,7 +174,7 @@ export const DIVIPOLA: readonly MunicipioTuple[] = [
   ['Suan', 'Atlántico', '08770'],
   ['Tubará', 'Atlántico', '08832'],
   ['Usiacurí', 'Atlántico', '08849'],
-  ['Bogotá, D.c.', 'Bogotá D.C.', '11001'],
+  ['Bogotá, D.C.', 'Bogotá, D.C.', '11001'],
   ['Achí', 'Bolívar', '13006'],
   ['Altos del Rosario', 'Bolívar', '13030'],
   ['Arenal', 'Bolívar', '13042'],
@@ -913,8 +916,6 @@ export const DIVIPOLA: readonly MunicipioTuple[] = [
   ['Quinchía', 'Risaralda', '66594'],
   ['Santa Rosa de Cabal', 'Risaralda', '66682'],
   ['Santuario', 'Risaralda', '66687'],
-  ['Providencia', 'San Andrés y Providencia', '88564'],
-  ['San Andrés', 'San Andrés y Providencia', '88001'],
   ['Aguada', 'Santander', '68013'],
   ['Albania', 'Santander', '68020'],
   ['Aratoca', 'Santander', '68051'],

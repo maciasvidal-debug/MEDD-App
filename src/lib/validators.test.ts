@@ -89,7 +89,7 @@ describe('step1Schema', () => {
 
 describe('step2Schema', () => {
   const valid = {
-    fNac: '1990-05-01', ciudad: 'Bogotá', dir: '', estrato: 3,
+    fNac: '1990-05-01', ciudad: 'Bogotá', departamento: 'Bogotá, D.C.', dir: '', estrato: 3,
     etnia: 'Ninguna', asSalud: 'Contributivo', estLab: 'Empleado',
     ingreso: '1-3 SMMLV', nvEstu: 'Profesional', nvPosg: '',
   }
@@ -108,6 +108,11 @@ describe('step2Schema', () => {
     for (const f of ['etnia', 'asSalud', 'estLab', 'ingreso', 'nvEstu'] as const) {
       expect(step2Schema.safeParse({ ...valid, [f]: '' }).success).toBe(false)
     }
+  })
+
+  it('requires ciudad and departamento (no empty geography)', () => {
+    expect(step2Schema.safeParse({ ...valid, ciudad: '' }).success).toBe(false)
+    expect(step2Schema.safeParse({ ...valid, departamento: '' }).success).toBe(false)
   })
 
   // Cross-field rule (the deterministic gate the wizard mirrors in the UI).

@@ -30,3 +30,16 @@ export function searchMunicipios(term: string, limit = 10): MunicipioRecord[] {
   }
   return [...starts, ...contains].slice(0, limit)
 }
+
+/**
+ * Department for a municipality, but ONLY when the name resolves to a single
+ * catalogue entry. Same-named municipalities (e.g. Sabanalarga in Atlántico vs
+ * Casanare) are ambiguous → returns '' so the surveyor must disambiguate by
+ * picking from the dropdown. Used to auto-fill `departamento` for free text.
+ */
+export function lookupDepartamento(municipio: string): string {
+  const q = fold(municipio)
+  if (!q) return ''
+  const matches = INDEX.filter(e => e.key === q)
+  return matches.length === 1 ? matches[0].departamento : ''
+}
