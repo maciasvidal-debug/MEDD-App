@@ -1,68 +1,42 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useMunicipios } from './useMunicipios'
 
-// The municipio combobox debounces (300ms) and hits a remote SoQL endpoint.
-// These exercise the timing/escaping/error edges that are hard to verify by hand.
+// The municipio combobox now resolves against the bundled DIVIPOLA catalogue
+// (offline, synchronous) instead of a remote endpoint.
 describe('useMunicipios', () => {
-  beforeEach(() => { vi.useFakeTimers() })
-  afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers() })
-
-  it('does not fetch for terms shorter than 2 chars and clears state', () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+  it('returns nothing for terms shorter than 2 chars', () => {
     const { result } = renderHook(() => useMunicipios())
     act(() => { result.current.search('a') })
-    act(() => { vi.advanceTimersByTime(500) })
-    expect(fetchSpy).not.toHaveBeenCalled()
     expect(result.current.results).toEqual([])
     expect(result.current.error).toBe('')
-  })
-
-  it('debounces rapid calls into a single fetch after 300ms', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true, json: async () => [{ municipio: 'BOGOTA', departamento: 'CUNDINAMARCA' }],
-    } as Response)
-    const { result } = renderHook(() => useMunicipios())
-    act(() => { result.current.search('bog') })
-    act(() => { result.current.search('bogo') })
-    act(() => { result.current.search('bogot') })
-    expect(fetchSpy).not.toHaveBeenCalled() // nothing until the timer fires
-    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-    expect(result.current.results).toHaveLength(1)
     expect(result.current.loading).toBe(false)
   })
 
-  it('uppercases the term and escapes single quotes in the LIKE clause', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true, json: async () => [],
-    } as Response)
+  it('finds municipalities offline, accent/case-insensitive, with their department', () => {
     const { result } = renderHook(() => useMunicipios())
-    act(() => { result.current.search("be'l") })
-    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
-    const url = decodeURIComponent(String(fetchSpy.mock.calls[0][0])).replace(/\+/g, ' ')
-    expect(url).toContain("upper(municipio) LIKE '%BE''L%'")
+    act(() => { result.current.search('barranq') })
+    const hit = result.current.results.find(r => r.municipio === 'Barranquilla')
+    expect(hit).toBeTruthy()
+    expect(hit?.departamento).toBe('Atlántico')
   })
 
-  it('surfaces a friendly error on network failure', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'))
+  it('disambiguates same-named municipalities by department (Sabanalarga)', () => {
     const { result } = renderHook(() => useMunicipios())
-    act(() => { result.current.search('bogota') })
-    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
-    expect(result.current.error).toMatch(/Sin conexión/)
-    expect(result.current.results).toEqual([])
-    expect(result.current.loading).toBe(false)
+    act(() => { result.current.search('sabanalarga') })
+    const depts = result.current.results
+      .filter(r => r.municipio === 'Sabanalarga')
+      .map(r => r.departamento)
+    expect(depts).toContain('Atlántico')
+    expect(depts).toContain('Casanare')
   })
 
-  it('clear() cancels a pending debounce so no request fires', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => [] } as Response)
+  it('clear() empties the results', () => {
     const { result } = renderHook(() => useMunicipios())
     act(() => { result.current.search('bogota') })
+    expect(result.current.results.length).toBeGreaterThan(0)
     act(() => { result.current.clear() })
-    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
-    expect(fetchSpy).not.toHaveBeenCalled()
     expect(result.current.results).toEqual([])
-    expect(result.current.error).toBe('')
   })
 })

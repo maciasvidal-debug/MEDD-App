@@ -1,50 +1,27 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { searchMunicipios } from '../lib/divipola'
 
 export interface MunicipioRecord {
   municipio:    string
   departamento: string
 }
 
-const API = 'https://www.datos.gov.co/resource/82di-kkh9.json'
-
+// Offline-first municipio lookup backed by the bundled DIVIPOLA catalogue
+// (src/lib/divipola.data.ts). Previously this hit a remote SoQL endpoint, which
+// failed in the field (no connectivity) and forced surveyors into free text —
+// the source of the city heterogeneity. Now it resolves synchronously against
+// the local catalogue, so there is no loading or network-error state.
 export function useMunicipios() {
   const [results, setResults] = useState<MunicipioRecord[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const search = useCallback((term: string) => {
-    if (timer.current) clearTimeout(timer.current)
-    if (term.trim().length < 2) { setResults([]); setError(''); return }
-
-    timer.current = setTimeout(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const t = term.trim().toUpperCase().replace(/'/g, "''")
-        const url = new URL(API)
-        url.searchParams.set('$limit', '10')
-        url.searchParams.set('$order', 'municipio ASC')
-        url.searchParams.set('$where', `upper(municipio) LIKE '%${t}%'`)
-        const res = await fetch(url.toString())
-        if (!res.ok) throw new Error()
-        const data = await res.json()
-        setResults(data as MunicipioRecord[])
-      } catch {
-        setError('Sin conexión al catálogo de municipios')
-        setResults([])
-      } finally {
-        setLoading(false)
-      }
-    }, 300)
+  // When a department is given, results are scoped to it and an empty term lists
+  // the whole department (browsable); a higher cap lets the larger departments
+  // (Antioquia, Cundinamarca…) show in full.
+  const search = useCallback((term: string, departamento?: string) => {
+    setResults(searchMunicipios(term, departamento ? 200 : 10, departamento))
   }, [])
 
-  const clear = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current)
-    setResults([])
-    setError('')
-    setLoading(false)
-  }, [])
+  const clear = useCallback(() => setResults([]), [])
 
-  return { results, loading, error, search, clear }
+  return { results, loading: false, error: '', search, clear }
 }
