@@ -111,6 +111,32 @@ export function HelpTip({ text, label }: { text: string; label?: string }) {
   )
 }
 
+// ─── RevealNote ───────────────────────────────────────────────────────────────
+// In-context, just-in-time guidance shown at the top of a conditionally-revealed
+// block: it states why the block appeared and what to do, turning skip-logic into
+// help without tooltips, tours or extra screens. aria-live announces it to AT.
+
+export function RevealNote({ children, icon = 'ti-arrow-down-circle' }: {
+  children: React.ReactNode; icon?: string
+}) {
+  return (
+    <div
+      role="note"
+      aria-live="polite"
+      style={{
+        display: 'flex', gap: 8, alignItems: 'flex-start',
+        background: C.tealLight,
+        border: `1px solid color-mix(in srgb, ${C.teal} 30%, transparent)`,
+        borderRadius: 10, padding: '9px 11px', margin: '2px 0 14px',
+        fontSize: 12.5, lineHeight: 1.5, color: C.text,
+      }}
+    >
+      <i className={`ti ${icon}`} style={{ fontSize: 16, color: C.teal, flexShrink: 0, marginTop: 1 }} aria-hidden />
+      <span>{children}</span>
+    </div>
+  )
+}
+
 // ─── FieldError ───────────────────────────────────────────────────────────────
 
 export function FieldError({ message }: { message?: string }) {

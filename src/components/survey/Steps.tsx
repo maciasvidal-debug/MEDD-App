@@ -7,8 +7,9 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Field, ChipGroup, SectionHead, Divider,
-  Card, Button, Spinner, C, Badge,
+  Card, Button, Spinner, C, Badge, RevealNote,
 } from '../ui'
+import { useFocusOnReveal } from '../ui/useFocusOnReveal'
 import { ChipField, YesNoField, MultiChipField } from '../form'
 import { useCUM } from '../../hooks/useCUM'
 import { useMunicipios } from '../../hooks/useMunicipios'
@@ -551,6 +552,15 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
   // Reasons for expiry only make sense once expired meds are declared.
   const hasExpired = vtoMedNc === 'Sí' || (cantMedVto ?? 0) > 0
 
+  // Just-in-time focus/scroll when an answer reveals a follow-up block: big
+  // blocks scroll into view; the small "Otro" boxes also grab focus so the
+  // surveyor lands right on the field to fill.
+  const medSobRef   = useFocusOnReveal<HTMLDivElement>(medSob === 'Sí')
+  const expiredRef  = useFocusOnReveal<HTMLDivElement>(hasExpired)
+  const otroNoConRef  = useFocusOnReveal<HTMLDivElement>(!!motNoConsumo?.includes('Otro'), true)
+  const otroVencRef   = useFocusOnReveal<HTMLDivElement>(!!motVencimiento?.includes('Otro'), true)
+  const otroDispRef   = useFocusOnReveal<HTMLDivElement>(!!dispFinal?.includes('Otro'), true)
+
   function handleNext(data: Step4Data) {
     const patch: Partial<SurveyDraft> = { ...data } as Partial<SurveyDraft>
     if (data.dispMedVc !== 'Sí') patch.ctoDispVc = ''
@@ -571,7 +581,11 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
         label="¿Tiene medicamentos guardados sin consumir?" error={errors.medSob?.message} />
 
       {medSob === 'Sí' && (
-        <div className="fade-in">
+        <div className="fade-in" ref={medSobRef}>
+          <RevealNote>
+            Como el hogar <strong>guarda medicamentos sin consumir</strong>, complete las cantidades y,
+            si observa vencidos, regístrelos uno a uno en el paso de <strong>Medicamentos</strong>.
+          </RevealNote>
           <Divider label="Conocimiento del entrevistado" />
 
           <YesNoField control={control} name="dispMedVc" help={FIELD_HELP.dispMedVc}
@@ -627,22 +641,33 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
             label="¿Por qué no se consumieron? (puede elegir varias)"
             options={OPT.motNoConsumo} />
           {motNoConsumo?.includes('Otro') && (
-            <Field label="Otro motivo de no consumo">
-              <Controller name="motNoConsumoOtro" control={control}
-                render={({ field }) => <input placeholder="Especifique…" {...field} />} />
-            </Field>
+            <div ref={otroNoConRef}>
+              <Field label="Otro motivo de no consumo" hint="Seleccionó «Otro»: especifique cuál."
+                error={errors.motNoConsumoOtro?.message}>
+                <Controller name="motNoConsumoOtro" control={control}
+                  render={({ field }) => <input placeholder="Especifique…" {...field} />} />
+              </Field>
+            </div>
           )}
 
           {hasExpired && (
-            <div className="fade-in">
+            <div className="fade-in" ref={expiredRef}>
+              <RevealNote icon="ti-alert-triangle">
+                Marcó <strong>medicamentos vencidos</strong> en el hogar: registre cada producto vencido
+                con su <strong>fecha de vencimiento</strong> en el paso de Medicamentos — es lo que habilita
+                el análisis por producto.
+              </RevealNote>
               <MultiChipField control={control} name="motVencimiento"
                 label="¿Por qué llegaron a acumularse o vencerse? (puede elegir varias)"
                 options={OPT.motVencimiento} />
               {motVencimiento?.includes('Otro') && (
-                <Field label="Otra razón de acumulación/vencimiento">
-                  <Controller name="motVencimientoOtro" control={control}
-                    render={({ field }) => <input placeholder="Especifique…" {...field} />} />
-                </Field>
+                <div ref={otroVencRef}>
+                  <Field label="Otra razón de acumulación/vencimiento" hint="Seleccionó «Otro»: especifique cuál."
+                    error={errors.motVencimientoOtro?.message}>
+                    <Controller name="motVencimientoOtro" control={control}
+                      render={({ field }) => <input placeholder="Especifique…" {...field} />} />
+                  </Field>
+                </div>
               )}
             </div>
           )}
@@ -651,10 +676,13 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
             label="¿Qué hace realmente con los medicamentos que ya no usa? (puede elegir varias)"
             options={OPT.dispFinal} />
           {dispFinal?.includes('Otro') && (
-            <Field label="Otra conducta de disposición">
-              <Controller name="dispFinalOtro" control={control}
-                render={({ field }) => <input placeholder="Especifique…" {...field} />} />
-            </Field>
+            <div ref={otroDispRef}>
+              <Field label="Otra conducta de disposición" hint="Seleccionó «Otro»: especifique cuál."
+                error={errors.dispFinalOtro?.message}>
+                <Controller name="dispFinalOtro" control={control}
+                  render={({ field }) => <input placeholder="Especifique…" {...field} />} />
+              </Field>
+            </div>
           )}
 
           <YesNoField control={control} name="conocePuntos"
