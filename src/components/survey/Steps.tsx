@@ -300,6 +300,7 @@ function EducationFields({ control, nvEstu, setValue, errors }: {
   setValue: UseFormSetValue<Step2Data>
   errors:   FieldErrors<Step2Data>
 }) {
+  const posgRef = useFocusOnReveal<HTMLDivElement>(nvEstu === 'Posgrado')
   return (
     <>
       <ChipField
@@ -308,10 +309,13 @@ function EducationFields({ control, nvEstu, setValue, errors }: {
         onAfterChange={val => { if (val !== 'Posgrado') setValue('nvPosg', '') }}
       />
       {nvEstu === 'Posgrado' && (
-        <ChipField
-          control={control} name="nvPosg" label="Nivel de posgrado" required
-          options={OPT.nvPosg} error={errors.nvPosg?.message}
-        />
+        <div className="fade-in" ref={posgRef}>
+          <RevealNote>Indicó <strong>posgrado</strong>: seleccione el nivel alcanzado.</RevealNote>
+          <ChipField
+            control={control} name="nvPosg" label="Nivel de posgrado" required
+            options={OPT.nvPosg} error={errors.nvPosg?.message}
+          />
+        </div>
       )}
     </>
   )
@@ -430,6 +434,11 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
   const medPrc   = watch('medPrc')
   const fPrc     = watch('fPrc')
 
+  // Reveal guidance + focus/scroll down the health chain.
+  const estSaludRef = useFocusOnReveal<HTMLDivElement>(estSalud === 'Sí', true)
+  const conMedRef   = useFocusOnReveal<HTMLDivElement>(conMed === 'Sí')
+  const medPrcRef   = useFocusOnReveal<HTMLDivElement>(medPrc === 'Sí')
+
   function handleNext(data: Step3Data) {
     const patch: Partial<SurveyDraft> = { ...data } as Partial<SurveyDraft>
     if (data.estSalud !== 'Sí') {
@@ -460,7 +469,11 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
       />
 
       {estSalud === 'Sí' && (
-        <div className="fade-in">
+        <div className="fade-in" ref={estSaludRef}>
+          <RevealNote>
+            Indicó un <strong>problema de salud reciente</strong>: describa cuál e indique si toma
+            medicamentos para tratarlo.
+          </RevealNote>
           <Field label="¿Cuál es su principal problema de salud?">
             <Controller name="prbSalud" control={control}
               render={({ field }) => (
@@ -471,12 +484,16 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
           <YesNoField control={control} name="conMed" label="¿Consume medicamentos para este problema?" />
 
           {conMed === 'Sí' && (
-            <div className="fade-in">
+            <div className="fade-in" ref={conMedRef}>
               <YesNoField control={control} name="medPrc"
                 label="¿Los medicamentos fueron prescritos por un profesional de salud?" />
 
               {medPrc === 'Sí' && (
-                <div className="fade-in">
+                <div className="fade-in" ref={medPrcRef}>
+                  <RevealNote>
+                    Medicamento <strong>prescrito</strong>: registre la fecha de prescripción y la de
+                    entrega en farmacia (ambas entre el nacimiento y la entrevista).
+                  </RevealNote>
                   <Field label="Fecha de prescripción médica">
                     <input
                       type="date"
@@ -556,10 +573,12 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
   // blocks scroll into view; the small "Otro" boxes also grab focus so the
   // surveyor lands right on the field to fill.
   const medSobRef   = useFocusOnReveal<HTMLDivElement>(medSob === 'Sí')
+  const dispVcRef   = useFocusOnReveal<HTMLDivElement>(dispMedVc === 'Sí', true)
   const expiredRef  = useFocusOnReveal<HTMLDivElement>(hasExpired)
   const otroNoConRef  = useFocusOnReveal<HTMLDivElement>(!!motNoConsumo?.includes('Otro'), true)
   const otroVencRef   = useFocusOnReveal<HTMLDivElement>(!!motVencimiento?.includes('Otro'), true)
   const otroDispRef   = useFocusOnReveal<HTMLDivElement>(!!dispFinal?.includes('Otro'), true)
+  const conocePuntosRef = useFocusOnReveal<HTMLDivElement>(conocePuntos === 'Sí', true)
 
   function handleNext(data: Step4Data) {
     const patch: Partial<SurveyDraft> = { ...data } as Partial<SurveyDraft>
@@ -592,8 +611,9 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
             label="¿Sabe qué hacer con los medicamentos vencidos?" />
 
           {dispMedVc === 'Sí' && (
-            <div className="fade-in">
-              <Field label="¿Qué hace con los medicamentos vencidos?">
+            <div className="fade-in" ref={dispVcRef}>
+              <Field label="¿Qué hace con los medicamentos vencidos?"
+                hint="En palabras del entrevistado: qué hace hoy con ellos.">
                 <Controller name="ctoDispVc" control={control}
                   render={({ field }) => (
                     <textarea placeholder="Describa la práctica actual…" rows={3} {...field} />
@@ -688,10 +708,12 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
           <YesNoField control={control} name="conocePuntos"
             label="¿Conoce puntos de recolección de medicamentos (punto azul, farmacia)?" />
           {conocePuntos === 'Sí' && (
-            <Field label="¿Cuál(es) conoce?">
-              <Controller name="cualPunto" control={control}
-                render={({ field }) => <input placeholder="Nombre del punto / lugar…" {...field} />} />
-            </Field>
+            <div ref={conocePuntosRef}>
+              <Field label="¿Cuál(es) conoce?" hint="Nombre del punto azul, farmacia o lugar de recolección.">
+                <Controller name="cualPunto" control={control}
+                  render={({ field }) => <input placeholder="Nombre del punto / lugar…" {...field} />} />
+              </Field>
+            </div>
           )}
         </div>
       )}
