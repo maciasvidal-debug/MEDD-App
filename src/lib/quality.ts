@@ -51,15 +51,9 @@ export function declaresExpiredWithoutDetail(
  * plausibility flags that are surfaced but don't block. `duplicate` is a likely
  * prior record (same respondent fingerprint), excluding the row being edited.
  */
-export function validateDraft(
-  d: SurveyDraft,
-  existing: Survey[] = [],
-  editingId?: string,
-): QualityReport {
+// Hard logical impossibilities that should block the save.
+function collectErrors(d: SurveyDraft): string[] {
   const errors: string[] = []
-  const warnings: string[] = []
-
-  // — Hard logical impossibilities —
   if (d.fNac && d.fEta) {
     const age = dayDiff(d.fEta, d.fNac)
     if (age != null && age <= 0) errors.push('La fecha de nacimiento es posterior (o igual) a la de la entrevista.')
@@ -74,8 +68,12 @@ export function validateDraft(
   if (declaresExpiredWithoutDetail(d)) {
     errors.push('Indicó medicamentos vencidos en casa, pero ningún producto del detalle tiene fecha de vencimiento pasada. Agregue el/los producto(s) vencido(s) con su fecha de vencimiento en el paso de Medicamentos.')
   }
+  return errors
+}
 
-  // — Soft plausibility —
+// Soft plausibility flags that are surfaced but don't block the save.
+function collectWarnings(d: SurveyDraft): string[] {
+  const warnings: string[] = []
   const edad = calcEdad(d.fEta, d.fNac)
   if (edad != null && (edad < 0 || edad > 110)) warnings.push(`Edad atípica (${edad} años): verifique las fechas.`)
   if (d.pesoMedNc != null && d.pesoMedNc > 5000) warnings.push(`Peso muy alto (${d.pesoMedNc} g): confirme la unidad (gramos).`)
@@ -95,14 +93,27 @@ export function validateDraft(
   if (d.medSob === 'Sí' && d.vtoMedNc === 'Sí' && (d.cantMedVto == null || d.cantMedVto === 0)) {
     warnings.push('Indicó vencidos en casa pero la cantidad de vencidos es 0.')
   }
+  return warnings
+}
 
-  // — Likely duplicate (same respondent fingerprint) —
-  const duplicate = (d.fNac && d.ciudad && d.fEta)
-    ? existing.find(s =>
-        s.id !== editingId &&
-        s.fNac === d.fNac && s.ciudad === d.ciudad && s.fEta === d.fEta,
-      ) ?? null
-    : null
+// Likely prior record (same respondent fingerprint), excluding the edited row.
+function findDuplicate(d: SurveyDraft, existing: Survey[], editingId?: string): Survey | null {
+  if (!(d.fNac && d.ciudad && d.fEta)) return null
+  return existing.find(s =>
+    s.id !== editingId &&
+    s.fNac === d.fNac && s.ciudad === d.ciudad && s.fEta === d.fEta,
+  ) ?? null
+}
 
-  return { errors, warnings, completeness: completenessOf(d), duplicate }
+export function validateDraft(
+  d: SurveyDraft,
+  existing: Survey[] = [],
+  editingId?: string,
+): QualityReport {
+  return {
+    errors:       collectErrors(d),
+    warnings:     collectWarnings(d),
+    completeness: completenessOf(d),
+    duplicate:    findDuplicate(d, existing, editingId),
+  }
 }

@@ -940,19 +940,30 @@ interface SurveyorEffect {
 // read as a measurement / inter-observer quality flag, not a true effect. Program
 // is categorical (chi-square + PR vs the most-sampled program); academic semester
 // is ordinal, so it also gets a Cochran–Armitage trend test.
+// Tally {total, cases} per group key, skipping rows whose key is null/empty.
+// Shared by the program / semester / surveyor breakdowns below.
+function groupCases<K>(
+  surveys: Survey[],
+  keyOf: (s: Survey) => K | null | undefined,
+  isCase: (s: Survey) => boolean,
+): Map<K, { total: number; cases: number }> {
+  const m = new Map<K, { total: number; cases: number }>()
+  for (const s of surveys) {
+    const k = keyOf(s)
+    if (k == null || (k as unknown) === '') continue
+    const g = m.get(k) ?? { total: 0, cases: 0 }
+    g.total++
+    if (isCase(s)) g.cases++
+    m.set(k, g)
+  }
+  return m
+}
+
 function buildSurveyorEffect(surveys: Survey[]): SurveyorEffect | null {
   const isCase = (s: Survey) => s.vtoMedNc === 'Sí'
 
   // By program
-  const progMap = new Map<string, { total: number; cases: number }>()
-  for (const s of surveys) {
-    if (!s.etrPrograma) continue
-    const g = progMap.get(s.etrPrograma) ?? { total: 0, cases: 0 }
-    g.total++
-    if (isCase(s)) g.cases++
-    progMap.set(s.etrPrograma, g)
-  }
-  const progEntries = Array.from(progMap.entries()).filter(([, g]) => g.total > 0)
+  const progEntries = Array.from(groupCases(surveys, s => s.etrPrograma, isCase).entries())
 
   let programs: AssocGroup[] | null = null
   let chi: ChiSquare | null = null
@@ -972,14 +983,7 @@ function buildSurveyorEffect(surveys: Survey[]): SurveyorEffect | null {
   }
 
   // By academic semester (ordinal trend)
-  const semMap = new Map<number, { total: number; cases: number }>()
-  for (const s of surveys) {
-    if (s.etrSemestre == null) continue
-    const g = semMap.get(s.etrSemestre) ?? { total: 0, cases: 0 }
-    g.total++
-    if (isCase(s)) g.cases++
-    semMap.set(s.etrSemestre, g)
-  }
+  const semMap = groupCases(surveys, s => s.etrSemestre, isCase)
   const nSemester = Array.from(semMap.values()).reduce((sum, g) => sum + g.total, 0)
   const trend = semMap.size >= 2
     ? cochranArmitage(
@@ -990,15 +994,10 @@ function buildSurveyorEffect(surveys: Survey[]): SurveyorEffect | null {
     : null
 
   // Outcome clustering by surveyor (nuiEtr) → intraclass correlation
-  const survMap = new Map<number, { n: number; cases: number }>()
-  for (const s of surveys) {
-    if (s.nuiEtr == null) continue
-    const g = survMap.get(s.nuiEtr) ?? { n: 0, cases: 0 }
-    g.n++
-    if (isCase(s)) g.cases++
-    survMap.set(s.nuiEtr, g)
-  }
-  const icc = iccBinary(Array.from(survMap.values()))
+  const icc = iccBinary(
+    Array.from(groupCases(surveys, s => s.nuiEtr, isCase).values())
+      .map(g => ({ n: g.total, cases: g.cases })),
+  )
 
   if (!programs && !trend && !icc) return null
   return { programs, chi, ref, trend, nSemester, icc }
