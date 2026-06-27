@@ -382,11 +382,17 @@ export function buildTextAnalysis(surveys: Survey[]): TextAnalysisResult | null 
 
   // Co-occurrence matrix (symmetric, zero diagonal)
   const themeLabels = themes.map(t => t.theme)
-  const matrix: number[][] = themeLabels.map((t1, i) =>
-    themeLabels.map((t2, j) =>
-      i === j ? 0 : surveyThemes.filter(st => st.includes(t1) && st.includes(t2)).length
-    )
-  )
+  const themeIndex = new Map(themeLabels.map((t, i) => [t, i]))
+  const matrix: number[][] = themeLabels.map(() => new Array(themeLabels.length).fill(0))
+  // Single pass over surveys: increment each theme pair present in a survey
+  for (const st of surveyThemes) {
+    const idx = st.map(t => themeIndex.get(t)!)
+    for (let a = 0; a < idx.length; a++)
+      for (let b = a + 1; b < idx.length; b++) {
+        matrix[idx[a]][idx[b]]++
+        matrix[idx[b]][idx[a]]++
+      }
+  }
 
   return {
     n, nWithObs, corpus, topTerms, bigrams, themes,
