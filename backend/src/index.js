@@ -13,11 +13,34 @@ const surveys = require('./routes/surveys');
 const analytics = require('./routes/analytics');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
+// Interpret the TRUST_PROXY env var into a value Express accepts for its
+// 'trust proxy' setting. Returns undefined when unset so the caller can leave
+// the Express default (disabled) in place.
+function parseTrustProxy(value) {
+    if (value === undefined || value.trim() === '') return undefined;
+    const v = value.trim();
+    if (v.toLowerCase() === 'true') return true;
+    if (v.toLowerCase() === 'false') return false;
+    if (/^\d+$/.test(v)) return Number(v); // number of proxy hops to trust
+    return v; // IP / subnet / preset list passed through to Express
+}
+
 const app = express();
 
-// Trust the first proxy hop so rate limiting sees the real client IP when
-// deployed behind a load balancer / reverse proxy.
-app.set('trust proxy', 1);
+// Configure proxy trust for rate limiting. Express derives the client IP from
+// the X-Forwarded-For header ONLY when a proxy is trusted, so trust must stay
+// OFF by default: a direct-to-internet deployment that trusts proxies lets any
+// client spoof X-Forwarded-For and bypass the rate limits. Opt in via
+// TRUST_PROXY only when actually behind a load balancer / reverse proxy:
+//   - a hop count, e.g. "1"
+//   - "true" / "false"
+//   - a comma-separated list of trusted IPs / subnets / preset names,
+//     e.g. "loopback, 10.0.0.0/8"
+// When TRUST_PROXY is unset, Express keeps its secure default (disabled).
+const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+if (trustProxy !== undefined) {
+    app.set('trust proxy', trustProxy);
+}
 app.disable('x-powered-by');
 
 // Secure HTTP headers.
