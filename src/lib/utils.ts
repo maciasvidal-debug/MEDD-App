@@ -69,19 +69,24 @@ export function fmtTimestamp(iso: string): string {
 
 // ─── UUID ─────────────────────────────────────────────────────────────────
 
+// Cryptographically-secure UUID v4. Uses crypto.randomUUID where available
+// (secure contexts), falling back to a crypto.getRandomValues-filled template
+// for insecure-context (http) deployments where randomUUID may be unavailable.
+// Never falls back to Math.random(): a non-CSPRNG would yield weak, potentially
+// predictable record ids and worse collision resistance for a primary key, so we
+// fail fast instead. Any runtime that can run this PWA (it requires IndexedDB)
+// provides Web Crypto, making the throw unreachable in supported environments.
 export function uuid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    let r: number
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
       const array = new Uint8Array(1)
       crypto.getRandomValues(array)
-      r = array[0] % 16
-    } else {
-      r = (Math.random() * 16) | 0
-    }
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
-  })
+      const r = array[0] % 16 // 256 % 16 === 0 → uniform, no modulo bias
+      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+    })
+  }
+  throw new Error('uuid(): the Web Crypto API is required to generate secure identifiers')
 }
 
 // ─── Numbers ──────────────────────────────────────────────────────────────
