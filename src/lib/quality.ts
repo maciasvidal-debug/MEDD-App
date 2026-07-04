@@ -1,5 +1,5 @@
 import type { SurveyDraft, Survey } from '../types'
-import { calcEdad, dayDiff, productMetrics } from './utils'
+import { calcEdad, dayDiff, productMetrics } from './date'
 
 export interface QualityReport {
   errors:       string[]  // hard logical impossibilities → block save

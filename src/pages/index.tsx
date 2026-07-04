@@ -11,10 +11,9 @@ import {
 } from '../components/settings'
 import { useStore } from '../lib/store'
 import { useCUM } from '../hooks/useCUM'
-import {
-  calcEdad, fmtDate, fmtTimestamp, compareSortable,
-  toCSV, toCodebookCSV, downloadBlob, dateTag, productMetrics,
-} from '../lib/utils'
+import { calcEdad, fmtDate, fmtTimestamp, dateTag, productMetrics } from '../lib/date'
+import { toCSV, toCodebookCSV } from '../lib/csv'
+import { compareSortable, downloadBlob } from '../lib/utils'
 import { TOTAL_STEPS, FIELD_GUIDE } from '../lib/constants'
 import { isProfileComplete, surveyMissingProfile } from '../lib/validators'
 import { declaresExpiredWithoutDetail } from '../lib/quality'

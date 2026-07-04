@@ -1,4 +1,5 @@
-import { wilsonCI, pct } from './utils'
+import { wilsonCI } from './stats'
+import { pct } from './utils'
 
 // ─── Auto-generated plain-language read-out ("Lectura rápida") ──────────────
 // Translates the dashboard's key statistics into short, plain-Spanish takeaways
