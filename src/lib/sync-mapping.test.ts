@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toRow, fromRow } from './sync-mapping'
+import { toRow, fromRow, type SupabaseRow } from './sync-mapping'
 import type { Survey } from '../types'
 
 const survey: Survey = {
@@ -125,5 +125,105 @@ describe('sync mapping toRow/fromRow', () => {
     expect(back.estrato).toBeNull()
     expect(back.cantMed).toBeNull()
     expect(back.etrSemestre).toBeNull()
+  })
+
+  it('preserves legitimate zero values in numeric fields (0 is a value, not "empty")', () => {
+    // estrato (1–6), cant_med/cant_med_vto/peso_med_nc (>= 0), nui_etr and
+    // etr_semestre all accept 0 as real data. The mapping must map numerics
+    // straight through (never `|| null`), or a valid 0 would be lost as null.
+    const zeros = { ...survey, estrato: 0, cantMed: 0, cantMedVto: 0, pesoMedNc: 0, nuiEtr: 0, etrSemestre: 0 }
+    const row = toRow(zeros, 'u')
+    expect(row.estrato).toBe(0)
+    expect(row.cant_med).toBe(0)
+    expect(row.cant_med_vto).toBe(0)
+    expect(row.peso_med_nc).toBe(0)
+    expect(row.nui_etr).toBe(0)
+    expect(row.etr_semestre).toBe(0)
+    const back = fromRow(row)
+    expect(back.estrato).toBe(0)
+    expect(back.cantMed).toBe(0)
+    expect(back.cantMedVto).toBe(0)
+    expect(back.pesoMedNc).toBe(0)
+    expect(back.nuiEtr).toBe(0)
+    expect(back.etrSemestre).toBe(0)
+  })
+
+  it('round-trips departamento when present, but maps absent → undefined (not "")', () => {
+    const withDep = { ...survey, departamento: 'Cundinamarca' }
+    expect(toRow(withDep, 'u').departamento).toBe('Cundinamarca')
+    expect(fromRow(toRow(withDep, 'u')).departamento).toBe('Cundinamarca')
+    // Unlike ciudad (which normalizes to ''), an absent departamento stays
+    // undefined — it is captured separately and optional by design.
+    expect(toRow(survey, 'u').departamento).toBeNull()
+    expect(fromRow(toRow(survey, 'u')).departamento).toBeUndefined()
+  })
+
+  it('round-trips the medication sub-records verbatim (nested 1:N passthrough)', () => {
+    const meds: Survey['medications'] = [
+      { nmMed: 'Dolex', dci: 'Acetaminofén', concMed: 500, undConc: 'mg', fVto: '2027-03-01' },
+      // A partially-filled row (blank concentration/unit/vencimiento) must survive intact.
+      { nmMed: 'Amoxil', dci: 'Amoxicilina', concMed: null, undConc: '', fVto: '' },
+    ]
+    const back = fromRow(toRow({ ...survey, medications: meds }, 'u'))
+    expect(back.medications).toEqual(meds)
+  })
+})
+
+describe('fromRow defensive reads from a raw Supabase row', () => {
+  // The round-trip suite always feeds fromRow the output of toRow. This exercises
+  // the other real path: a row straight from Postgres, which returns null for
+  // empty text/array columns. fromRow must normalize those so the UI never sees
+  // null where it expects a string or array (uncontrolled inputs, `.map` crashes).
+  it('coerces null optional columns to safe client defaults', () => {
+    const rawRow: SupabaseRow = {
+      id: 'row-1',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      started_at: null, data_env: null, backcheck_of: null, instrument_version: null,
+      f_eta: null, nui_etr: null, nui: 3,
+      etr_programa: null, etr_tipo_inst: null, etr_semestre: null, etr_institucion: null,
+      f_nac: null, ciudad: null, departamento: null, dir: null, estrato: null,
+      etnia: null, as_salud: null, est_lab: null, ingreso: null, nv_estu: null, nv_posg: null,
+      per_salud: null, est_salud: null, prb_salud: null, con_med: null, med_prc: null,
+      f_prc: null, f_disp: null, ind_med: null, med_sob: null, disp_med_vc: null,
+      cto_disp_vc: null, vto_med_nc: null, cant_med: null, cant_med_vto: null, peso_med_nc: null,
+      medications: null,
+      mot_no_consumo: null, mot_no_consumo_otro: null,
+      mot_vencimiento: null, mot_vencimiento_otro: null,
+      disp_final: null, disp_final_otro: null,
+      conoce_puntos: null, cual_punto: null, obs: null,
+    }
+    const back = fromRow(rawRow)
+
+    // Text columns → '' (never null), so controlled form inputs stay controlled.
+    expect(back.fEta).toBe('')
+    expect(back.ciudad).toBe('')
+    expect(back.dir).toBe('')
+    expect(back.obs).toBe('')
+    expect(back.motNoConsumoOtro).toBe('')
+    expect(back.cualPunto).toBe('')
+
+    // Array columns → [] (never null), so the UI can `.map` unconditionally.
+    expect(back.medications).toEqual([])
+    expect(back.motNoConsumo).toEqual([])
+    expect(back.motVencimiento).toEqual([])
+    expect(back.dispFinal).toEqual([])
+
+    // Nullable numerics stay null (a genuine "no value"), never coerced to 0.
+    expect(back.estrato).toBeNull()
+    expect(back.cantMed).toBeNull()
+    expect(back.pesoMedNc).toBeNull()
+    expect(back.nuiEtr).toBeNull()
+    expect(back.etrSemestre).toBeNull()
+
+    // Absent optional/para-data columns read back as undefined.
+    expect(back.startedAt).toBeUndefined()
+    expect(back.dataEnv).toBeUndefined()
+    expect(back.backcheckOf).toBeUndefined()
+    expect(back.instrumentVersion).toBeUndefined()
+    expect(back.departamento).toBeUndefined()
+
+    // Anything materialized from the server is, by definition, synced.
+    expect(back.syncStatus).toBe('synced')
   })
 })
