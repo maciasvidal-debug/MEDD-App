@@ -135,19 +135,21 @@ function tokenise(text: string): string[] {
 }
 
 // ─── Term frequency ───────────────────────────────────────────────────────────
-function computeTF(texts: string[]): Map<string, number> {
+// Operates on already-tokenised texts so the (comparatively costly) tokenisation
+// is done once and shared with computeBigrams, rather than repeated per consumer.
+function computeTF(tokensByText: string[][]): Map<string, number> {
   const freq = new Map<string, number>()
-  for (const text of texts)
-    for (const token of tokenise(text))
+  for (const tokens of tokensByText)
+    for (const token of tokens)
       freq.set(token, (freq.get(token) ?? 0) + 1)
   return freq
 }
 
 // ─── Bigrams ──────────────────────────────────────────────────────────────────
-function computeBigrams(texts: string[]): Map<string, number> {
+// Shares the pre-tokenised corpus with computeTF (see above).
+function computeBigrams(tokensByText: string[][]): Map<string, number> {
   const freq = new Map<string, number>()
-  for (const text of texts) {
-    const tokens = tokenise(text)
+  for (const tokens of tokensByText) {
     for (let i = 0; i < tokens.length - 1; i++) {
       const bg = `${tokens[i]} ${tokens[i + 1]}`
       freq.set(bg, (freq.get(bg) ?? 0) + 1)
@@ -352,8 +354,12 @@ export function buildTextAnalysis(surveys: Survey[]): TextAnalysisResult | null 
 
   const corpus = withObs.map(s => s.obs.trim())
 
+  // Tokenise the corpus once and reuse it for both term-frequency and bigram
+  // computation, which would otherwise each re-tokenise every observation.
+  const tokensByText = corpus.map(tokenise)
+
   // Term frequency
-  const tfMap = computeTF(corpus)
+  const tfMap = computeTF(tokensByText)
   const sortedTerms = Array.from(tfMap.entries()).sort((a, b) => b[1] - a[1])
   const totalOcc = sortedTerms.reduce((a, [, c]) => a + c, 0)
   const topTerms: TermFreq[] = sortedTerms
@@ -361,7 +367,7 @@ export function buildTextAnalysis(surveys: Survey[]): TextAnalysisResult | null 
     .map(([term, count]) => ({ term, count, pct: totalOcc > 0 ? count / totalOcc : 0 }))
 
   // Bigrams (min frequency 2)
-  const bgMap = computeBigrams(corpus)
+  const bgMap = computeBigrams(tokensByText)
   const bigrams: TermFreq[] = Array.from(bgMap.entries())
     .filter(([, c]) => c >= 2)
     .sort((a, b) => b[1] - a[1])
