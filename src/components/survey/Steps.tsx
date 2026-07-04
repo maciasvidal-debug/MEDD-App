@@ -17,7 +17,7 @@ import { useMunicipios } from '../../hooks/useMunicipios'
 import { normalizeCiudad } from '../../lib/ciudad'
 import { DEPARTAMENTOS, lookupDepartamento } from '../../lib/divipola'
 import { OPT, FIELD_HELP } from '../../lib/constants'
-import { calcEdad, fmtDate, productMetrics } from '../../lib/utils'
+import { calcEdad, fmtDate, productMetrics } from '../../lib/date'
 import { validateDraft } from '../../lib/quality'
 import { useStore } from '../../lib/store'
 import {

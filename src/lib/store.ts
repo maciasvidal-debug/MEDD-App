@@ -11,7 +11,8 @@ import {
 import { supabase } from '../lib/supabase'
 import { pushSurvey, deleteSurveyRemote, fullSync, fetchProfile, upsertProfile } from '../lib/sync'
 import { isProfileComplete, surveyMissingProfile } from '../lib/validators'
-import { uuid, todayISO } from '../lib/utils'
+import { uuid } from '../lib/utils'
+import { todayISO } from '../lib/date'
 import { EMPTY_DRAFT, DEFAULT_SETTINGS, INSTRUMENT_VERSION } from '../lib/constants'
 
 // ─── Toast ────────────────────────────────────────────────────────────────
