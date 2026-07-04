@@ -1,10 +1,8 @@
-import type { Survey } from '../types'
-
 // Statistical analysis: inferential tests (proportions, risk ratios, stratified
 // Mantel–Haenszel / Breslow–Day, chi-square, trend), the shared chi-square/gamma
-// internals they depend on, multiple-comparison control, data-quality / fraud
-// signals, and descriptive aggregation helpers. Grouped together because the
-// inferential and fraud tests all share the private chi-square tail below.
+// internals they depend on, multiple-comparison control, and data-quality /
+// fraud signals. Grouped together because the inferential and fraud tests all
+// share the private chi-square tail below.
 
 // ─── Inferential statistics ─────────────────────────────────────────────────
 
@@ -444,33 +442,4 @@ export function cohenKappa(pairs: [string, string][]): KappaResult | null {
   let pe = 0
   for (const c of cats) pe += ((rowA[c] ?? 0) / n) * ((rowB[c] ?? 0) / n)
   return { kappa: pe >= 1 ? 0 : (po - pe) / (1 - pe), agree: po, n }
-}
-
-// ─── Descriptive aggregation ──────────────────────────────────────────────
-
-export function freqTable<T extends string>(
-  surveys: Survey[],
-  key: keyof Survey,
-  options: readonly T[],
-): { name: T; n: number }[] {
-  return options.map(v => ({
-    name: v,
-    n: surveys.filter(s => s[key] === v).length,
-  }))
-}
-
-/** Groups surveys by a string key and sums a numeric field. */
-export function groupSum(
-  surveys: Survey[],
-  groupKey: keyof Survey,
-  sumKey: keyof Survey,
-): { name: string; value: number }[] {
-  const map = new Map<string, number>()
-  for (const s of surveys) {
-    const k = String(s[groupKey] ?? 'Sin dato') || 'Sin dato'
-    map.set(k, (map.get(k) ?? 0) + ((s[sumKey] as number | null) ?? 0))
-  }
-  return Array.from(map.entries())
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value)
 }

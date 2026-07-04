@@ -28,9 +28,6 @@ export function uuid(): string {
 export const pct = (n: number, total: number) =>
   total > 0 ? Math.round((n / total) * 100) : 0
 
-export const safeNum = (v: string | number | null | undefined): number =>
-  typeof v === 'number' ? v : parseFloat(String(v ?? '')) || 0
-
 /**
  * Comparator for sortable table cells. Empty values (null/undefined/'') always
  * sort last regardless of direction; numbers compare numerically and strings use
