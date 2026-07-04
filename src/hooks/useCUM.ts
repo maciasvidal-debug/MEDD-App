@@ -65,7 +65,15 @@ export function useCUM(): UseCUMResult {
         signal: controller.signal,
       })
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        // Include status text, request URL, and a snippet of the response body
+        // so globally-caught failures carry enough context to debug the API.
+        const body = await res.text().catch(() => '')
+        throw new Error(
+          `CUM API request failed: HTTP ${res.status} ${res.statusText} — ${url}` +
+          (body ? ` — ${body.slice(0, 200)}` : '')
+        )
+      }
 
       const data: CUMRecord[] = await res.json()
       setResults(dedupe(data))
