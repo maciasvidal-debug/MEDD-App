@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { pct, safeNum, compareSortable, uuid } from './utils'
+import { pct, compareSortable, uuid } from './utils'
 
 describe('pct', () => {
   it('rounds the percentage', () => {
@@ -9,18 +9,6 @@ describe('pct', () => {
   it('returns 0 for a zero/empty base (no division by zero)', () => {
     expect(pct(5, 0)).toBe(0)
     expect(pct(0, 0)).toBe(0)
-  })
-})
-
-describe('safeNum', () => {
-  it('passes numbers through and parses numeric strings', () => {
-    expect(safeNum(42)).toBe(42)
-    expect(safeNum('3.5')).toBe(3.5)
-  })
-  it('falls back to 0 for null/undefined/non-numeric', () => {
-    expect(safeNum(null)).toBe(0)
-    expect(safeNum(undefined)).toBe(0)
-    expect(safeNum('abc')).toBe(0)
   })
 })
 

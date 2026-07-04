@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   wilsonCI, quantile, prevalenceRatio, chiSquareTest, cochranArmitage,
   mantelHaenszelRR, iccBinary, breslowDay, holmAdjust, terminalDigitTest, cohenKappa,
-  freqTable, groupSum,
 } from './stats'
-import type { Survey } from '../types'
 
 describe('wilsonCI', () => {
   it('returns a zero-width interval when there is no base', () => {
@@ -220,43 +218,5 @@ describe('cohenKappa', () => {
   it('goes negative for systematic disagreement', () => {
     const r = cohenKappa([['Sí', 'No'], ['No', 'Sí'], ['Sí', 'No'], ['No', 'Sí']])!
     expect(r.kappa).toBeLessThan(0)
-  })
-})
-
-describe('freqTable', () => {
-  it('counts occurrences per option, including zero-count options', () => {
-    const surveys = [
-      { asSalud: 'Contributivo' }, { asSalud: 'Contributivo' }, { asSalud: 'Subsidiado' },
-    ] as unknown as Survey[]
-    const t = freqTable(surveys, 'asSalud', ['Contributivo', 'Subsidiado', 'Especial'] as const)
-    expect(t).toEqual([
-      { name: 'Contributivo', n: 2 },
-      { name: 'Subsidiado', n: 1 },
-      { name: 'Especial', n: 0 },
-    ])
-  })
-  it('returns all-zero counts for an empty survey list', () => {
-    expect(freqTable([], 'asSalud', ['Contributivo'] as const)).toEqual([{ name: 'Contributivo', n: 0 }])
-  })
-})
-
-describe('groupSum', () => {
-  it('groups by a key, sums a numeric field and sorts descending', () => {
-    const surveys = [
-      { ciudad: 'Bogotá', cantMed: 3 },
-      { ciudad: 'Bogotá', cantMed: 2 },
-      { ciudad: 'Cali', cantMed: 4 },
-    ] as unknown as Survey[]
-    expect(groupSum(surveys, 'ciudad', 'cantMed')).toEqual([
-      { name: 'Bogotá', value: 5 },
-      { name: 'Cali', value: 4 },
-    ])
-  })
-  it('buckets null/empty group keys and null sums under "Sin dato"/0', () => {
-    const surveys = [
-      { ciudad: '', cantMed: null },
-      { ciudad: null, cantMed: 2 },
-    ] as unknown as Survey[]
-    expect(groupSum(surveys, 'ciudad', 'cantMed')).toEqual([{ name: 'Sin dato', value: 2 }])
   })
 })
