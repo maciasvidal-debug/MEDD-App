@@ -10,6 +10,7 @@ import AuthPage from './pages/auth'
 import ProfileOnboarding from './pages/ProfileOnboarding'
 import Welcome from './pages/Welcome'
 import { isProfileComplete } from './lib/validators'
+import { useNetworkStatus } from './hooks/useNetworkStatus'
 
 // Dashboard pulls in Recharts (heavy); load it on demand so it stays out of the
 // initial bundle and only downloads when the user opens the panel.
@@ -137,19 +138,7 @@ export default function App() {
 // Persistent offline indicator: the app is offline-first (IndexedDB + deferred
 // sync), so the key reassurance is that data is being saved locally meanwhile.
 function NetworkBanner() {
-  const [online, setOnline] = React.useState(
-    typeof navigator !== 'undefined' ? navigator.onLine : true,
-  )
-  useEffect(() => {
-    const goOnline  = () => setOnline(true)
-    const goOffline = () => setOnline(false)
-    window.addEventListener('online', goOnline)
-    window.addEventListener('offline', goOffline)
-    return () => {
-      window.removeEventListener('online', goOnline)
-      window.removeEventListener('offline', goOffline)
-    }
-  }, [])
+  const online = useNetworkStatus()
 
   if (online) return null
   return (
@@ -172,19 +161,7 @@ function NetworkBanner() {
 // not already syncing, and there is something pending — otherwise renders null.
 function PendingSyncBanner() {
   const { surveys, syncing, triggerSync } = useStore()
-  const [online, setOnline] = React.useState(
-    typeof navigator !== 'undefined' ? navigator.onLine : true,
-  )
-  useEffect(() => {
-    const on = () => setOnline(true)
-    const off = () => setOnline(false)
-    window.addEventListener('online', on)
-    window.addEventListener('offline', off)
-    return () => {
-      window.removeEventListener('online', on)
-      window.removeEventListener('offline', off)
-    }
-  }, [])
+  const online = useNetworkStatus()
 
   const pending = surveys.filter(s => s.syncStatus !== 'synced').length
   if (!online || syncing || pending === 0) return null
