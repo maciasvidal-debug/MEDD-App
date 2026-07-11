@@ -66,10 +66,18 @@ function toNumOrNull(v) {
     return Number.isFinite(n) ? n : NaN;
 }
 
+// Upper bounds of the numeric DB columns, enforced here so an over-range value
+// is rejected as a clean 400 *before* the INSERT, rather than reaching Postgres
+// and surfacing as a raw 22003 (numeric_value_out_of_range) the client can't act
+// on. Defense-in-depth: explicit input bounds instead of leaning on the DB.
+const PG_INT_MAX   = 2147483647; // INTEGER (int4) upper bound
+const CONC_MED_MAX = 1e9;        // NUMERIC(12,3): up to 9 integer digits -> < 1e9
+const PESO_MAX     = 1e10;       // NUMERIC(12,2): up to 10 integer digits -> < 1e10
+
 function validateIdentity(body, v, errors, today) {
     v.nui_etr = toIntOrNull(body.nui_etr);
-    if (v.nui_etr === null || Number.isNaN(v.nui_etr) || v.nui_etr <= 0)
-        errors.push('NUI_ETR (ID del encuestador) debe ser un entero positivo.');
+    if (v.nui_etr === null || Number.isNaN(v.nui_etr) || v.nui_etr <= 0 || v.nui_etr > PG_INT_MAX)
+        errors.push(`NUI_ETR (ID del encuestador) debe ser un entero entre 1 y ${PG_INT_MAX}.`);
 
     v.f_eta = isValidDateStr(body.f_eta) ? body.f_eta : null;
     if (!v.f_eta) errors.push('F_ETA (fecha de entrevista) es obligatoria (YYYY-MM-DD).');
@@ -162,12 +170,12 @@ function validateStorage(body, v, errors) {
     v.vto_med_nc = toBool(body.vto_med_nc);
 
     v.cant_med = toIntOrNull(body.cant_med);
-    if (v.cant_med !== null && (Number.isNaN(v.cant_med) || v.cant_med < 0))
-        errors.push('CANT_MED debe ser un entero >= 0.');
+    if (v.cant_med !== null && (Number.isNaN(v.cant_med) || v.cant_med < 0 || v.cant_med > PG_INT_MAX))
+        errors.push(`CANT_MED debe ser un entero entre 0 y ${PG_INT_MAX}.`);
 
     v.cant_med_vto = toIntOrNull(body.cant_med_vto);
-    if (v.cant_med_vto !== null && (Number.isNaN(v.cant_med_vto) || v.cant_med_vto < 0))
-        errors.push('CANT_MED_VTO debe ser un entero >= 0.');
+    if (v.cant_med_vto !== null && (Number.isNaN(v.cant_med_vto) || v.cant_med_vto < 0 || v.cant_med_vto > PG_INT_MAX))
+        errors.push(`CANT_MED_VTO debe ser un entero entre 0 y ${PG_INT_MAX}.`);
     if (
         v.cant_med_vto !== null && v.cant_med !== null &&
         !Number.isNaN(v.cant_med_vto) && !Number.isNaN(v.cant_med) &&
@@ -176,8 +184,8 @@ function validateStorage(body, v, errors) {
         errors.push('CANT_MED_VTO no puede exceder CANT_MED.');
 
     v.peso_med_nc = toNumOrNull(body.peso_med_nc);
-    if (v.peso_med_nc !== null && (Number.isNaN(v.peso_med_nc) || v.peso_med_nc < 0))
-        errors.push('PESO_MED_NC debe ser un número >= 0.');
+    if (v.peso_med_nc !== null && (Number.isNaN(v.peso_med_nc) || v.peso_med_nc < 0 || v.peso_med_nc >= PESO_MAX))
+        errors.push(`PESO_MED_NC debe ser un número entre 0 y ${PESO_MAX}.`);
 
     v.obs = body.obs ? String(body.obs).trim().slice(0, 2000) : null;
 }
@@ -206,8 +214,8 @@ function validateMedications(body, v, errors) {
         };
         if (!med.nm_med && !med.dci)
             errors.push(`Medicamento #${i + 1}: requiere al menos Nombre comercial (NM_MED) o DCI.`);
-        if (med.conc_med !== null && (Number.isNaN(med.conc_med) || med.conc_med < 0))
-            errors.push(`Medicamento #${i + 1}: CONC_MED debe ser un número >= 0.`);
+        if (med.conc_med !== null && (Number.isNaN(med.conc_med) || med.conc_med < 0 || med.conc_med >= CONC_MED_MAX))
+            errors.push(`Medicamento #${i + 1}: CONC_MED debe ser un número entre 0 y ${CONC_MED_MAX}.`);
         if (med.und_conc && !ENUMS.und_conc.includes(med.und_conc))
             errors.push(`Medicamento #${i + 1}: UND_CONC inválida.`);
         if (m.f_vto && !med.f_vto)
