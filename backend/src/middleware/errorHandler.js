@@ -9,7 +9,9 @@
 //   23502 not_null_violation   23503 foreign_key_violation
 //   23505 unique_violation     23514 check_violation
 //   22P02 invalid_text_representation (e.g. malformed integer/uuid)
-const CLIENT_PG_CODES = new Set(['23502', '23503', '23505', '23514', '22P02']);
+//   22003 numeric_value_out_of_range (over-range int/numeric) — a safety net;
+//         inputs are also range-checked up-front in schema.js validation.
+const CLIENT_PG_CODES = new Set(['23502', '23503', '23505', '23514', '22P02', '22003']);
 
 // Wrap an async route handler so rejected promises reach the error handler
 // instead of becoming unhandled rejections.
