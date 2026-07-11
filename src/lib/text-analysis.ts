@@ -147,14 +147,27 @@ function computeTF(tokensByText: string[][]): Map<string, number> {
 
 // ─── Bigrams ──────────────────────────────────────────────────────────────────
 // Shares the pre-tokenised corpus with computeTF (see above).
+//
+// Counts into a two-level map keyed by the (already-interned) token strings so
+// the hot loop never allocates or re-hashes a fresh "a b" string per occurrence
+// — repeated bigrams reuse the tokens' cached hashes instead. The "a b" key is
+// built once per distinct bigram at the end; `order` records first appearance so
+// the returned map keeps the same insertion order as a flat single-pass count.
 function computeBigrams(tokensByText: string[][]): Map<string, number> {
-  const freq = new Map<string, number>()
+  const counts = new Map<string, Map<string, number>>()
+  const order: [string, string][] = []
   for (const tokens of tokensByText) {
-    for (let i = 0; i < tokens.length - 1; i++) {
-      const bg = `${tokens[i]} ${tokens[i + 1]}`
-      freq.set(bg, (freq.get(bg) ?? 0) + 1)
+    for (let i = 1; i < tokens.length; i++) {
+      const a = tokens[i - 1], b = tokens[i]
+      let inner = counts.get(a)
+      if (inner === undefined) counts.set(a, (inner = new Map()))
+      const c = inner.get(b)
+      if (c === undefined) { inner.set(b, 1); order.push([a, b]) }
+      else inner.set(b, c + 1)
     }
   }
+  const freq = new Map<string, number>()
+  for (const [a, b] of order) freq.set(`${a} ${b}`, counts.get(a)!.get(b)!)
   return freq
 }
 
