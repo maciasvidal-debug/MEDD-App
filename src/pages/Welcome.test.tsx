@@ -10,6 +10,15 @@ import type { User } from '@supabase/supabase-js'
 // stub it so the import doesn't need env vars.
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
 
+// Advance to the last step of the encuestador tour (4 steps → 3 «Siguiente»
+// clicks). Chained rather than looped so it stays clear of no-await-in-loop.
+function goToLastStep(user: ReturnType<typeof userEvent.setup>) {
+  return [1, 2, 3].reduce(
+    (p) => p.then(() => user.click(screen.getByRole('button', { name: /Siguiente/ }))),
+    Promise.resolve(),
+  )
+}
+
 beforeEach(() => {
   localStorage.clear()
   useStore.setState({
@@ -64,8 +73,7 @@ describe('Welcome — step navigation', () => {
   it('swaps «Siguiente» for «Empezar» on the last step', async () => {
     const user = userEvent.setup()
     render(<Welcome />)
-    // Encuestador tour has 4 steps → 3 clicks to reach the last.
-    for (let n = 0; n < 3; n++) await user.click(screen.getByRole('button', { name: /Siguiente/ }))
+    await goToLastStep(user)
 
     expect(screen.getByRole('button', { name: /Empezar/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Siguiente/ })).not.toBeInTheDocument()
@@ -76,7 +84,7 @@ describe('Welcome — dismissal closes the tour', () => {
   it('«Empezar» on the last step closes and remembers the tour', async () => {
     const user = userEvent.setup()
     render(<Welcome />)
-    for (let n = 0; n < 3; n++) await user.click(screen.getByRole('button', { name: /Siguiente/ }))
+    await goToLastStep(user)
     await user.click(screen.getByRole('button', { name: /Empezar/ }))
 
     expect(useStore.getState().welcomeOpen).toBe(false)
