@@ -552,28 +552,49 @@ export interface AdjustedAssoc {
 // dichotomised high (4–6) vs low (1–3); the confounder strata are the programs.
 // Comparing the crude vs the MH-adjusted PR shows whether who collected the data
 // distorts the socioeconomic association. Needs ≥2 program strata to be meaningful.
-export function buildEstratoAdjusted(surveys: Survey[]): AdjustedAssoc | null {
-  const strataMap = new Map<string, Stratum2x2>()
-  let aT = 0, bT = 0, cT = 0, dT = 0
+// Builds the program-stratified 2×2 tables for the estrato→"vencidos en casa"
+// association. Each survey with a known estrato and surveyor program lands in one
+// cell of its program's table: rows are high (4–6) vs low (1–3) estrato, columns
+// are case ("vencidos en casa") vs non-case.
+function buildProgramStrata(surveys: Survey[]): Map<string, Stratum2x2> {
+  const strata = new Map<string, Stratum2x2>()
   for (const s of surveys) {
     if (s.estrato == null || !s.etrPrograma) continue
+    const st = strata.get(s.etrPrograma) ?? { a: 0, b: 0, c: 0, d: 0 }
     const high = isEstratoHigh(s.estrato)
     const isCase = s.vtoMedNc === 'Sí'
-    const st = strataMap.get(s.etrPrograma) ?? { a: 0, b: 0, c: 0, d: 0 }
-    if (high && isCase)       { st.a++; aT++ }
-    else if (high && !isCase) { st.b++; bT++ }
-    else if (!high && isCase) { st.c++; cT++ }
-    else                      { st.d++; dT++ }
-    strataMap.set(s.etrPrograma, st)
+    if (high && isCase)       st.a++
+    else if (high && !isCase) st.b++
+    else if (!high && isCase) st.c++
+    else                      st.d++
+    strata.set(s.etrPrograma, st)
   }
+  return strata
+}
 
-  const mh = mantelHaenszelRR(Array.from(strataMap.values()))
+// Collapses a set of 2×2 strata into the single pooled (crude) table.
+const poolStrata = (strata: Stratum2x2[]): Stratum2x2 =>
+  strata.reduce(
+    (t, s) => ({ a: t.a + s.a, b: t.b + s.b, c: t.c + s.c, d: t.d + s.d }),
+    { a: 0, b: 0, c: 0, d: 0 },
+  )
+
+export function buildEstratoAdjusted(surveys: Survey[]): AdjustedAssoc | null {
+  const strata = Array.from(buildProgramStrata(surveys).values())
+
+  const mh = mantelHaenszelRR(strata)
   if (!mh || mh.strata < 2) return null
 
-  const crude = prevalenceRatio(aT, aT + bT, cT, cT + dT)
+  const pooled = poolStrata(strata)
+  const crude = prevalenceRatio(pooled.a, pooled.a + pooled.b, pooled.c, pooled.c + pooled.d)
   if (!Number.isFinite(crude.rr)) return null
 
-  const bd = breslowDay(Array.from(strataMap.values()))
+  const bd = breslowDay(strata)
   const pctChange = mh.rr > 0 ? Math.abs(crude.rr - mh.rr) / mh.rr * 100 : 0
-  return { crude, mh, bd, exposedTotal: aT + bT, unexposedTotal: cT + dT, pctChange }
+  return {
+    crude, mh, bd,
+    exposedTotal: pooled.a + pooled.b,
+    unexposedTotal: pooled.c + pooled.d,
+    pctChange,
+  }
 }
