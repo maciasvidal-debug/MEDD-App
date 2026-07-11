@@ -85,3 +85,32 @@ describe('analytics /socio dimension is allowlisted (SQL injection guard)', () =
         expect(sql).toContain('"estrato"');
     });
 });
+
+describe('analytics numeric normalization', () => {
+    test('geo-hotspots coerces numeric columns, keeps text, preserves NULL', async () => {
+        pool.query.mockResolvedValueOnce({
+            rows: [{
+                ciudad: 'Bogotá',
+                surveys: '12',
+                median_estrato: null,       // PERCENTILE_DISC has no COALESCE → can be NULL
+                unused_units: '340',
+                expired_units: '55',
+                weight_g: '1234.50',
+            }],
+        });
+        const token = await mintToken({ role: 'investigador' });
+        const res = await request(app)
+            .get('/api/analytics/geo-hotspots')
+            .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual([{
+            ciudad: 'Bogotá',
+            surveys: 12,
+            median_estrato: null,
+            unused_units: 340,
+            expired_units: 55,
+            weight_g: 1234.5,
+        }]);
+    });
+});

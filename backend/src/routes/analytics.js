@@ -125,15 +125,22 @@ router.get('/by-city', asyncHandler(async (req, res) => {
     res.json(result.rows.map((r) => ({ city: r.city, count: Number(r.count) })));
 }));
 
-// Convert numeric/bigint string columns from pg into JS numbers.
+// Every numeric/bigint column pg hands back as a string across the analytics
+// aggregation queries (geo-hotspots, risk, socio). Listed explicitly so the hot
+// endpoints coerce only these known keys instead of scanning each row's fields.
+const NUMERIC_COLS = [
+    'surveys', 'median_estrato', 'unused_units', 'expired_units', 'weight_g',
+    'avg_unused_per_survey', 'vigente', 'd0_180', 'd181_365', 'd365_plus',
+    'avg_t_vto',
+];
+
+// Convert the known numeric/bigint string columns from pg into JS numbers,
+// leaving text columns and SQL NULLs (e.g. an empty median/average) untouched.
 function normalizeNums(row) {
-    const out = {};
-    for (const [k, val] of Object.entries(row)) {
-        if (val !== null && val !== '' && !isNaN(val) && typeof val !== 'boolean' && k !== 'ciudad' && k !== 'segment') {
-            out[k] = Number(val);
-        } else {
-            out[k] = val;
-        }
+    const out = { ...row };
+    for (const k of NUMERIC_COLS) {
+        const val = out[k];
+        if (val !== null && val !== undefined) out[k] = Number(val);
     }
     return out;
 }
