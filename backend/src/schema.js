@@ -182,8 +182,20 @@ function validateStorage(body, v, errors) {
     v.obs = body.obs ? String(body.obs).trim().slice(0, 2000) : null;
 }
 
+// A real household medication inventory holds at most a few dozen items. Cap
+// the array well below Postgres's 65535 bind-parameter ceiling so a malicious
+// or buggy client can't inflate the bulk INSERT and exhaust memory/connections.
+const MAX_MEDICATIONS = 100;
+
 function validateMedications(body, v, errors) {
     const meds = Array.isArray(body.medications) ? body.medications : [];
+    // Reject oversized payloads before mapping the array, so an abusive request
+    // never allocates the per-item work (or the downstream bulk query string).
+    if (meds.length > MAX_MEDICATIONS) {
+        errors.push(`Demasiados medicamentos: máximo ${MAX_MEDICATIONS} por encuesta (se recibieron ${meds.length}).`);
+        v.medications = [];
+        return;
+    }
     v.medications = meds.map((m, i) => {
         const med = {
             nm_med:   m.nm_med   ? String(m.nm_med).trim().slice(0, 200) : null,
