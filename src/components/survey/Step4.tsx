@@ -7,7 +7,7 @@ import { MultiChipField, YesNoField } from '../form'
 import { OPT, FIELD_HELP } from '../../lib/constants'
 import { step4Schema, type Step4Data } from '../../lib/validators'
 import type { SurveyDraft } from '../../types'
-import { WizardNavBar, type StepProps } from './_shared'
+import { WizardNavBar, scrollToFirstError, type StepProps } from './_shared'
 
 // ─── Step 4 — Almacenamiento & disposición ────────────────────────────────
 // Implements: DISP_MED_VC=No → clear CTO_DISP_VC
@@ -207,7 +207,7 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit(handleNext)} noValidate>
+    <form onSubmit={handleSubmit(handleNext, scrollToFirstError)} noValidate>
       <SectionHead icon="ti-package" label="Medicamentos sin consumir y disposición" />
 
       <YesNoField control={control} name="medSob" required help={FIELD_HELP.medSob}

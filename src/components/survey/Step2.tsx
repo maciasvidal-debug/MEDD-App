@@ -11,7 +11,7 @@ import { OPT, FIELD_HELP } from '../../lib/constants'
 import { calcEdad } from '../../lib/date'
 import { step2Schema, type Step2Data } from '../../lib/validators'
 import type { SurveyDraft } from '../../types'
-import { WizardNavBar, type StepProps } from './_shared'
+import { WizardNavBar, scrollToFirstError, type StepProps } from './_shared'
 
 // ─── Municipio combobox ───────────────────────────────────────────────────────
 
@@ -191,7 +191,7 @@ function EstratoField({ control, error }: { control: Control<Step2Data>; error?:
                 aria-checked={field.value === n}
                 onClick={() => field.onChange(field.value === n ? null : n)}
                 style={{
-                  width: 42, height: 38, borderRadius: 8, fontWeight: 500, fontSize: 14,
+                  width: 44, height: 44, borderRadius: 8, fontWeight: 500, fontSize: 14,
                   border: field.value === n ? `1.5px solid ${C.teal}` : `0.5px solid ${C.border}`,
                   background: field.value === n ? C.tealLight : C.surface,
                   color: field.value === n ? C.teal : C.text,
@@ -261,7 +261,7 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
   const edad   = calcEdad(draft.fEta, fNac)
 
   return (
-    <form onSubmit={handleSubmit(data => onNext(data as Partial<SurveyDraft>))} noValidate>
+    <form onSubmit={handleSubmit(data => onNext(data as Partial<SurveyDraft>), scrollToFirstError)} noValidate>
       <SectionHead icon="ti-users" label="Datos sociodemográficos" />
 
       <BirthDateField

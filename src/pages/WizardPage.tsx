@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { TopBar, StepBar } from '../components/layout'
 import { Dialog, IconButton, C } from '../components/ui'
 import { Step1, Step2, Step3, Step4, Step5, Step6 } from '../components/survey/Steps'
@@ -11,6 +11,17 @@ import type { SurveyDraft } from '../types'
 export function WizardPage() {
   const { wizard, setWizardStep, updateDraft, closeWizard, addSurvey, updateSurvey, surveys } = useStore()
   const [guideOpen, setGuideOpen] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Reset scroll to the top of the step on every step change. The nav bar is a
+  // sticky footer, so advancing/going back would otherwise land the surveyor
+  // mid-way down the next step (past its heading and first field). Instant (not
+  // smooth) so the new step is oriented immediately.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, left: 0 })
+    window.scrollTo({ top: 0 })
+  }, [wizard?.step])
+
   if (!wizard) return null
   const { step, draft, editingId, backcheckOf } = wizard
   const originalNui = backcheckOf ? surveys.find(s => s.id === backcheckOf)?.nui : undefined
@@ -55,7 +66,7 @@ export function WizardPage() {
         </div>
       )}
       <StepBar currentStep={step} />
-      <div className="page-content narrow" style={{ paddingBottom: 24 }}>
+      <div ref={scrollRef} className="page-content narrow" style={{ paddingBottom: 24 }}>
         {step === 1 && <Step1 {...stepProps} />}
         {step === 2 && <Step2 {...stepProps} />}
         {step === 3 && <Step3 {...stepProps} />}
