@@ -386,6 +386,49 @@ button:not(:disabled):active { transform: scale(0.98); }
 /* Status dot for badges/legends (replaces some decorative icon-in-square chips). */
 .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
+/* ─── Auth screen ────────────────────────────────────────────────────────────── */
+/* Mobile-first: a single centred form column. ≥900px a brand/story panel appears
+   on the left (kills the "bare card floating in an empty page" first impression)
+   while the form stays a comfortable measure on the right. */
+.auth-root {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--c-bg);
+}
+.auth-brand { display: none; }
+.auth-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  min-width: 0;
+}
+.auth-card { width: 100%; max-width: 400px; }
+
+@media (min-width: 900px) {
+  .auth-root { grid-template-columns: 1.05fr 1fr; }
+  .auth-brand {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 30px;
+    padding: 56px 8% 56px 7%;
+    color: #fff;
+    background: var(--grad-brand);
+    position: relative;
+    overflow: hidden;
+  }
+  /* Soft radial sheen so the flat gradient reads as a crafted surface, not a fill. */
+  .auth-brand::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(120% 90% at 88% 8%, rgba(255,255,255,0.16), transparent 55%);
+    pointer-events: none;
+  }
+  .auth-brand > * { position: relative; z-index: 1; }
+}
+
 /* Floating bottom nav: a detached pill in the thumb zone (signature gesture). */
 .nav-float {
   left: 50% !important;

@@ -6,7 +6,7 @@ import { ChipField, YesNoField } from '../form'
 import { OPT, FIELD_HELP } from '../../lib/constants'
 import { step3Schema, type Step3Data } from '../../lib/validators'
 import type { SurveyDraft } from '../../types'
-import { WizardNavBar, type StepProps } from './_shared'
+import { WizardNavBar, scrollToFirstError, type StepProps } from './_shared'
 
 // ─── Step 3 — Salud ───────────────────────────────────────────────────────
 // Implements the deterministic field-logic state machine:
@@ -54,7 +54,7 @@ export function Step3({ draft, onNext, onBack }: StepProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit(handleNext)} noValidate>
+    <form onSubmit={handleSubmit(handleNext, scrollToFirstError)} noValidate>
       <SectionHead icon="ti-heart-rate-monitor" label="Estado de salud" />
 
       <ChipField control={control} name="perSalud" label="Percepción general de salud" required

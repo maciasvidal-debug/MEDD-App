@@ -12,6 +12,19 @@ export interface StepProps {
   isLast?: boolean
 }
 
+// Pass as react-hook-form's onInvalid handler so a failed "Siguiente" doesn't
+// dead-end: RHF's native focus only reaches registered <input>s, so chip / yes-no
+// questions (Controller-backed) would leave their error off-screen with no visible
+// feedback. This brings the first error (and its field) into view for every field
+// type. Deferred a frame so the FieldError nodes are committed before we scroll.
+export function scrollToFirstError() {
+  requestAnimationFrame(() => {
+    const el = document.querySelector<HTMLElement>('[role="alert"]')
+    if (!el) return
+    try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch { /* jsdom */ }
+  })
+}
+
 export function WizardNavBar({
   onBack, showBack = true, isSave = false,
 }: { onBack: () => void; showBack?: boolean; isSave?: boolean }) {

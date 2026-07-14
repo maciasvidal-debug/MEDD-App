@@ -168,6 +168,12 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
   function handleSave(obs: string) {
     if (report.errors.length > 0) {
       pushToast('Corrige los errores antes de guardar.', 'error')
+      // The save button sits at the bottom of a long summary; bring the quality
+      // report (which lists the blocking errors) into view so the toast isn't the
+      // only signal and the surveyor sees exactly what to fix.
+      try {
+        document.getElementById('wizard-quality')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } catch { /* jsdom */ }
       return
     }
     onNext({ obs })
@@ -180,7 +186,7 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
         Verifique los datos antes de guardar definitivamente.
       </p>
 
-      <QualityCard report={report} />
+      <div id="wizard-quality"><QualityCard report={report} /></div>
 
       <IdentificacionCard draft={draft} />
       <DemografiaCard draft={draft} edad={edad} />
