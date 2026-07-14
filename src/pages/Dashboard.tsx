@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip,
+  XAxis, YAxis, Tooltip, LabelList,
 } from 'recharts'
 import { TopBar } from '../components/layout'
 import { StatCard, Card, Button, EmptyState, Chip, HelpTip, C, CHART } from '../components/ui'
@@ -92,19 +92,27 @@ function DistBar({ data, dataKey = 'n', color, yWidth = 80, barName }: {
 }) {
   const gid = `bar-${color.replace('#', '')}`
   return (
+    // Right margin reserves room for the inline value label at the end of the
+    // longest bar so it isn't clipped.
     <div style={{ height: Math.max(80, data.length * 34) }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }} barCategoryGap="22%">
+        <BarChart data={data} layout="vertical" margin={{ left: 0, right: 34, top: 4, bottom: 0 }} barCategoryGap="22%">
           <defs>
             <linearGradient id={gid} x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%" stopColor={color} stopOpacity={0.95} />
               <stop offset="100%" stopColor={color} stopOpacity={0.6} />
             </linearGradient>
           </defs>
-          <XAxis type="number" tick={{ fontSize: 11, fill: CHART.axis }} allowDecimals={false} axisLine={false} tickLine={false} />
+          {/* Axis hidden: each bar is labelled with its value directly (readable
+              at a glance and on touch, where there's no hover for the tooltip),
+              so the numeric axis would just be chart-junk. Kept for domain calc. */}
+          <XAxis type="number" hide />
           <YAxis type="category" dataKey="name" tick={<DistBarYTick width={yWidth} />} width={yWidth} axisLine={false} tickLine={false} interval={0} />
           <Tooltip content={<CustomTip />} cursor={{ fill: CHART.track }} />
-          <Bar dataKey={dataKey} fill={`url(#${gid})`} radius={[0, 5, 5, 0]} maxBarSize={26} name={barName} />
+          <Bar dataKey={dataKey} fill={`url(#${gid})`} radius={[0, 5, 5, 0]} maxBarSize={26} name={barName}>
+            {/* Literal colour: SVG fill can't resolve the CSS var() tokens. */}
+            <LabelList dataKey={dataKey} position="right" fill={CHART.axis} fontSize={11} />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
