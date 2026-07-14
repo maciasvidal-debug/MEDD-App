@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip,
@@ -345,6 +345,27 @@ export default function DashboardPage() {
     integrityCount: integrityIssues.length, tests: inferentialTests, holm,
   }), [n, nSob, nVenc, nDisp, unidTotal, vencTotal, assoc, surveyorEffect, adjusted, backcheck, retention, medStats, integrityIssues, inferentialTests, holm])
 
+  // Wayfinding index for the sticky section nav — lists only the blocks that
+  // actually render for this dataset/role, in DOM order. Keyed by the same
+  // presence conditions used in the JSX below so a chip never jumps to nothing.
+  const sections = useMemo<NavSection[]>(() => {
+    const list: NavSection[] = [{ id: 'sec-resumen', label: 'Resumen', icon: 'ti-layout-dashboard' }]
+    if (medStats || motiveStats || disposal || classMotive)
+      list.push({ id: 'sec-medicamentos', label: 'Medicamentos', icon: 'ti-pill' })
+    list.push({ id: 'sec-inferencia', label: 'Prevalencia', icon: 'ti-chart-dots' })
+    if (surveyorEffect || adjusted || retention ||
+        (isInvestigador && (surveyorQC || integrityIssues.length > 0 || backcheck)))
+      list.push({ id: 'sec-calidad', label: 'Calidad', icon: 'ti-shield-check' })
+    if (ciudadVenc.length || barEstrato.length || barAsSalud.length ||
+        barNvEstu.length || barNvPosg.length || barEtnia.length)
+      list.push({ id: 'sec-distribuciones', label: 'Distribuciones', icon: 'ti-chart-bar' })
+    if (isInvestigador && textAnalysis)
+      list.push({ id: 'sec-cualitativo', label: 'Cualitativo', icon: 'ti-message-2' })
+    return list
+  }, [medStats, motiveStats, disposal, classMotive, surveyorEffect, adjusted, retention,
+      isInvestigador, surveyorQC, integrityIssues.length, backcheck, textAnalysis,
+      ciudadVenc.length, barEstrato.length, barAsSalud.length, barNvEstu.length, barNvPosg.length, barEtnia.length])
+
   // No data at all (vs. "filters returned nothing", handled further down)
   if (surveys.length === 0) {
     return (
@@ -376,6 +397,13 @@ export default function DashboardPage() {
         icon="ti-layout-dashboard"
         accent={C.navy}
       />
+
+      {/* Sticky section navigator — a sibling of the TopBar (NOT inside
+          .page-content, whose overflow:auto would trap the sticky and let it
+          scroll away). Sits just below the header once the page is long enough
+          to get lost in (≥3 sections present). */}
+      {n > 0 && sections.length >= 3 && <DashboardSectionNav sections={sections} />}
+
       <div className="page-content">
 
         {/* Role-adaptive hero */}
@@ -418,6 +446,7 @@ export default function DashboardPage() {
         ) : (
         <>
         {/* KPIs */}
+        <SectionAnchor id="sec-resumen" />
         <p style={{ fontSize: 11, color: C.hint, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
           Indicadores clave · {n} encuesta{n !== 1 ? 's' : ''}
         </p>
@@ -448,6 +477,7 @@ export default function DashboardPage() {
         <QuickReadCard insights={insights} />
 
         {/* Analítica a nivel de medicamento (producto) */}
+        <SectionAnchor id="sec-medicamentos" />
         {medStats && <MedicationStatsCard s={medStats} />}
 
         {/* Motivos de no consumo / acumulación y disposición (instrumento v2) */}
@@ -460,6 +490,7 @@ export default function DashboardPage() {
         {classMotive && <ClassMotiveCard c={classMotive} />}
 
         {/* Prevalencias con incertidumbre */}
+        <SectionAnchor id="sec-inferencia" />
         <PrevalenceCard
           rows={[
             { label: 'Almacena medicamentos sin consumir', ci: wilsonCI(nSob, n) },
@@ -472,6 +503,7 @@ export default function DashboardPage() {
         {assoc && <AssociationCard assoc={assoc} />}
 
         {/* Control de calidad: efecto del encuestador */}
+        <SectionAnchor id="sec-calidad" />
         {surveyorEffect && <SurveyorEffectCard s={surveyorEffect} />}
 
         {/* Control de calidad operativo por encuestador (para-data / antifraude) */}
@@ -493,6 +525,7 @@ export default function DashboardPage() {
         <StatNotesCard tests={inferentialTests} holm={holm} />
 
         {/* Distribuciones — 2 columnas en pantallas anchas para aprovechar el espacio */}
+        <SectionAnchor id="sec-distribuciones" />
         <div className="chart-grid">
         {/* Hotspots geográficos: CIUDAD x CANT_MED_VTO */}
         {ciudadVenc.length > 0 && (
@@ -546,6 +579,7 @@ export default function DashboardPage() {
         {/* ── Análisis cualitativo de texto libre ─────────────────────────── */}
         {isInvestigador && textAnalysis && (
           <>
+            <SectionAnchor id="sec-cualitativo" />
             <p style={{ fontSize: 11, color: C.hint, textTransform: 'uppercase', letterSpacing: '0.5px', margin: '20px 0 8px' }}>
               Análisis cualitativo · observaciones de campo
             </p>
@@ -730,6 +764,90 @@ function FilterBar({
         Exportar {filtersActive ? 'selección' : 'todo'} (CSV · {exportCount})
       </button>
     </Card>
+  )
+}
+
+// ─── Section wayfinding (investigator's long analytical scroll) ─────────────
+// The panel stacks ~18 analytical cards in one column; without a map the
+// investigator has to hunt by scrolling. A sticky "jump to" chip row gives an
+// at-a-glance table of contents and one-tap navigation to each block.
+//
+// Deliberately its OWN component with its OWN state: the parent DashboardPage is
+// tuned (useShallow) so the heavy Recharts tree bails out of unrelated
+// re-renders. Scroll-spy state lives HERE, a sibling of the charts — so tracking
+// the active section on scroll never re-renders them.
+
+// Zero-height anchor placed before each section group; scrollMarginTop clears the
+// sticky TopBar + section nav so a jumped-to heading isn't hidden beneath them.
+function SectionAnchor({ id }: { id: string }) {
+  return <div id={id} style={{ scrollMarginTop: 116 }} aria-hidden />
+}
+
+interface NavSection { id: string; label: string; icon: string }
+function DashboardSectionNav({ sections }: { sections: NavSection[] }) {
+  const [active, setActive] = useState(sections[0]?.id ?? '')
+  const ids = sections.map(s => s.id).join(',')
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return
+    const els = ids.split(',').map(id => document.getElementById(id)).filter(Boolean) as HTMLElement[]
+    if (!els.length) return
+    // A band across the middle of the viewport decides the "current" section:
+    // the topmost anchor inside it wins, so the active chip tracks what the
+    // investigator is actually reading.
+    const obs = new IntersectionObserver(
+      entries => {
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        if (visible[0]) setActive(visible[0].target.id)
+      },
+      { rootMargin: '-45% 0px -50% 0px', threshold: 0 },
+    )
+    els.forEach(el => obs.observe(el))
+    return () => obs.disconnect()
+  }, [ids])
+
+  function jump(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setActive(id)
+  }
+
+  return (
+    <nav
+      aria-label="Secciones del panel"
+      style={{
+        position: 'sticky', top: 58, zIndex: 9,
+        display: 'flex', gap: 6, overflowX: 'auto', padding: '9px 16px',
+        background: C.surface, borderBottom: `1px solid ${C.border}`,
+        boxShadow: '0 4px 10px -8px rgba(14, 23, 38, 0.25)',
+        WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+      }}
+    >
+      {sections.map(s => {
+        const on = active === s.id
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => jump(s.id)}
+            aria-current={on ? 'true' : undefined}
+            style={{
+              flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '7px 13px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap',
+              fontSize: 12.5, fontWeight: on ? 600 : 500,
+              border: on ? `1px solid ${C.teal}` : `1px solid ${C.border}`,
+              background: on ? C.tealLight : C.surface,
+              color: on ? C.teal : C.muted,
+              transition: 'background 0.14s, color 0.14s, border-color 0.14s',
+            }}
+          >
+            <i className={`ti ${s.icon}`} style={{ fontSize: 15 }} aria-hidden />
+            {s.label}
+          </button>
+        )
+      })}
+    </nav>
   )
 }
 

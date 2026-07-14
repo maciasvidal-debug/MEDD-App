@@ -11,7 +11,9 @@ describe('scrollToFirstError', () => {
   beforeEach(() => {
     // jsdom has no layout engine, so scrollIntoView is undefined — stub it.
     scrollSpy = vi.fn()
-    Element.prototype.scrollIntoView = scrollSpy
+    // jsdom has no scrollIntoView; install our spy (cast: the mock stands in for
+    // the DOM method signature).
+    Element.prototype.scrollIntoView = scrollSpy as unknown as (arg?: boolean | ScrollIntoViewOptions) => void
     // Deterministic rAF: run the callback synchronously.
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 0 })
   })

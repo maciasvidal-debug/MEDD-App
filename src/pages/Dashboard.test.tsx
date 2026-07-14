@@ -148,4 +148,27 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/Concordancia de back-check/i)).toBeInTheDocument()
     expect(screen.getByText(/κ ítems Sí\/No/)).toBeInTheDocument()
   })
+
+  it('renders the sticky section navigator and jumps on click', () => {
+    // A scroll-margin anchor + scrollIntoView underpin the jump; jsdom has no
+    // layout, so stub scrollIntoView to assert the click wiring.
+    const scrollSpy = vi.fn()
+    Element.prototype.scrollIntoView = scrollSpy as unknown as (arg?: boolean | ScrollIntoViewOptions) => void
+    useStore.setState({
+      surveys: [mkSurvey('a'), mkSurvey('b', { ciudad: 'Cali', estrato: 2 })],
+    })
+    render(<DashboardPage />)
+
+    const nav = screen.getByRole('navigation', { name: /Secciones del panel/i })
+    expect(nav).toBeInTheDocument()
+    // At least the always-present sections plus distributions are listed.
+    const resumen = screen.getByRole('button', { name: /Resumen/i })
+    const distrib = screen.getByRole('button', { name: /Distribuciones/i })
+    expect(resumen).toBeInTheDocument()
+    // The matching anchor exists for the chip to scroll to.
+    expect(document.getElementById('sec-distribuciones')).toBeInTheDocument()
+
+    distrib.click()
+    expect(scrollSpy).toHaveBeenCalled()
+  })
 })
