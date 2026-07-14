@@ -8,9 +8,25 @@ import { downloadBlob } from '../lib/utils'
 // ─── EXPORT PAGE ──────────────────────────────────────────────────────────
 
 export function ExportarPage() {
-  const { surveys } = useStore()
+  const { surveys, pushToast } = useStore()
   const n = surveys.length
   const disabled = n === 0
+
+  // Close the loop on the export: a browser download gives no visible feedback
+  // (especially on mobile, where it drops silently into the download tray), so
+  // confirm the action fired and how many records it covered.
+  function exportCSV() {
+    downloadBlob(toCSV(surveys), `MEDD_${dateTag()}.csv`, 'text/csv;charset=utf-8')
+    pushToast(`CSV exportado · ${n} registro${n !== 1 ? 's' : ''}`, 'success')
+  }
+  function exportCodebook() {
+    downloadBlob(toCodebookCSV(), `MEDD_codebook_${dateTag()}.csv`, 'text/csv;charset=utf-8')
+    pushToast('Diccionario (codebook) descargado', 'success')
+  }
+  function exportJSON() {
+    downloadBlob(JSON.stringify(surveys, null, 2), `MEDD_${dateTag()}.json`, 'application/json')
+    pushToast(`JSON exportado · ${n} registro${n !== 1 ? 's' : ''}`, 'success')
+  }
 
   return (
     <div>
@@ -33,7 +49,7 @@ export function ExportarPage() {
             fullWidth disabled={disabled}
             style={{ background: disabled ? C.bg : '#3B6D11', color: disabled ? C.hint : '#fff', border: 'none' }}
             icon="ti-download"
-            onClick={() => downloadBlob(toCSV(surveys), `MEDD_${dateTag()}.csv`, 'text/csv;charset=utf-8')}
+            onClick={exportCSV}
           >
             Descargar .csv
           </Button>
@@ -41,7 +57,7 @@ export function ExportarPage() {
             fullWidth variant="ghost"
             style={{ marginTop: 8 }}
             icon="ti-book-2"
-            onClick={() => downloadBlob(toCodebookCSV(), `MEDD_codebook_${dateTag()}.csv`, 'text/csv;charset=utf-8')}
+            onClick={exportCodebook}
           >
             Descargar diccionario (codebook)
           </Button>
@@ -59,7 +75,7 @@ export function ExportarPage() {
             fullWidth disabled={disabled}
             style={{ background: disabled ? C.bg : '#1D4ED8', color: disabled ? C.hint : '#fff', border: 'none' }}
             icon="ti-download"
-            onClick={() => downloadBlob(JSON.stringify(surveys, null, 2), `MEDD_${dateTag()}.json`, 'application/json')}
+            onClick={exportJSON}
           >
             Descargar .json
           </Button>

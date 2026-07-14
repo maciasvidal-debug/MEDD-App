@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TopBar } from '../components/layout'
-import { Card, Button, C } from '../components/ui'
+import { Card, Button, EmptyState, C } from '../components/ui'
 import { useCUM } from '../hooks/useCUM'
 
 // ─── BUSCAR PAGE ──────────────────────────────────────────────────────────
@@ -24,12 +24,12 @@ export function BuscarPage() {
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && query.trim().length >= 3 && search(query)}
+            onKeyDown={e => e.key === 'Enter' && query.trim().length >= 3 && search(query.trim())}
             placeholder="Nombre comercial o principio activo…"
           />
           <Button
             disabled={loading || query.trim().length < 3}
-            onClick={() => search(query)}
+            onClick={() => search(query.trim())}
             icon={loading ? 'ti-loader-2' : 'ti-search'}
             style={{ flexShrink: 0, paddingLeft: 14, paddingRight: 14 }}
           >
@@ -53,6 +53,22 @@ export function BuscarPage() {
           <p style={{ color: C.muted, fontSize: 13 }}>Sin resultados para "{query}".</p>
         )}
 
+        {/* First-run prompt: before any search, orient the user instead of
+            showing a bare input on an empty page. */}
+        {!searched && !loading && !error && (
+          <EmptyState
+            icon="ti-vaccine-bottle"
+            title="Consulta el catálogo oficial"
+            description="Escribe un nombre comercial o principio activo (mínimo 3 letras) para buscar en el CUM-INVIMA y copiar los datos verificados a tu encuesta."
+          />
+        )}
+
+        {results.length > 0 && (
+          <p style={{ fontSize: 12, color: C.muted, margin: '2px 2px 10px' }}>
+            {results.length} resultado{results.length !== 1 ? 's' : ''}
+          </p>
+        )}
+
         {results.map((r, i) => (
           <Card key={i} className="lift" style={{ marginBottom: 10 }}>
             <div className="fd" style={{ fontWeight: 600, fontSize: 14.5, marginBottom: 4, letterSpacing: '-0.01em' }}>{r.producto || '—'}</div>
@@ -73,8 +89,10 @@ export function BuscarPage() {
                   disabled={!val}
                   style={{
                     fontSize: 11, minHeight: 36, padding: '8px 12px', borderRadius: 20, cursor: val ? 'pointer' : 'not-allowed',
-                    border: `0.5px solid ${copied === key ? '#BBF7D0' : C.border}`,
-                    background: copied === key ? '#DCFCE7' : C.bg,
+                    // Tokens (not hardcoded light greens) so the "Copiado" state
+                    // stays legible in dark mode too.
+                    border: `0.5px solid ${copied === key ? C.green : C.border}`,
+                    background: copied === key ? C.greenLight : C.bg,
                     color: copied === key ? C.green : C.muted,
                     opacity: val ? 1 : 0.4,
                   }}
