@@ -69,6 +69,11 @@ interface AppStore {
   session: Session | null
   authReady: boolean
   userRole: UserRole | null
+  // Whether the account is approved (user_roles.active). Defaults true and only
+  // flips false when the role lookup explicitly returns an inactive row, so a
+  // failed/slow lookup never locks out a legitimate user — the RLS policy is the
+  // real gate; this only drives the "pending approval" UI.
+  userActive: boolean
   initAuth: () => () => void
   signIn: (email: string, password: string) => Promise<string | null>
   signUp: (email: string, password: string) => Promise<string | null>
@@ -161,6 +166,7 @@ export const useStore = create<AppStore>((set, get) => ({
   session: null,
   authReady: false,
   userRole: null,
+  userActive: true,
 
   initAuth() {
     // `onAuthStateChange` is the single source of truth: supabase-js fires an
@@ -184,7 +190,7 @@ export const useStore = create<AppStore>((set, get) => ({
       set({ session, user: next, authReady: true })
 
       if (!next) {
-        set({ userRole: null })
+        set({ userRole: null, userActive: true })
         return
       }
 
@@ -199,18 +205,23 @@ export const useStore = create<AppStore>((set, get) => ({
           if (differentUser) await applyUserScope(next.id)
 
           let userRole: UserRole = 'encuestador'
+          let userActive = true
           try {
             const { data: roleRow } = await supabase
               .from('user_roles')
-              .select('role')
+              .select('role, active')
               .eq('user_id', next.id)
               .single()
             userRole = (roleRow?.role as UserRole) ?? 'encuestador'
+            // Only an explicit `active === false` gates the user; a missing row
+            // or absent column (older schema) is treated as active — RLS still
+            // enforces the real rule server-side.
+            userActive = (roleRow as { active?: boolean } | null)?.active !== false
           } catch {
             // Role lookup is best-effort; fall back to the default role rather
             // than leaving the user in a broken/blocked state.
           }
-          set({ userRole })
+          set({ userRole, userActive })
 
           // Load local settings first, then overlay the account-synced surveyor
           // profile (user_profiles) so it follows the user across devices and is

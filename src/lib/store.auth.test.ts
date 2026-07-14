@@ -8,7 +8,7 @@ import type { Session, User } from '@supabase/supabase-js'
 // fire auth events, and serve a role row for the deferred hydration.
 const authState = vi.hoisted(() => ({
   cb: null as null | ((event: string, session: unknown) => void),
-  roleRow: null as { role: string } | null,
+  roleRow: null as { role: string; active?: boolean } | null,
 }))
 
 vi.mock('./supabase', () => ({
@@ -82,6 +82,31 @@ describe('initAuth', () => {
     const unsub = useStore.getState().initAuth()
     authState.cb!('INITIAL_SESSION', session('u3'))
     await waitFor(() => expect(useStore.getState().userRole).toBe('encuestador'))
+    unsub()
+  })
+
+  it('gates an inactive account (active=false) via userActive', async () => {
+    authState.roleRow = { role: 'encuestador', active: false }
+    const unsub = useStore.getState().initAuth()
+    authState.cb!('INITIAL_SESSION', session('u4'))
+    await waitFor(() => expect(useStore.getState().userActive).toBe(false))
+    unsub()
+  })
+
+  it('treats a missing active field as active (older schema / RLS enforces)', async () => {
+    authState.roleRow = { role: 'encuestador' }
+    const unsub = useStore.getState().initAuth()
+    authState.cb!('INITIAL_SESSION', session('u5'))
+    await waitFor(() => expect(useStore.getState().userRole).toBe('encuestador'))
+    expect(useStore.getState().userActive).toBe(true)
+    unsub()
+  })
+
+  it('resets userActive on sign-out', () => {
+    const unsub = useStore.getState().initAuth()
+    useStore.setState({ userActive: false })
+    authState.cb!('SIGNED_OUT', null)
+    expect(useStore.getState().userActive).toBe(true)
     unsub()
   })
 })

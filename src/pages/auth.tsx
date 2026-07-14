@@ -2,8 +2,6 @@ import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Button, Logo, C } from '../components/ui'
 
-type AuthMode = 'login' | 'register'
-
 // Trust signals shown on the desktop brand panel. Grounded in what the product
 // actually does (offline-first capture, cross-device sync, per-user RLS) — no
 // invented claims, just the reassurances a field worker needs on day one.
@@ -16,65 +14,28 @@ const FEATURES = [
     body: 'Cada usuario solo ve y edita sus propios registros (RLS por cuenta).' },
 ]
 
+// Login-only: public sign-up is disabled (accounts are provisioned by the study
+// coordinator in Supabase), so there is no "Registrarse" tab. Access control and
+// account approval live server-side (RLS + user_roles.active); see migration 015.
 export default function AuthPage() {
-  const [mode, setMode]       = useState<AuthMode>('login')
   const [email, setEmail]     = useState('')
   const [password, setPass]   = useState('')
   const [showPw, setShowPw]   = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
-  const [info, setInfo]       = useState<string | null>(null)
-
-  // Mirror the Supabase password policy (min 6 + lower/upper/digit/symbol) on the
-  // client so users see the rules and get a friendly message, instead of passing
-  // local validation only to be rejected by the server with a raw English error.
-  const pwChecks = [
-    { ok: password.length >= 6,        label: 'Mínimo 6 caracteres' },
-    { ok: /[a-z]/.test(password),      label: 'Una minúscula' },
-    { ok: /[A-Z]/.test(password),      label: 'Una mayúscula' },
-    { ok: /\d/.test(password),         label: 'Un número' },
-    { ok: /[^A-Za-z0-9]/.test(password), label: 'Un símbolo' },
-  ]
-  const passwordValid = pwChecks.every(c => c.ok)
-  const submitDisabled = loading || (mode === 'register' && !passwordValid)
-
-  function switchMode(next: AuthMode) {
-    setMode(next); setError(null); setInfo(null)
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setInfo(null)
-
-    // Enforce the policy on registration only — existing accounts may predate it,
-    // so login must never be blocked by a format check.
-    if (mode === 'register' && !passwordValid) {
-      setError('La contraseña debe tener mínimo 6 caracteres e incluir mayúscula, minúscula, número y símbolo.')
-      return
-    }
     setLoading(true)
 
     // try/finally so a thrown network error (no connectivity, DNS, CORS) still
     // clears the spinner and surfaces a message, instead of hanging the button.
     try {
-      if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) setError(error.message)
-      } else {
-        const { data, error } = await supabase.auth.signUp({ email, password })
-        if (error) {
-          setError(error.message)
-        } else if (data.session) {
-          // Email confirmation is disabled → signUp returns a session and the user
-          // is already signed in. The auth listener (store.initAuth) picks up the
-          // SIGNED_IN event and routes into the app, so no message is needed here.
-        } else {
-          // Email confirmation is enabled → no session yet; the user must verify
-          // via the emailed link before logging in.
-          setInfo('Cuenta creada. Revisa tu correo para confirmar el registro.')
-        }
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) setError(error.message)
+      // On success the auth listener (store.initAuth) picks up SIGNED_IN and routes
+      // into the app, so nothing else is needed here.
     } catch {
       setError('No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.')
     } finally {
@@ -130,27 +91,7 @@ export default function AuthPage() {
             <p style={styles.subtitle}>Medicamentos no utilizados — Colombia</p>
           </div>
 
-          {/* Tabs */}
-          <div style={styles.tabs} role="tablist" aria-label="Autenticación">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === 'login'}
-              style={{ ...styles.tab, ...(mode === 'login' ? styles.tabActive : {}) }}
-              onClick={() => switchMode('login')}
-            >
-              Iniciar sesión
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === 'register'}
-              style={{ ...styles.tab, ...(mode === 'register' ? styles.tabActive : {}) }}
-              onClick={() => switchMode('register')}
-            >
-              Registrarse
-            </button>
-          </div>
+          <h1 style={styles.heading}>Iniciar sesión</h1>
 
           {/* Form */}
           <form onSubmit={handleSubmit} style={styles.form}>
@@ -176,12 +117,11 @@ export default function AuthPage() {
                   id="password"
                   type={showPw ? 'text' : 'password'}
                   required
-                  minLength={6}
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  autoComplete="current-password"
                   enterKeyHint="go"
                   value={password}
                   onChange={e => setPass(e.target.value)}
-                  placeholder={mode === 'register' ? 'Crea una contraseña segura' : 'Tu contraseña'}
+                  placeholder="Tu contraseña"
                   style={{ paddingRight: 44 }}
                 />
                 <button
@@ -195,43 +135,30 @@ export default function AuthPage() {
                   <i className={`ti ${showPw ? 'ti-eye-off' : 'ti-eye'}`} style={{ fontSize: 18 }} aria-hidden />
                 </button>
               </div>
-              {mode === 'register' && password.length > 0 && (
-                <ul style={styles.pwList} aria-label="Requisitos de la contraseña">
-                  {pwChecks.map(c => (
-                    <li key={c.label} style={{ ...styles.pwItem, color: c.ok ? C.green : C.muted }}>
-                      <i className={`ti ${c.ok ? 'ti-circle-check-filled' : 'ti-circle'}`} style={{ fontSize: 14 }} aria-hidden />
-                      {c.label}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
 
             {error && <p role="alert" aria-live="assertive" style={styles.error}>{error}</p>}
-            {info  && <p role="alert" aria-live="assertive" style={styles.info}>{info}</p>}
 
             <Button
               type="submit"
               size="lg"
               fullWidth
-              disabled={submitDisabled}
-              icon={loading ? undefined : (mode === 'login' ? 'ti-login-2' : 'ti-user-plus')}
+              disabled={loading}
+              icon={loading ? undefined : 'ti-login-2'}
               style={{ marginTop: 4 }}
             >
               {loading
                 ? <i className="ti ti-loader-2" style={{ animation: 'spin 0.8s linear infinite', fontSize: 17 }} aria-hidden />
-                : mode === 'login' ? 'Ingresar' : 'Crear cuenta'}
+                : 'Ingresar'}
             </Button>
 
-            {/* Password recovery is intentionally admin-assisted: email confirmation
-                is off (addresses aren't verified) and no SMTP is configured, so an
-                in-app "reset by email" flow would dead-end. Point users to the
-                coordinator instead of leaving them stuck. */}
-            {mode === 'login' && (
-              <p style={styles.recovery}>
-                ¿Olvidaste tu contraseña? Contacta al coordinador del estudio para restablecerla.
-              </p>
-            )}
+            {/* Accounts are provisioned by the study coordinator (no public
+                sign-up), and password recovery is admin-assisted — email
+                confirmation is off and no SMTP is configured, so an in-app email
+                reset would dead-end. Point users to the coordinator. */}
+            <p style={styles.recovery}>
+              ¿Sin cuenta o contraseña olvidada? Contacta al coordinador del estudio.
+            </p>
           </form>
         </div>
       </main>
@@ -242,7 +169,7 @@ export default function AuthPage() {
 const styles: Record<string, React.CSSProperties> = {
   header: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   logo: {
     fontSize: 32,
@@ -255,31 +182,12 @@ const styles: Record<string, React.CSSProperties> = {
     color: C.muted,
     marginTop: 4,
   },
-  tabs: {
-    display: 'flex',
-    borderRadius: 10,
-    overflow: 'hidden',
-    border: `1px solid ${C.border}`,
-    background: C.surface2,
-    padding: 3,
-    gap: 3,
-    marginBottom: 24,
-  },
-  tab: {
-    flex: 1,
-    padding: '9px 0',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: 8,
-    cursor: 'pointer',
-    fontSize: 13,
-    color: C.muted,
-    transition: 'background 0.15s, color 0.15s',
-  },
-  tabActive: {
-    background: C.teal,
-    color: '#FFFFFF',
+  heading: {
+    fontSize: 15,
     fontWeight: 600,
+    color: C.text,
+    textAlign: 'center',
+    marginBottom: 18,
   },
   form: {
     display: 'flex',
@@ -305,21 +213,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: C.muted,
     cursor: 'pointer',
   },
-  pwList: {
-    listStyle: 'none',
-    margin: '8px 0 0',
-    padding: 0,
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '4px 12px',
-  },
-  pwItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 5,
-    fontSize: 11.5,
-    transition: 'color 0.15s',
-  },
   label: {
     fontSize: 12,
     fontWeight: 500,
@@ -329,13 +222,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: C.red,
     background: C.redLight,
-    borderRadius: 8,
-    padding: '8px 10px',
-  },
-  info: {
-    fontSize: 12,
-    color: C.green,
-    background: C.greenLight,
     borderRadius: 8,
     padding: '8px 10px',
   },
