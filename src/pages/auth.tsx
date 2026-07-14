@@ -222,6 +222,16 @@ export default function AuthPage() {
                 ? <i className="ti ti-loader-2" style={{ animation: 'spin 0.8s linear infinite', fontSize: 17 }} aria-hidden />
                 : mode === 'login' ? 'Ingresar' : 'Crear cuenta'}
             </Button>
+
+            {/* Password recovery is intentionally admin-assisted: email confirmation
+                is off (addresses aren't verified) and no SMTP is configured, so an
+                in-app "reset by email" flow would dead-end. Point users to the
+                coordinator instead of leaving them stuck. */}
+            {mode === 'login' && (
+              <p style={styles.recovery}>
+                ¿Olvidaste tu contraseña? Contacta al coordinador del estudio para restablecerla.
+              </p>
+            )}
           </form>
         </div>
       </main>
@@ -328,5 +338,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: C.greenLight,
     borderRadius: 8,
     padding: '8px 10px',
+  },
+  recovery: {
+    fontSize: 12,
+    color: C.muted,
+    textAlign: 'center',
+    lineHeight: 1.5,
+    marginTop: 2,
   },
 }
