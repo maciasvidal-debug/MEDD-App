@@ -38,7 +38,7 @@ const survey: Survey = {
   cantMed: 5,
   cantMedVto: 2,
   pesoMedNc: 12.5,
-  medications: [{ nmMed: 'Acetaminofén', dci: 'Paracetamol' } as Survey['medications'][number]],
+  medications: [{ nmMed: 'Acetaminofén', dci: 'Paracetamol', concMed: null, undConc: '', fVto: '' }],
   motNoConsumo: ['Sobró de la dosis'],
   motNoConsumoOtro: '',
   motVencimiento: ['Olvido'],
@@ -158,7 +158,7 @@ describe('sync mapping toRow/fromRow', () => {
     expect(fromRow(toRow(survey, 'u')).departamento).toBeUndefined()
   })
 
-  it('round-trips the medication sub-records verbatim (nested 1:N passthrough)', () => {
+  it('round-trips the medication sub-records (nested 1:N) losslessly', () => {
     const meds: Survey['medications'] = [
       { nmMed: 'Dolex', dci: 'Acetaminofén', concMed: 500, undConc: 'mg', fVto: '2027-03-01' },
       // A partially-filled row (blank concentration/unit/vencimiento) must survive intact.
@@ -166,6 +166,34 @@ describe('sync mapping toRow/fromRow', () => {
     ]
     const back = fromRow(toRow({ ...survey, medications: meds }, 'u'))
     expect(back.medications).toEqual(meds)
+  })
+
+  it('collapses empty optional medication fields to null in storage (view-safe)', () => {
+    // An empty fVto/concMed must NOT reach the JSONB as "": the analytics view
+    // casts them to date/numeric and "" is not NULL. Store null instead, then
+    // restore the local invariant (fVto: '', concMed: null) on the way back.
+    const meds: Survey['medications'] = [
+      { nmMed: 'Amoxil', dci: 'Amoxicilina', concMed: null, undConc: '', fVto: '' },
+    ]
+    const stored = toRow({ ...survey, medications: meds }, 'u').medications as Record<string, unknown>[]
+    expect(stored[0].fVto).toBeNull()
+    expect(stored[0].concMed).toBeNull()
+    // A populated expiry/concentration is stored verbatim (only empties collapse).
+    const full = toRow({ ...survey, medications: [
+      { nmMed: 'Dolex', dci: 'Acetaminofén', concMed: 500, undConc: 'mg', fVto: '2027-03-01' },
+    ] }, 'u').medications as Record<string, unknown>[]
+    expect(full[0].fVto).toBe('2027-03-01')
+    expect(full[0].concMed).toBe(500)
+  })
+
+  it('defensively normalizes legacy medications that stored "" verbatim', () => {
+    // Rows written by the pre-hardening mapping can carry "" for fVto/concMed.
+    // fromRow must still surface a clean local shape.
+    const back = fromRow({
+      ...toRow(survey, 'u'),
+      medications: [{ nmMed: 'X', dci: 'Y', concMed: '', undConc: '', fVto: '' }],
+    })
+    expect(back.medications).toEqual([{ nmMed: 'X', dci: 'Y', concMed: null, undConc: '', fVto: '' }])
   })
 })
 
