@@ -204,6 +204,11 @@ describe('buildTextAnalysis — theme detection', () => {
     expect(r!.themes.some(t => t.theme === 'Calidad del dato')).toBe(true)
   })
 
+  it('detects a multi-word keyword phrase ("adulto mayor")', () => {
+    const r = buildTextAnalysis([s('vive con un adulto mayor en casa')])
+    expect(r!.themes.some(t => t.theme === 'Entorno social')).toBe(true)
+  })
+
   it('counts each theme at most once per survey', () => {
     // obs with "farmacia" repeated 5 times → still 1 survey for the theme
     const r = buildTextAnalysis([s('farmacia farmacia farmacia farmacia farmacia')])
