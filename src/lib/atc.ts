@@ -8,8 +8,10 @@
 // letra del código. Una sola tabla fuente evita que niveles 1 y 2 se
 // desincronicen.
 //
-// Es PURA y determinista (misma entrada → misma salida, sin efectos ni estado):
-// segura, idempotente y trivial de testear.
+// Es determinista y referencialmente transparente (misma entrada → misma
+// salida, sin efectos observables): segura, idempotente y trivial de testear.
+// Internamente memoiza el emparejamiento por DCI (detalle de implementación que
+// no cambia esos resultados).
 //
 // Estrategia: normalizar (minúsculas, sin tildes, espacios) y buscar la primera
 // RAÍZ de principio activo como subcadena. Las reglas están ORDENADAS: combos
@@ -154,15 +156,42 @@ const RULES: ReadonlyArray<readonly [string, string]> = [
   ['multivitamin', 'A11'], ['fosfato tricalc', 'A12'], ['calcio', 'A12'], ['zinc', 'A12'],
 ]
 
+// Memoización del resultado por DCI normalizado. therapeuticGroup y
+// therapeuticSubgroup invocan matchCode con los mismos principios activos una y
+// otra vez (un medicamento frecuente como "acetaminofen" aparece en muchas
+// encuestas, y ambos niveles se derivan por separado), así que cachear evita
+// repetir el escaneo lineal de RULES. Es un detalle interno que NO altera el
+// determinismo ni la pureza observable: misma entrada → misma salida. Cota LRU
+// para acotar la memoria ante un flujo ilimitado de nombres distintos.
+const CACHE_MAX = 2000
+const codeCache = new Map<string, string | null>()
+
 // Código ATC nivel 2 (o el centinela FITO) del principio activo, o null si no
 // se reconoce. Núcleo compartido del que derivan ambos niveles.
 function matchCode(dci: string): string | null {
   const d = normalizeDci(dci || '')
   if (!d) return null
-  for (const [needle, code] of RULES) {
-    if (d.includes(needle)) return code
+
+  // Sólo se almacenan string|null, nunca undefined → undefined ≡ ausente.
+  const cached = codeCache.get(d)
+  if (cached !== undefined) {
+    // Refresca la posición LRU: reinsertar la deja como la más reciente.
+    codeCache.delete(d)
+    codeCache.set(d, cached)
+    return cached
   }
-  return null
+
+  let code: string | null = null
+  for (const [needle, c] of RULES) {
+    if (d.includes(needle)) { code = c; break }
+  }
+
+  codeCache.set(d, code)
+  if (codeCache.size > CACHE_MAX) {
+    // Evacúa la entrada menos usada recientemente (primera del orden de iteración).
+    codeCache.delete(codeCache.keys().next().value as string)
+  }
+  return code
 }
 
 /** Grupo terapéutico ATC nivel 1 (anatómico) del principio activo, o

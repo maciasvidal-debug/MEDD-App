@@ -77,3 +77,17 @@ describe('therapeuticSubgroup (ATC level 2)', () => {
     expect(therapeuticSubgroup('xyz sustancia inexistente')).toBe(SIN_CLASIFICAR)
   })
 })
+
+describe('matchCode memoization is transparent', () => {
+  it('repeated and cross-function calls on the same DCI stay consistent', () => {
+    // Both functions share the memoized matchCode; a cached hit (including a
+    // cached "unknown" null) must yield the same result as the first call.
+    for (const dci of ['acetaminofen', 'acetaminofen', 'losartan 50 mg potasico',
+                        'xyz sustancia inexistente', 'xyz sustancia inexistente', '']) {
+      expect(therapeuticGroup(dci)).toBe(therapeuticGroup(dci))
+      expect(therapeuticSubgroup(dci)).toBe(therapeuticSubgroup(dci))
+    }
+    // A normalized variant resolves to the same class as its canonical form.
+    expect(therapeuticSubgroup('  ACETAMINOFÉN  ')).toBe(therapeuticSubgroup('acetaminofen'))
+  })
+})
