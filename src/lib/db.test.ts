@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   saveSurvey, getAllSurveys, getSurvey, deleteSurvey, saveManySurveys,
-  addDeletion, getDeletionIds, removeDeletion, clearLocalUserData,
+  addDeletion, getDeletionIds, removeDeletion, removeDeletions, clearLocalUserData,
   getSettings, saveSettings, getDraft, saveDraft, clearDraft,
 } from './db'
 import { DEFAULT_SETTINGS } from './constants'
@@ -50,6 +50,20 @@ describe('db — deletion tombstones (v4 store)', () => {
     expect((await getDeletionIds()).sort()).toEqual(['x', 'y'])
     await removeDeletion('x')
     expect(await getDeletionIds()).toEqual(['y'])
+  })
+
+  it('removeDeletions drops many tombstones in one transaction', async () => {
+    await addDeletion('a')
+    await addDeletion('b')
+    await addDeletion('c')
+    await removeDeletions(['a', 'c'])
+    expect(await getDeletionIds()).toEqual(['b'])
+  })
+
+  it('removeDeletions is a no-op for an empty array', async () => {
+    await addDeletion('keep')
+    await removeDeletions([])
+    expect(await getDeletionIds()).toEqual(['keep'])
   })
 })
 

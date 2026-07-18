@@ -141,6 +141,15 @@ export async function removeDeletion(id: string): Promise<void> {
   await db.delete('deletions', id)
 }
 
+// Drop many tombstones in one readwrite transaction instead of opening a
+// separate transaction per id (mirrors saveManySurveys' bulk-write pattern).
+export async function removeDeletions(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  const db = await getDB()
+  const tx = db.transaction('deletions', 'readwrite')
+  await Promise.all([...ids.map(id => tx.store.delete(id)), tx.done])
+}
+
 // ─── Settings ─────────────────────────────────────────────────────────────
 
 const SETTINGS_KEY = 'app_settings'

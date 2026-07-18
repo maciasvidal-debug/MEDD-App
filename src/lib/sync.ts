@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { getAllSurveys, saveManySurveys, getDeletionIds, removeDeletion } from './db'
+import { getAllSurveys, saveManySurveys, getDeletionIds, removeDeletions } from './db'
 import { toRow, fromRow } from './sync-mapping'
 import type { Survey, UserRole, Settings } from '../types'
 
@@ -131,7 +131,7 @@ export async function fullSync(
     // call failed (keep them all pending to retry and guard the pull below).
     const ok = await deleteSurveysRemote(deletionIds)
     if (ok) {
-      await Promise.all(deletionIds.map(id => removeDeletion(id)))
+      await removeDeletions(deletionIds)
     } else {
       for (const id of deletionIds) tombstoned.add(id)
     }
