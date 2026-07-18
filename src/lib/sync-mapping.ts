@@ -7,6 +7,43 @@ import type { Survey, Medication, DataEnv } from '../types'
 
 export type SupabaseRow = Record<string, unknown>
 
+// Treat '' (and null/undefined) as SQL NULL. Mirrors the NULLIF(<text>, '')
+// applied inside v_product_metrics (migration 004): an empty string is not NULL
+// and would crash the view's ::date / ::numeric casts, so collapse it here too.
+const blankToNull = (v: unknown): unknown =>
+  v === '' || v === undefined || v === null ? null : v
+
+// Normalize a medication for JSONB storage. The medications array is stored as
+// an opaque JSONB blob and read back by the analytics view, which casts
+// fVto → date and concMed → numeric. The view already guards every cast with
+// NULLIF (migration 004), but normalizing the optional expiry/concentration to
+// null *before* they reach the column is belt-and-suspenders: the stored data
+// is clean, so even a consumer that reads the JSONB without that guard is safe.
+function toMedRow(m: Medication): SupabaseRow {
+  return {
+    nmMed:   m.nmMed,
+    dci:     m.dci,
+    // concMed is typed number|null but may arrive as '' from older persisted
+    // records, so guard the raw value defensively rather than trusting the type.
+    concMed: blankToNull(m.concMed),
+    undConc: m.undConc,
+    fVto:    blankToNull(m.fVto),
+  }
+}
+
+// Inverse of toMedRow: restore the local Medication invariant (fVto is a string,
+// '' when unknown; concMed is number|null) after the write side normalized empty
+// optionals to null. Also tolerant of legacy rows that stored '' verbatim.
+function fromMedRow(m: Record<string, unknown>): Medication {
+  return {
+    nmMed:   (m.nmMed as string) ?? '',
+    dci:     (m.dci as string) ?? '',
+    concMed: m.concMed == null || m.concMed === '' ? null : (m.concMed as number),
+    undConc: (m.undConc as Medication['undConc']) ?? '',
+    fVto:    m.fVto ? String(m.fVto) : '',
+  }
+}
+
 export function toRow(survey: Survey, userId: string): SupabaseRow {
   return {
     id:           survey.id,
@@ -49,7 +86,7 @@ export function toRow(survey: Survey, userId: string): SupabaseRow {
     cant_med:     survey.cantMed,
     cant_med_vto: survey.cantMedVto,
     peso_med_nc:  survey.pesoMedNc,
-    medications:  survey.medications,
+    medications:  (survey.medications ?? []).map(toMedRow),
     mot_no_consumo:       survey.motNoConsumo,
     mot_no_consumo_otro:  survey.motNoConsumoOtro   || null,
     mot_vencimiento:      survey.motVencimiento,
@@ -104,7 +141,7 @@ export function fromRow(row: SupabaseRow): Survey {
     cantMed:     row.cant_med    as number | null,
     cantMedVto:  row.cant_med_vto as number | null,
     pesoMedNc:   row.peso_med_nc  as number | null,
-    medications: (row.medications as Medication[]) ?? [],
+    medications: ((row.medications as Record<string, unknown>[]) ?? []).map(fromMedRow),
     motNoConsumo:       (row.mot_no_consumo as string[]) ?? [],
     motNoConsumoOtro:   (row.mot_no_consumo_otro as string) ?? '',
     motVencimiento:     (row.mot_vencimiento as string[]) ?? [],
