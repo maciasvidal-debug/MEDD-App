@@ -172,11 +172,28 @@ function computeBigrams(tokensByText: string[][]): Map<string, number> {
 }
 
 // ─── Theme detection ──────────────────────────────────────────────────────────
+
+// Escape any regex metacharacters so a keyword is matched literally (the dict is
+// exported/extensible, so don't assume keywords are always plain [a-z ]).
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Precompile one alternation RegExp per theme, once at module load. Matching a
+// text becomes a single scan that short-circuits on the first hit, instead of
+// re-walking the keyword list with a separate substring search per keyword for
+// every survey. Semantics are identical to `kws.some(kw => text.includes(kw))`:
+// unanchored, no word boundaries, so multi-word phrases still match verbatim.
+const THEME_MATCHERS: ReadonlyArray<readonly [string, RegExp]> =
+  Object.entries(THEMATIC_DICT).map(
+    ([theme, kws]) => [theme, new RegExp(kws.map(escapeRegExp).join('|'))] as const,
+  )
+
 // Returns all theme names whose keyword list has at least one match in `text`.
 function detectThemes(text: string): string[] {
   const n = norm(text)
-  return Object.entries(THEMATIC_DICT)
-    .filter(([, kws]) => kws.some(kw => n.includes(kw)))
+  return THEME_MATCHERS
+    .filter(([, re]) => re.test(n))
     .map(([theme]) => theme)
 }
 
