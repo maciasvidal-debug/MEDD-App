@@ -11,11 +11,18 @@ const { quoteIdent } = require('../utils/sql');
 // router regardless of how/where it is mounted in the app.
 router.use(requireAuth);
 
-// Validate the :id route param once: nui is a positive integer. Rejects
-// garbage like /surveys/abc before it ever reaches a query.
+// surveys.nui is a SERIAL (INTEGER / int4) column, so its domain is
+// 1..2147483647. Enforcing the upper bound here mirrors PG_INT_MAX.
+const PG_INT_MAX = 2147483647; // INTEGER (int4) upper bound
+
+// Validate the :id route param once: nui is a positive integer within the
+// INTEGER range. Rejects garbage like /surveys/abc and over-range values like
+// /surveys/99999999999999999999 with a clean 400 *before* they reach a query,
+// rather than leaning on Postgres's 22003 (numeric_value_out_of_range) as the
+// only guard. Defense-in-depth: explicit input bounds, consistent with schema.js.
 router.param('id', (req, res, next, id) => {
-    if (!/^[1-9]\d*$/.test(id)) {
-        return res.status(400).json({ error: 'ID inválido', details: ['nui debe ser un entero positivo'] });
+    if (!/^[1-9]\d*$/.test(id) || Number(id) > PG_INT_MAX) {
+        return res.status(400).json({ error: 'ID inválido', details: ['nui debe ser un entero positivo dentro del rango permitido'] });
     }
     next();
 });

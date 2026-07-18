@@ -46,6 +46,15 @@ describe('surveys ownership (detail)', () => {
         expect(pool.query).not.toHaveBeenCalled();
     });
 
+    test('over-range :id (beyond INTEGER max) is rejected before any query (400)', async () => {
+        const token = await mintToken();
+        // Passes the positive-integer regex but overflows INTEGER (int4);
+        // must be rejected up-front, not left to Postgres's 22003 safety net.
+        const res = await request(app).get('/api/surveys/99999999999999999999').set('Authorization', `Bearer ${token}`);
+        expect(res.status).toBe(400);
+        expect(pool.query).not.toHaveBeenCalled();
+    });
+
     test("another user's survey returns 404 (no existence leak)", async () => {
         pool.query.mockResolvedValueOnce({ rows: [] });
         const token = await mintToken({ sub: 'user-2', role: 'encuestador' });
