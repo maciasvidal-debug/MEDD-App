@@ -92,7 +92,7 @@ describe('validateDraft — completeness & duplicates', () => {
 // just-over (warns) and exactly-at (does not warn) for each.
 describe('validateDraft — warning thresholds', () => {
   const hasWeight = (r: { warnings: string[] }) => r.warnings.some(w => w.includes('Peso'))
-  const hasAge    = (r: { warnings: string[] }) => r.warnings.some(w => w.includes('Edad atípica'))
+  const hasAge    = (r: { errors: string[] })   => r.errors.some(e => e.includes('Edad implausible'))
 
   it('warns on weight strictly above 5000 g, not at the boundary', () => {
     expect(hasWeight(validateDraft(draft({ pesoMedNc: 5001 })))).toBe(true)
@@ -100,10 +100,10 @@ describe('validateDraft — warning thresholds', () => {
     expect(hasWeight(validateDraft(draft({ pesoMedNc: 0 })))).toBe(false)
   })
 
-  it('warns on an implausible age (> 110 or < 0)', () => {
+  it('blocks (hard error) on an implausible age (> 110), not a soft warning (Rec. 2)', () => {
     // Interview long after birth → age > 110.
     expect(hasAge(validateDraft(draft({ fEta: '2026-01-01', fNac: '1900-01-01' })))).toBe(true)
-    // A plausible adult age does not warn.
+    // A plausible adult age does not error.
     expect(hasAge(validateDraft(draft({ fEta: '2026-01-01', fNac: '1990-01-01' })))).toBe(false)
   })
 

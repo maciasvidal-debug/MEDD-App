@@ -85,6 +85,16 @@ describe('step1Schema', () => {
     expect(step1Schema.safeParse({ ...valid, nuiEtr: -5 }).success).toBe(false)
     expect(step1Schema.safeParse({ ...valid, nuiEtr: 1.5 }).success).toBe(false)
   })
+
+  it('rejects an interview date outside the study window (Rec. 2)', () => {
+    // Before the study started (the pilot exported a 2012 record).
+    expect(step1Schema.safeParse({ ...valid, fEta: '2012-06-01' }).success).toBe(false)
+    expect(step1Schema.safeParse({ ...valid, fEta: '2023-12-31' }).success).toBe(false)
+    // In the future.
+    expect(step1Schema.safeParse({ ...valid, fEta: '2999-01-01' }).success).toBe(false)
+    // The study-start boundary itself is valid.
+    expect(step1Schema.safeParse({ ...valid, fEta: '2024-01-01' }).success).toBe(true)
+  })
 })
 
 describe('step2Schema', () => {
@@ -126,7 +136,7 @@ describe('step2Schema', () => {
 
 describe('step4Schema — "Otro" requires its free text', () => {
   const valid = {
-    medSob: 'Sí', dispMedVc: '', ctoDispVc: '', vtoMedNc: 'No',
+    medSob: 'Sí', dispMedVc: 'No', ctoDispVc: '', vtoMedNc: 'No',
     cantMed: 0, cantMedVto: 0, pesoMedNc: null,
     motNoConsumo: [] as string[], motNoConsumoOtro: '',
     motVencimiento: [] as string[], motVencimientoOtro: '',
@@ -185,5 +195,17 @@ describe('step4Schema', () => {
     expect(step4Schema.safeParse({ ...valid, cantMedVto: -1 }).success).toBe(false)
     expect(step4Schema.safeParse({ ...valid, pesoMedNc: -0.5 }).success).toBe(false)
     expect(step4Schema.safeParse({ ...valid, cantMed: 0, pesoMedNc: 0 }).success).toBe(true)
+  })
+
+  // Disposal block is mandatory once the home keeps unused meds (Rec. 2): the
+  // pilot showed non-random missingness here. It must NOT block a medSob='No'
+  // record (the block isn't shown then).
+  it('requires the disposal block (dispMedVc, vtoMedNc) only when medSob is "Sí"', () => {
+    const kept = { ...valid, medSob: 'Sí', dispMedVc: 'No', vtoMedNc: 'No' }
+    expect(step4Schema.safeParse(kept).success).toBe(true)
+    expect(step4Schema.safeParse({ ...kept, dispMedVc: '' }).success).toBe(false)
+    expect(step4Schema.safeParse({ ...kept, vtoMedNc: '' }).success).toBe(false)
+    // medSob='No' with the disposal block empty stays valid (block not applicable).
+    expect(step4Schema.safeParse({ ...valid, medSob: 'No', dispMedVc: '', vtoMedNc: '' }).success).toBe(true)
   })
 })

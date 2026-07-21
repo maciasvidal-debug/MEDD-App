@@ -26,6 +26,13 @@ export const OPT = {
 // actually asked the question (see Survey.instrumentVersion).
 export const INSTRUMENT_VERSION = 2
 
+// Earliest plausible interview date (F_ETA). Fieldwork for this study cannot
+// predate 2024, so a date before this — or in the future — is a capture error
+// (the pilot exported a record with F_ETA in 2012). Validated at capture in Zod
+// so the implausible date never enters. Kept as a constant (not hard-coded in
+// the schema) so a future wave can move the window in one place.
+export const STUDY_START = '2024-01-01'
+
 // Main Colombian cities (CIUDAD dropdown)
 export const CIUDADES = [
   'Bogotá', 'Medellín', 'Cali', 'Barranquilla', 'Cartagena', 'Cúcuta',
