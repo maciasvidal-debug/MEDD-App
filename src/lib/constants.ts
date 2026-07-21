@@ -15,6 +15,9 @@ export const OPT = {
   estrato: [1, 2, 3, 4, 5, 6] as const,
   etrPrograma: ['Medicina', 'Enfermería', 'Regencia en Farmacia', 'Química Farmacéutica', 'Odontología', 'Bacteriología', 'Nutrición y Dietética', 'Otra'] as const,
   etrTipoInst: ['Pública', 'Privada'] as const,
+  // Método de selección muestral (diseño). Cierra el vacío del piloto: sin
+  // registrar el diseño, el agrupamiento por hogar/encuestador no era modelable.
+  metodoSeleccion: ['Aleatorio simple', 'Sistemático', 'Por conglomerados', 'Por conveniencia', 'Otro'] as const,
   // Motivos / disposición (instrumento v2). El valor «Otro» habilita un texto libre.
   motNoConsumo: ['No terminó el tratamiento', 'Mejoró / cedieron los síntomas', 'Efectos adversos', 'Cambio de tratamiento médico', 'Sobró de la dosis', 'Automedicación', 'Fallecimiento de un familiar', 'Otro'] as const,
   motVencimiento: ['Olvido', 'Acopio preventivo', 'Compró de más', 'Dosis sobrante', 'No sabía dónde desecharlos', 'Otro'] as const,
@@ -60,6 +63,8 @@ export const EMPTY_DRAFT: SurveyDraft = {
   fEta:       '',
   nuiEtr:     null,
   nui:        0,
+  hogarId:    '',
+  metodoSeleccion: '',
   etrPrograma:    '',
   etrTipoInst:    '',
   etrSemestre:    null,
@@ -147,7 +152,9 @@ export const CODEBOOK: CodebookEntry[] = [
   { variable: 'id',            etiqueta: 'Identificador único del registro', tipo: 'texto (UUID)', valores: '—' },
   { variable: 'fEta',          etiqueta: 'Fecha de la entrevista', tipo: 'fecha', valores: 'AAAA-MM-DD' },
   { variable: 'nui',           etiqueta: 'Número de encuesta', tipo: 'entero', valores: 'consecutivo' },
-  { variable: 'nuiEtr',        etiqueta: 'ID del encuestador', tipo: 'entero', valores: '—' },
+  { variable: 'nuiEtr',        etiqueta: 'ID del encuestador (clúster de encuestador)', tipo: 'entero', valores: '—' },
+  { variable: 'hogarId',       etiqueta: 'Identificador de hogar (clúster de hogar; co-residentes comparten código)', tipo: 'texto', valores: '— (vacío en históricos)' },
+  { variable: 'metodoSeleccion', etiqueta: 'Método de selección muestral (diseño)', tipo: 'categórico', valores: 'Aleatorio simple; Sistemático; Por conglomerados; Por conveniencia; Otro (vacío en históricos)' },
   { variable: 'etrPrograma',   etiqueta: 'Programa académico del encuestador', tipo: 'categórico', valores: 'Medicina; Enfermería; Regencia en Farmacia; Química Farmacéutica; Odontología; Bacteriología; Nutrición y Dietética; Otra' },
   { variable: 'etrTipoInst',   etiqueta: 'Tipo de institución del encuestador', tipo: 'categórico', valores: 'Pública; Privada' },
   { variable: 'etrSemestre',   etiqueta: 'Semestre académico del encuestador', tipo: 'entero', valores: '1–12' },

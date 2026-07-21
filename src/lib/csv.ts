@@ -5,7 +5,7 @@ import { CODEBOOK } from './constants'
 // self-describing data-dictionary export.
 
 const CSV_COLUMNS: (keyof Survey)[] = [
-  'id', 'fEta', 'nui', 'nuiEtr',
+  'id', 'fEta', 'nui', 'nuiEtr', 'hogarId', 'metodoSeleccion',
   'etrPrograma', 'etrTipoInst', 'etrSemestre', 'etrInstitucion',
   'fNac',
   'ciudad', 'departamento', 'dir', 'estrato',

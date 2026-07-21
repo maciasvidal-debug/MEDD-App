@@ -20,6 +20,13 @@ import { EMPTY_DRAFT, DEFAULT_SETTINGS, INSTRUMENT_VERSION } from '../lib/consta
 export type Theme = 'light' | 'dark'
 export type Density = 'comfortable' | 'compact'
 
+// Código de hogar corto y legible (H-XXXXXX). Autogenerado en cada captura y
+// editable, para que el encuestador pueda reutilizar el mismo código en las
+// demás personas del hogar. Deriva del uuid para heredar su unicidad.
+function newHogarId(): string {
+  return 'H-' + uuid().replace(/-/g, '').slice(0, 6).toUpperCase()
+}
+
 const THEME_KEY = 'medd_theme'
 function readTheme(): Theme {
   if (typeof window === 'undefined') return 'light'
@@ -493,6 +500,10 @@ export const useStore = create<AppStore>((set, get) => ({
       fEta:   todayISO(),
       nuiEtr,
       nui:    surveyCount + 1,
+      // Autogenera un identificador de hogar estable y editable: el encuestador
+      // lo reutiliza (lo copia) para las demás personas del mismo hogar, de modo
+      // que el agrupamiento por hogar queda registrado desde la captura.
+      hogarId: newHogarId(),
       // Stamp the surveyor profile snapshot from settings onto the survey.
       etrPrograma:    settings.etrPrograma,
       etrTipoInst:    settings.etrTipoInst,
@@ -514,6 +525,10 @@ export const useStore = create<AppStore>((set, get) => ({
       fEta:   todayISO(),
       nuiEtr,
       nui:    surveys.length + 1,
+      // Un back-check re-verifica el MISMO hogar → hereda su hogar_id (si el
+      // original no lo tuviera, se autogenera uno nuevo).
+      hogarId: original.hogarId || newHogarId(),
+      metodoSeleccion: original.metodoSeleccion,
       etrPrograma:    settings.etrPrograma,
       etrTipoInst:    settings.etrTipoInst,
       etrSemestre:    settings.etrSemestre ? parseInt(settings.etrSemestre, 10) || null : null,

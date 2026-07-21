@@ -9,6 +9,8 @@ const survey: Survey = {
   fEta: '2026-01-01',
   nuiEtr: 42,
   nui: 7,
+  hogarId: 'H-ABC123',
+  metodoSeleccion: 'Aleatorio simple',
   etrPrograma: 'Medicina',
   etrTipoInst: 'Pública',
   etrSemestre: 8,

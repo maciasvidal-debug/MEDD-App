@@ -69,10 +69,15 @@ describe('surveyMissingProfile', () => {
 // ─── Zod step schemas ──────────────────────────────────────────────────────
 
 describe('step1Schema', () => {
-  const valid = { fEta: '2026-01-10', nuiEtr: 123, nui: 1 }
+  const valid = { fEta: '2026-01-10', nuiEtr: 123, nui: 1, hogarId: 'H-ABC123', metodoSeleccion: 'Aleatorio simple' }
 
   it('accepts a well-formed step', () => {
     expect(step1Schema.safeParse(valid).success).toBe(true)
+  })
+
+  it('requires hogarId and metodoSeleccion (sampling design, Rec. 5)', () => {
+    expect(step1Schema.safeParse({ ...valid, hogarId: '' }).success).toBe(false)
+    expect(step1Schema.safeParse({ ...valid, metodoSeleccion: '' }).success).toBe(false)
   })
 
   it('requires a non-empty interview date in YYYY-MM-DD format', () => {

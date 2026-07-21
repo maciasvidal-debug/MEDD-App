@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Field, SectionHead } from '../ui'
-import { FIELD_HELP } from '../../lib/constants'
+import { FIELD_HELP, OPT } from '../../lib/constants'
 import { step1Schema, type Step1Data } from '../../lib/validators'
 import type { SurveyDraft } from '../../types'
 import { WizardNavBar, scrollToFirstError, type StepProps } from './_shared'
@@ -11,7 +11,10 @@ import { WizardNavBar, scrollToFirstError, type StepProps } from './_shared'
 export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
   const { register, handleSubmit, formState: { errors } } = useForm<Step1Data>({
     resolver: zodResolver(step1Schema),
-    defaultValues: { fEta: draft.fEta, nuiEtr: draft.nuiEtr ?? undefined, nui: draft.nui },
+    defaultValues: {
+      fEta: draft.fEta, nuiEtr: draft.nuiEtr ?? undefined, nui: draft.nui,
+      hogarId: draft.hogarId, metodoSeleccion: draft.metodoSeleccion,
+    },
   })
 
   return (
@@ -35,6 +38,22 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
 
       <Field label="Número de encuesta" hint="Asignado automáticamente">
         <input type="text" value={draft.nui} readOnly {...register('nui', { valueAsNumber: true })} />
+      </Field>
+
+      <Field
+        label="Identificador de hogar"
+        required
+        hint="Autogenerado. Use el MISMO código para varias personas del mismo hogar."
+        error={errors.hogarId?.message}
+      >
+        <input type="text" placeholder="H-XXXXXX" {...register('hogarId')} />
+      </Field>
+
+      <Field label="Método de selección muestral" required error={errors.metodoSeleccion?.message}>
+        <select {...register('metodoSeleccion')}>
+          <option value="">Seleccione…</option>
+          {OPT.metodoSeleccion.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
       </Field>
 
       <WizardNavBar onBack={onBack} showBack={!isFirst} />

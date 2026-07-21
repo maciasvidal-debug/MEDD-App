@@ -53,6 +53,11 @@ export const step1Schema = z.object({
             .int('Debe ser un entero')
             .positive('Debe ser un entero positivo'),
   nui:    z.number(),
+  // Diseño muestral (Rec. 5): identificador de hogar obligatorio (autogenerado
+  // por el asistente, editable) y método de selección obligatorio, para dejar el
+  // agrupamiento y el diseño identificables desde la captura.
+  hogarId:         z.string().min(1, 'El identificador de hogar es obligatorio'),
+  metodoSeleccion: z.string().min(1, 'Seleccione el método de selección muestral'),
 })
 
 // ─── Step 2 — Demografía ─────────────────────────────────────────────────

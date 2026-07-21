@@ -67,6 +67,20 @@ describe('toCSV', () => {
     expect(toCSV([]).trim().split('\n')[0]).toContain('ciudad,departamento,dir')
   })
 
+  it('exports the household id and sampling method columns (Rec. 5)', () => {
+    const header = toCSV([]).trim().split('\n')[0]
+    expect(header).toContain('hogarId')
+    expect(header).toContain('metodoSeleccion')
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 2, hogarId: 'H-ABC123',
+        metodoSeleccion: 'Aleatorio simple', medications: [] },
+    ] as unknown as Survey[]
+    const [h, row] = toCSV(surveys).trim().split('\n')
+    const cols = h.split(',')
+    expect(row.split(',')[cols.indexOf('hogarId')]).toBe('H-ABC123')
+    expect(row.split(',')[cols.indexOf('metodoSeleccion')]).toBe('Aleatorio simple')
+  })
+
   it('packs all stored products into the single "medications" column', () => {
     const header = toCSV([]).trim().split('\n')[0].split(',')
     // Exactly one medications column — not five flat sub-field columns.
