@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toCSV, toCodebookCSV, assertVersioned } from './csv'
+import { toCSV, toAnalyticalCSV, toCodebookCSV, assertVersioned, encuestadorCluster } from './csv'
 import type { Survey } from '../types'
 
 describe('toCSV', () => {
@@ -139,6 +139,45 @@ describe('versioning guard (Rec. 1)', () => {
       { id: 'a', nui: 1, medications: [] }, // instrumentVersion ausente
     ] as unknown as Survey[]
     expect(() => toCSV(surveys)).toThrow(/Export bloqueado/i)
+  })
+})
+
+describe('toAnalyticalCSV — de-identified export (Rec. 6)', () => {
+  const surveys = [
+    { id: 'a', nui: 1, instrumentVersion: 2, nuiEtr: 1012345678,
+      dir: 'Calle 1 # 2-3', prbSalud: 'hipertensión', hogarId: 'H-ABC123', medications: [] },
+  ] as unknown as Survey[]
+
+  it('omits the exact address (dir) column entirely', () => {
+    const header = toAnalyticalCSV(surveys).trim().split('\n')[0].split(',')
+    expect(header).not.toContain('dir')
+  })
+
+  it('pseudonymizes nuiEtr into a stable encuestadorCluster code (raw id absent)', () => {
+    const [header, row] = toAnalyticalCSV(surveys).trim().split('\n')
+    const cols = header.split(',')
+    expect(cols).toContain('encuestadorCluster')
+    expect(cols).not.toContain('nuiEtr')
+    const cell = row.split(',')[cols.indexOf('encuestadorCluster')]
+    expect(cell).toBe(encuestadorCluster(1012345678))
+    expect(cell).toMatch(/^E-/)
+    expect(row).not.toContain('1012345678') // raw surveyor id never appears
+  })
+
+  it('is deterministic and collision-stable per surveyor', () => {
+    expect(encuestadorCluster(1012345678)).toBe(encuestadorCluster(1012345678))
+    expect(encuestadorCluster(1)).not.toBe(encuestadorCluster(2))
+    expect(encuestadorCluster(null)).toBe('')
+  })
+
+  it('keeps analytical variables incl. free-text health (no loss of analytical power)', () => {
+    expect(toAnalyticalCSV(surveys)).toContain('hipertensión')
+    expect(toAnalyticalCSV(surveys).trim().split('\n')[0]).toContain('prbSalud')
+  })
+
+  it('still enforces the version guard', () => {
+    const bad = [{ id: 'x', nui: 1, medications: [] }] as unknown as Survey[]
+    expect(() => toAnalyticalCSV(bad)).toThrow(/Export bloqueado/i)
   })
 })
 

@@ -60,33 +60,75 @@ export function assertVersioned(surveys: Survey[]): void {
   }
 }
 
+// duracion_s: para-data interview duration in seconds (createdAt − startedAt),
+// a derived QC field for detecting implausibly fast (fabricated) interviews.
+function durationCell(s: Survey): string {
+  const durSec = s.startedAt && s.createdAt
+    ? Math.round((new Date(s.createdAt).getTime() - new Date(s.startedAt).getTime()) / 1000)
+    : null
+  return durSec != null && durSec >= 0 ? String(durSec) : ''
+}
+
+// medications packed into a SINGLE cell: every stored product joined by '|', the
+// five fields per product by ';' (nmMed;dci;concMed;undConc;fVto). Keeps the
+// header and every data row at the same column count.
+function medicationsCell(s: Survey): string {
+  return s.medications?.length
+    ? s.medications.map(m =>
+        [m.nmMed, m.dci, m.concMed, m.undConc, m.fVto].map(escapeCSV).join(';'),
+      ).join('|')
+    : ''
+}
+
+// Pseudónimo estable y no trivialmente reversible del identificador de
+// encuestador, para el export analítico: preserva el CLÚSTER (mismo encuestador
+// → mismo código, necesario para modelar el efecto-encuestador) sin exponer el
+// número crudo (que en el piloto podía ser un identificador personal). Hash FNV-1a.
+export function encuestadorCluster(nuiEtr: number | null): string {
+  if (nuiEtr == null) return ''
+  let h = 2166136261
+  const str = String(nuiEtr)
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return 'E-' + (h >>> 0).toString(36).toUpperCase().padStart(7, '0').slice(0, 7)
+}
+
 export function toCSV(surveys: Survey[]): string {
   // Rec. 1: rechaza de entrada cualquier registro sin versión declarada.
   assertVersioned(surveys)
-  // duracion_s: para-data interview duration in seconds (createdAt − startedAt),
-  // a derived QC field for detecting implausibly fast (fabricated) interviews.
-  //
-  // medications is a SINGLE column: every stored product is packed into one cell
-  // (products separated by '|', the five fields per product by ';', in the order
-  // nmMed;dci;concMed;undConc;fVto). This mirrors the `medications` codebook entry
-  // and keeps the header and every data row at the same column count — emitting
-  // the five sub-fields as separate headers (as before) made the header wider
-  // than the rows, shifting the medication data under the wrong column.
-  const medHeader = 'medications'
-  const header = [...CSV_COLUMNS, 'duracion_s', ...MOTIVE_COLUMNS, medHeader].join(',')
+  const header = [...CSV_COLUMNS, 'duracion_s', ...MOTIVE_COLUMNS, 'medications'].join(',')
   const rows = surveys.map(s => {
     const base = CSV_COLUMNS.map(col => escapeCSV(s[col])).join(',')
-    const durSec = s.startedAt && s.createdAt
-      ? Math.round((new Date(s.createdAt).getTime() - new Date(s.startedAt).getTime()) / 1000)
-      : null
-    const dur = durSec != null && durSec >= 0 ? String(durSec) : ''
     const motives = MOTIVE_COLUMNS.map(col => escapeCSV(s[col])).join(',')
-    const meds = s.medications?.length
-      ? s.medications.map(m =>
-          [m.nmMed, m.dci, m.concMed, m.undConc, m.fVto].map(escapeCSV).join(';'),
-        ).join('|')
-      : ''
-    return `${base},${dur},${motives},${escapeCSV(meds)}`
+    return `${base},${durationCell(s)},${motives},${escapeCSV(medicationsCell(s))}`
+  })
+  return '﻿' + [header, ...rows].join('\n')
+}
+
+/**
+ * Export analítico DES-IDENTIFICADO (Sec. 7 Rec. 6 · Habeas Data, Ley 1581).
+ * Mejores prácticas de minimización SIN restar poder analítico:
+ *   - Omite `dir` (dirección exacta): localizador directo de máxima
+ *     reidentificación y de escaso valor analítico (la geografía ya está en
+ *     ciudad/departamento/estrato).
+ *   - Seudonimiza `nuiEtr` → `encuestadorCluster` (código estable): conserva el
+ *     clúster de encuestador para el modelado del efecto-encuestador sin exponer
+ *     el identificador personal.
+ *   - CONSERVA el resto de variables analíticas, incluido el texto de salud
+ *     (prbSalud, ctoDispVc, obs…) que alimenta el análisis cualitativo — para no
+ *     restar poder analítico. El riesgo residual del texto libre se documenta.
+ * Cada fila mantiene versión, hogar_id y clúster limpios (denominadores listos).
+ */
+const ANALYTICAL_COLUMNS = CSV_COLUMNS.filter(c => c !== 'dir')
+export function toAnalyticalCSV(surveys: Survey[]): string {
+  assertVersioned(surveys)
+  const headerCols = ANALYTICAL_COLUMNS.map(c => (c === 'nuiEtr' ? 'encuestadorCluster' : c))
+  const header = [...headerCols, 'duracion_s', ...MOTIVE_COLUMNS, 'medications'].join(',')
+  const rows = surveys.map(s => {
+    const base = ANALYTICAL_COLUMNS
+      .map(col => (col === 'nuiEtr' ? escapeCSV(encuestadorCluster(s.nuiEtr)) : escapeCSV(s[col])))
+      .join(',')
+    const motives = MOTIVE_COLUMNS.map(col => escapeCSV(s[col])).join(',')
+    return `${base},${durationCell(s)},${motives},${escapeCSV(medicationsCell(s))}`
   })
   return '﻿' + [header, ...rows].join('\n')
 }
