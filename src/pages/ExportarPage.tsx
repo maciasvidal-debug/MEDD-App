@@ -16,8 +16,15 @@ export function ExportarPage() {
   // (especially on mobile, where it drops silently into the download tray), so
   // confirm the action fired and how many records it covered.
   function exportCSV() {
-    downloadBlob(toCSV(surveys), `MEDD_${dateTag()}.csv`, 'text/csv;charset=utf-8')
-    pushToast(`CSV exportado · ${n} registro${n !== 1 ? 's' : ''}`, 'success')
+    // toCSV aplica la barrera de versión (Rec. 1): si un registro llegara sin
+    // versión declarada, lanza en vez de emitir un dataset ambiguo. Se surfacea
+    // como error en lugar de descargar dato dudoso o romper la app.
+    try {
+      downloadBlob(toCSV(surveys), `MEDD_${dateTag()}.csv`, 'text/csv;charset=utf-8')
+      pushToast(`CSV exportado · ${n} registro${n !== 1 ? 's' : ''}`, 'success')
+    } catch (e) {
+      pushToast(e instanceof Error ? e.message : 'No se pudo exportar el CSV', 'error')
+    }
   }
   function exportCodebook() {
     downloadBlob(toCodebookCSV(), `MEDD_codebook_${dateTag()}.csv`, 'text/csv;charset=utf-8')

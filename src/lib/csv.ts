@@ -37,7 +37,32 @@ function escapeCSV(value: unknown): string {
     : str
 }
 
+/**
+ * Barrera de integridad de versión (Sec. 7 Rec. 1): el export NO debe emitir un
+ * dataset con `instrumentVersion` nulo — el defecto dominante del piloto fue
+ * exactamente eso (105/114 nulos, versiones mezcladas sin declarar). Los datos
+ * reales llegan normalizados en la frontera de lectura (getAllSurveys / fromRow),
+ * así que en producción esto nunca dispara; es una red de seguridad que hace
+ * fallar rápido si un registro sin versión se colara hasta el export.
+ *
+ * No impide MEZCLAR versiones: cada fila declara la suya en la columna
+ * `instrumentVersion`, así que las versiones quedan separadas por columna con la
+ * versión declarada (lo que la recomendación admite explícitamente).
+ */
+export function assertVersioned(surveys: Survey[]): void {
+  const sinVersion = surveys.filter(s => s.instrumentVersion == null)
+  if (sinVersion.length > 0) {
+    throw new Error(
+      `Export bloqueado: ${sinVersion.length} registro(s) sin versión de instrumento ` +
+      `(instrumentVersion nulo). Todo registro debe declarar su versión (1 ó 2) ` +
+      `antes de exportar. IDs: ${sinVersion.map(s => s.id).join(', ')}`,
+    )
+  }
+}
+
 export function toCSV(surveys: Survey[]): string {
+  // Rec. 1: rechaza de entrada cualquier registro sin versión declarada.
+  assertVersioned(surveys)
   // duracion_s: para-data interview duration in seconds (createdAt − startedAt),
   // a derived QC field for detecting implausibly fast (fabricated) interviews.
   //

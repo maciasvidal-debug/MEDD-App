@@ -107,7 +107,10 @@ export function fromRow(row: SupabaseRow): Survey {
     startedAt:   (row.started_at as string) ?? undefined,
     dataEnv:     (row.data_env as DataEnv) ?? undefined,
     backcheckOf: (row.backcheck_of as string) ?? undefined,
-    instrumentVersion: (row.instrument_version as number) ?? undefined,
+    // Invariante Rec. 1: todo registro lleva versión. Un registro remoto sin
+    // versión es, por definición, del instrumento v1 (previo a la batería de
+    // motivos) → se normaliza a 1, nunca undefined. Espeja el back-fill 017.
+    instrumentVersion: (row.instrument_version as number) ?? 1,
     fEta:        (row.f_eta as string)  ?? '',
     nuiEtr:      row.nui_etr as number | null,
     nui:         row.nui as number,

@@ -177,7 +177,7 @@ export const CODEBOOK: CodebookEntry[] = [
   { variable: 'startedAt',     etiqueta: 'Para-data: inicio de la captura (apertura del asistente)', tipo: 'datetime ISO', valores: '— (vacío en registros previos)' },
   { variable: 'dataEnv',       etiqueta: 'Ambiente de datos (piloto vs producción)', tipo: 'categórico', valores: 'pilot; prod' },
   { variable: 'duracion_s',    etiqueta: 'Para-data: duración de la entrevista en segundos (createdAt − startedAt)', tipo: 'entero', valores: '≥ 0 (vacío si no hay startedAt)' },
-  { variable: 'instrumentVersion', etiqueta: 'Versión del instrumento al capturar (1 = sin batería de motivos)', tipo: 'entero', valores: '1; 2 (vacío = 1)' },
+  { variable: 'instrumentVersion', etiqueta: 'Versión del instrumento al capturar (1 = sin batería de motivos)', tipo: 'entero', valores: '1; 2 (obligatorio, no nulo)' },
   { variable: 'motNoConsumo',      etiqueta: 'Motivos de no consumo (selección múltiple)', tipo: 'multivalor', valores: 'No terminó el tratamiento; Mejoró / cedieron los síntomas; Efectos adversos; Cambio de tratamiento médico; Sobró de la dosis; Automedicación; Fallecimiento de un familiar; Otro' },
   { variable: 'motNoConsumoOtro',  etiqueta: 'Motivo de no consumo — otro (texto)', tipo: 'texto', valores: '—' },
   { variable: 'motVencimiento',    etiqueta: 'Razones de acumulación/vencimiento (selección múltiple)', tipo: 'multivalor', valores: 'Olvido; Acopio preventivo; Compró de más; Dosis sobrante; No sabía dónde desecharlos; Otro' },

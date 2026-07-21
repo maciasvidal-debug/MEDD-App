@@ -62,7 +62,8 @@ describe('sync mapping toRow/fromRow', () => {
   it('round-trips every business field (fromRow ∘ toRow) and marks it synced', () => {
     const back = fromRow(toRow(survey, 'user-xyz'))
     // syncStatus is always normalized to 'synced' on the way back from remote.
-    expect(back).toEqual({ ...survey, syncStatus: 'synced' })
+    // The version-less fixture also normalizes to v1 (Rec. 1 non-null invariant).
+    expect(back).toEqual({ ...survey, instrumentVersion: 1, syncStatus: 'synced' })
   })
 
   it('maps empty strings to null in the row (clean storage) and back to empty strings', () => {
@@ -98,12 +99,15 @@ describe('sync mapping toRow/fromRow', () => {
     expect(fromRow(toRow(survey, 'u')).backcheckOf).toBeUndefined()
   })
 
-  it('round-trips the instrument version (absent → null/undefined)', () => {
+  it('round-trips the instrument version; a null row normalizes to v1 (Rec. 1)', () => {
     const v2 = { ...survey, instrumentVersion: 2 }
     expect(toRow(v2, 'u').instrument_version).toBe(2)
     expect(fromRow(toRow(v2, 'u')).instrumentVersion).toBe(2)
+    // Write side still sends null when the local record has no version…
     expect(toRow(survey, 'u').instrument_version).toBeNull()
-    expect(fromRow(toRow(survey, 'u')).instrumentVersion).toBeUndefined()
+    // …but the read side enforces the non-null invariant: a remote row without a
+    // version is a v1 record by definition, so it comes back as 1, never undefined.
+    expect(fromRow(toRow(survey, 'u')).instrumentVersion).toBe(1)
   })
 
   it('round-trips the motive arrays and disposal fields', () => {
@@ -248,7 +252,9 @@ describe('fromRow defensive reads from a raw Supabase row', () => {
     expect(back.startedAt).toBeUndefined()
     expect(back.dataEnv).toBeUndefined()
     expect(back.backcheckOf).toBeUndefined()
-    expect(back.instrumentVersion).toBeUndefined()
+    // …except instrumentVersion, which enforces the non-null invariant (Rec. 1):
+    // an absent version means a v1 record, so it reads back as 1, never undefined.
+    expect(back.instrumentVersion).toBe(1)
     expect(back.departamento).toBeUndefined()
 
     // Anything materialized from the server is, by definition, synced.
