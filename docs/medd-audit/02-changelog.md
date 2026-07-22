@@ -60,14 +60,16 @@ esquema resultante y valida:
 | E | 6 | `toAnalyticalCSV` des-identificado (omite `dir`, seudonimiza `nuiEtr`); nota de tamaño muestral | — | export des-identificado |
 | F | 4 | `estado_vencimiento` derivado por producto en el export; ampliación curada (no oficial) de ATC (grupos L/V, +12 subgrupos, ~120 reglas DCI) | — | clasificación ATC nueva; estado en export |
 | Fase 4 | — | Parser `parseSurveysCSV` + fixture + test de regresión del CSV histórico | — | regresión histórica (8 tests) |
+| Analítica | 5 · 6 | `v_product_metrics` expone `nui_etr`, `hogar_id`, `metodo_seleccion`, `instrument_version` y `departamento`, para modelar el agrupamiento (ICC) y separar denominadores por versión desde SQL (rol investigador) | `019_metrics_view_clustering.sql` | vista (sin test JS) |
 
 ### Migraciones — idempotencia y rollback
 
 Todas usan guardas (`add column if not exists`, chequeo de `pg_constraint`,
-back-fill solo sobre NULLs) y son seguras de re-ejecutar. Rollback documentado
-en cada archivo (`016`–`018`). **No se aplicaron a ningún proyecto Supabase en
-vivo**: son SQL versionado; su despliegue es un paso de operaciones (aplicar en
-orden 016→017→018, antes de desplegar el frontend, para no romper el upsert).
+back-fill solo sobre NULLs; la vista `019` es `create or replace`) y son seguras
+de re-ejecutar. Rollback documentado en cada archivo (`016`–`019`). **No se
+aplicaron a ningún proyecto Supabase en vivo**: son SQL versionado; su despliegue
+es un paso de operaciones (aplicar en orden 016→017→018→019, antes de desplegar
+el frontend, para no romper el upsert).
 
 ## Cumplimiento (Habeas Data, Ley 1581)
 
