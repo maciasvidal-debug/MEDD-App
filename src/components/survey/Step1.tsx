@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Field, SectionHead } from '../ui'
-import { FIELD_HELP, OPT } from '../../lib/constants'
+import { FIELD_HELP } from '../../lib/constants'
 import { step1Schema, type Step1Data } from '../../lib/validators'
 import type { SurveyDraft } from '../../types'
 import { WizardNavBar, scrollToFirstError, type StepProps } from './_shared'
@@ -13,7 +13,7 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
     resolver: zodResolver(step1Schema),
     defaultValues: {
       fEta: draft.fEta, nuiEtr: draft.nuiEtr ?? undefined, nui: draft.nui,
-      hogarId: draft.hogarId, metodoSeleccion: draft.metodoSeleccion,
+      hogarId: draft.hogarId,
     },
   })
 
@@ -49,12 +49,9 @@ export function Step1({ draft, onNext, onBack, isFirst }: StepProps) {
         <input type="text" placeholder="H-XXXXXX" {...register('hogarId')} />
       </Field>
 
-      <Field label="Método de selección muestral" required error={errors.metodoSeleccion?.message}>
-        <select {...register('metodoSeleccion')}>
-          <option value="">Seleccione…</option>
-          {OPT.metodoSeleccion.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-      </Field>
+      {/* El método de selección muestral NO se captura aquí: lo define el
+          investigador antes del estudio (constante de estudio/ola), no el
+          encuestador por encuesta. */}
 
       <WizardNavBar onBack={onBack} showBack={!isFirst} />
     </form>

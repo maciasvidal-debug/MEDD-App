@@ -154,7 +154,7 @@ export const CODEBOOK: CodebookEntry[] = [
   { variable: 'nui',           etiqueta: 'Número de encuesta', tipo: 'entero', valores: 'consecutivo' },
   { variable: 'nuiEtr',        etiqueta: 'ID del encuestador (clúster de encuestador)', tipo: 'entero', valores: '—' },
   { variable: 'hogarId',       etiqueta: 'Identificador de hogar (clúster de hogar; co-residentes comparten código)', tipo: 'texto', valores: '— (vacío en históricos)' },
-  { variable: 'metodoSeleccion', etiqueta: 'Método de selección muestral (diseño)', tipo: 'categórico', valores: 'Aleatorio simple; Sistemático; Por conglomerados; Por conveniencia; Otro (vacío en históricos)' },
+  { variable: 'metodoSeleccion', etiqueta: 'Método de selección muestral (constante de estudio; la fija el investigador antes de la ola, no el encuestador)', tipo: 'categórico', valores: 'Aleatorio simple; Sistemático; Por conglomerados; Por conveniencia; Otro (vacío = no fijado)' },
   { variable: 'etrPrograma',   etiqueta: 'Programa académico del encuestador', tipo: 'categórico', valores: 'Medicina; Enfermería; Regencia en Farmacia; Química Farmacéutica; Odontología; Bacteriología; Nutrición y Dietética; Otra' },
   { variable: 'etrTipoInst',   etiqueta: 'Tipo de institución del encuestador', tipo: 'categórico', valores: 'Pública; Privada' },
   { variable: 'etrSemestre',   etiqueta: 'Semestre académico del encuestador', tipo: 'entero', valores: '1–12' },

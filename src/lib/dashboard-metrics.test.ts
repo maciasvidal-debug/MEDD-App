@@ -3,7 +3,7 @@ import {
   buildRetention, buildEstratoAssociation, buildSurveyorEffect, buildSurveyorQC,
   buildMedicationStats, buildMotiveStats, buildDisposalStats, buildClassMotiveCross,
   buildBackcheckAgreement, buildEstratoAdjusted,
-  buildHouseholdClustering, buildSamplingMethod,
+  buildHouseholdClustering,
 } from './dashboard-metrics'
 import type { Survey, Medication, EtrPrograma } from '../types'
 
@@ -272,22 +272,3 @@ describe('buildHouseholdClustering (Rec. 5)', () => {
   })
 })
 
-describe('buildSamplingMethod (Rec. 5)', () => {
-  it('returns null when no survey declares a sampling method', () => {
-    expect(buildSamplingMethod([mkSurvey({ metodoSeleccion: '' })])).toBeNull()
-  })
-
-  it('tallies the declared methods in catalogue order', () => {
-    const r = buildSamplingMethod([
-      mkSurvey({ metodoSeleccion: 'Aleatorio simple' }),
-      mkSurvey({ metodoSeleccion: 'Aleatorio simple' }),
-      mkSurvey({ metodoSeleccion: 'Por conveniencia' }),
-      mkSurvey({ metodoSeleccion: '' }),
-    ])!
-    expect(r.n).toBe(3)
-    expect(r.byMethod).toEqual([
-      { name: 'Aleatorio simple', value: 2 },
-      { name: 'Por conveniencia', value: 1 },
-    ])
-  })
-})

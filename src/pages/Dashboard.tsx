@@ -20,11 +20,11 @@ import {
   buildRetention, buildEstratoAssociation, buildSurveyorEffect, buildSurveyorQC,
   buildMedicationStats, buildMotiveStats, buildDisposalStats, buildClassMotiveCross,
   buildBackcheckAgreement, buildEstratoAdjusted, FAST_SECONDS,
-  buildHouseholdClustering, buildSamplingMethod,
+  buildHouseholdClustering,
   type DaysSummary, type AssocGroup, type Association, type SurveyorEffect,
   type SurveyorQC, type MedStats, type MotiveStats, type DisposalStats,
   type ClassMotiveCross, type BackcheckAgreement, type AdjustedAssoc,
-  type HouseholdClustering, type SamplingMethod,
+  type HouseholdClustering,
 } from '../lib/dashboard-metrics'
 import type { Survey } from '../types'
 
@@ -308,7 +308,6 @@ export default function DashboardPage() {
   const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
   const surveyorQC = useMemo(() => buildSurveyorQC(data), [data])
   const household = useMemo(() => buildHouseholdClustering(data), [data])
-  const samplingMethod = useMemo(() => buildSamplingMethod(data), [data])
   // Product-level (medications[]) aggregation — the analytics that were missing.
   const medStats = useMemo(() => buildMedicationStats(data), [data])
   // Motives battery (instrument v2) — denominator scoped to records that were
@@ -521,9 +520,10 @@ export default function DashboardPage() {
         {/* Control de calidad operativo por encuestador (para-data / antifraude) */}
         {isInvestigador && surveyorQC && <SurveyorQCCard qc={surveyorQC} />}
 
-        {/* Diseño muestral: agrupamiento por hogar y método de selección (Rec. 5) */}
+        {/* Diseño muestral: agrupamiento por hogar (Rec. 5). El método de
+            selección es constante de estudio (investigador), no se grafica. */}
         {isInvestigador && household && (
-          <HouseholdClusteringCard h={household} method={samplingMethod} />
+          <HouseholdClusteringCard h={household} />
         )}
 
         {/* Integridad: vencidos declarados sin detalle de producto vencido */}
@@ -1071,7 +1071,7 @@ function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
 
 // ─── Household clustering + sampling design (Rec. 5) ────────────────────────
 
-function HouseholdClusteringCard({ h, method }: { h: HouseholdClustering; method: SamplingMethod | null }) {
+function HouseholdClusteringCard({ h }: { h: HouseholdClustering }) {
   const covPct = Math.round(h.coverage * 100)
   const noHogar = h.nWithHogar === 0
   const iccHigh = h.icc !== null && h.icc.icc >= 0.05
@@ -1083,7 +1083,7 @@ function HouseholdClusteringCard({ h, method }: { h: HouseholdClustering; method
   ]
   return (
     <Card style={{ marginBottom: 14 }}>
-      <SectionLabel help={STAT_GLOSSARY.icc}>Diseño muestral — hogar y método</SectionLabel>
+      <SectionLabel help={STAT_GLOSSARY.icc}>Diseño muestral — agrupamiento por hogar</SectionLabel>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
         El agrupamiento por <strong>hogar</strong> sólo es modelable cuando el dato trae{' '}
         <code>hogar_id</code>. Este panel mide la <strong>cobertura</strong> del identificador
@@ -1119,14 +1119,6 @@ function HouseholdClusteringCard({ h, method }: { h: HouseholdClustering; method
         </div>
       )}
 
-      {method && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 6 }}>
-            Método de selección declarado (n = {method.n})
-          </div>
-          <DistBar data={method.byMethod} dataKey="value" color={CHART.teal} yWidth={150} barName="Encuestas" />
-        </div>
-      )}
     </Card>
   )
 }
