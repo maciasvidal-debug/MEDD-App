@@ -1,5 +1,6 @@
 import type { Survey } from '../types'
 import { CODEBOOK } from './constants'
+import { productMetrics } from './date'
 
 // CSV serialization for data export, in codebook column order, plus the
 // self-describing data-dictionary export.
@@ -70,13 +71,20 @@ function durationCell(s: Survey): string {
 }
 
 // medications packed into a SINGLE cell: every stored product joined by '|', the
-// five fields per product by ';' (nmMed;dci;concMed;undConc;fVto). Keeps the
-// header and every data row at the same column count.
+// SIX fields per product by ';' (nmMed;dci;concMed;undConc;fVto;estadoVencimiento).
+// Keeps the header and every data row at the same column count.
+//
+// estadoVencimiento (Rec. 4) es DERIVADO contra la fecha de la entrevista
+// (F_ETA) — no se re-calcula a mano en el análisis: 'vencido' si F_ETA > F_VTO,
+// 'vigente' si no, '' cuando falta F_VTO o F_ETA (indeterminado).
 function medicationsCell(s: Survey): string {
   return s.medications?.length
-    ? s.medications.map(m =>
-        [m.nmMed, m.dci, m.concMed, m.undConc, m.fVto].map(escapeCSV).join(';'),
-      ).join('|')
+    ? s.medications.map(m => {
+        const estado = (m.fVto && s.fEta)
+          ? (productMetrics(s.fEta, s.fDisp, m).isExpired ? 'vencido' : 'vigente')
+          : ''
+        return [m.nmMed, m.dci, m.concMed, m.undConc, m.fVto, estado].map(escapeCSV).join(';')
+      }).join('|')
     : ''
 }
 

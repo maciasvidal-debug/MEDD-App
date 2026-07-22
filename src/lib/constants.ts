@@ -200,10 +200,11 @@ export const CODEBOOK: CodebookEntry[] = [
   { variable: 'dispFinalOtro',     etiqueta: 'Conducta de disposición — otro (texto)', tipo: 'texto', valores: '—' },
   { variable: 'conocePuntos',      etiqueta: 'Conoce puntos de recolección posconsumo', tipo: 'binario', valores: 'Sí; No (vacío = no preguntado)' },
   { variable: 'cualPunto',         etiqueta: 'Cuál punto de recolección conoce', tipo: 'texto', valores: '—' },
-  { variable: 'medications',   etiqueta: 'Medicamentos almacenados (lista; productos separados por |, campos por ;)', tipo: 'compuesto', valores: 'nmMed;dci;concMed;undConc;fVto' },
+  { variable: 'medications',   etiqueta: 'Medicamentos almacenados (lista; productos separados por |, campos por ;)', tipo: 'compuesto', valores: 'nmMed;dci;concMed;undConc;fVto;estadoVencimiento' },
   { variable: '  nmMed',       etiqueta: '— Nombre comercial del medicamento', tipo: 'texto', valores: '—' },
   { variable: '  dci',         etiqueta: '— Principio activo (DCI)', tipo: 'texto', valores: '—' },
   { variable: '  concMed',     etiqueta: '— Concentración', tipo: 'decimal', valores: '≥ 0' },
   { variable: '  undConc',     etiqueta: '— Unidad de concentración', tipo: 'categórico', valores: 'mcg; mg; g; UI; %' },
   { variable: '  fVto',        etiqueta: '— Fecha de vencimiento', tipo: 'fecha', valores: 'AAAA-MM-DD' },
+  { variable: '  estadoVencimiento', etiqueta: '— Estado de vencimiento derivado contra F_ETA', tipo: 'categórico', valores: 'vencido; vigente; (vacío = sin F_VTO/F_ETA)' },
 ]

@@ -52,15 +52,25 @@ describe('toCSV', () => {
     expect(row.split(',')[ci]).toBe('Sí')
   })
 
-  it('serialises multiple medications with ; field and | record separators', () => {
+  it('serialises multiple medications with ; field and | record separators, incl. derived expiry state', () => {
     const surveys = [
-      { id: 'a', nui: 1, instrumentVersion: 2, medications: [
-        { nmMed: 'A', dci: 'x', concMed: 500, undConc: 'mg', fVto: '2027-01-01' },
-        { nmMed: 'B', dci: 'y', concMed: 250, undConc: 'mg', fVto: '2027-02-01' },
+      { id: 'a', nui: 1, instrumentVersion: 2, fEta: '2026-01-01', medications: [
+        { nmMed: 'A', dci: 'x', concMed: 500, undConc: 'mg', fVto: '2027-01-01' }, // future → vigente
+        { nmMed: 'B', dci: 'y', concMed: 250, undConc: 'mg', fVto: '2025-02-01' }, // past → vencido
       ] },
     ] as unknown as Survey[]
     const dataRow = toCSV(surveys).trim().split('\n')[1]
-    expect(dataRow).toContain('A;x;500;mg;2027-01-01|B;y;250;mg;2027-02-01')
+    expect(dataRow).toContain('A;x;500;mg;2027-01-01;vigente|B;y;250;mg;2025-02-01;vencido')
+  })
+
+  it('leaves estadoVencimiento blank when fVto or fEta is missing (Rec. 4)', () => {
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 2, fEta: '2026-01-01', medications: [
+        { nmMed: 'C', dci: 'z', concMed: null, undConc: '', fVto: '' }, // sin fVto → indeterminado
+      ] },
+    ] as unknown as Survey[]
+    const dataRow = toCSV(surveys).trim().split('\n')[1]
+    expect(dataRow).toContain('C;z;;;;') // seis subcampos, estado vacío
   })
 
   it('exports departamento as its own column right after ciudad', () => {
