@@ -288,24 +288,9 @@ export function buildHouseholdClustering(surveys: Survey[]): HouseholdClustering
   }
 }
 
-// ─── Sampling-method distribution (metodoSeleccion) — Rec. 5 ────────────────
-// Deja el diseño muestral visible. Null cuando ningún registro declara método
-// (p. ej. el histórico del piloto), de modo que su tarjeta simplemente no aparece.
-export interface SamplingMethod { n: number; byMethod: Array<{ name: string; value: number }> }
-
-export function buildSamplingMethod(surveys: Survey[]): SamplingMethod | null {
-  const counts = new Map<string, number>()
-  for (const s of surveys) {
-    const m = (s.metodoSeleccion ?? '').trim()
-    if (m) counts.set(m, (counts.get(m) ?? 0) + 1)
-  }
-  const n = Array.from(counts.values()).reduce((a, b) => a + b, 0)
-  if (n === 0) return null
-  const byMethod = OPT.metodoSeleccion
-    .map(name => ({ name, value: counts.get(name) ?? 0 }))
-    .filter(x => x.value > 0)
-  return { n, byMethod }
-}
+// Nota: el método de selección muestral NO se distribuye por encuesta: es una
+// constante de estudio que fija el investigador antes de la recolección (no un
+// campo del encuestador), así que no tiene una métrica de dashboard por-registro.
 
 // ─── Product-level analytics (medications[]) ────────────────────────────────
 

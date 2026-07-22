@@ -130,5 +130,9 @@ e incompleta): úsese con análisis de sensibilidad con/sin `HH-`. Idempotente
    incidentales (`scrubFreeText`: correos, cédulas/teléfonos). Queda pendiente
    **revisión humana de nombres** antes de difundir a terceros (no automatizable
    con alta precisión).
-5. **Método de selección «Otro»** no captura texto libre asociado (se dejó como
-   opción simple para acotar el incremento); ampliar si se requiere el detalle.
+5. **Método de selección muestral** se **retiró de la captura del encuestador**
+   (es una constante de estudio que fija el investigador antes de la ola, no una
+   elección por encuesta). La columna `metodo_seleccion` permanece en el esquema
+   para que el investigador la fije a nivel de estudio/ola. **Pendiente**: un
+   mecanismo para que el investigador la establezca (config de estudio o
+   `UPDATE` por ola) — se puede añadir cuando se defina.

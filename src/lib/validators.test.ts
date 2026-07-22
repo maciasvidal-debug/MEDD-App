@@ -69,15 +69,17 @@ describe('surveyMissingProfile', () => {
 // ─── Zod step schemas ──────────────────────────────────────────────────────
 
 describe('step1Schema', () => {
-  const valid = { fEta: '2026-01-10', nuiEtr: 123, nui: 1, hogarId: 'H-ABC123', metodoSeleccion: 'Aleatorio simple' }
+  const valid = { fEta: '2026-01-10', nuiEtr: 123, nui: 1, hogarId: 'H-ABC123' }
 
   it('accepts a well-formed step', () => {
     expect(step1Schema.safeParse(valid).success).toBe(true)
   })
 
-  it('requires hogarId and metodoSeleccion (sampling design, Rec. 5)', () => {
+  it('requires hogarId (household cluster, Rec. 5) but NOT the sampling method', () => {
     expect(step1Schema.safeParse({ ...valid, hogarId: '' }).success).toBe(false)
-    expect(step1Schema.safeParse({ ...valid, metodoSeleccion: '' }).success).toBe(false)
+    // El método muestral es una constante de estudio fijada por el investigador,
+    // no un campo del encuestador → no se valida en la captura.
+    expect(step1Schema.safeParse({ ...valid, metodoSeleccion: '' }).success).toBe(true)
   })
 
   it('requires a non-empty interview date in YYYY-MM-DD format', () => {
