@@ -90,6 +90,17 @@ restaurado), y la vista expone las 5 columnas nuevas**.
 > orden recomendado; mientras tanto las capturas nuevas quedaban en local y
 > reintentaban el sync (sin pérdida de dato). `018` restauró el sync.
 
+### Migración 020 — back-fill heurístico de `hogar_id` en históricos
+
+Aplicada a producción el 2026-07-22. Infiere hogares en el dato del piloto
+agrupando filas con la **misma dirección + municipio normalizados** (grupos de
+≥2 co-residentes; singletons quedan NULL). El id inferido lleva prefijo **`HH-`**
+(vs `H-` capturado) para poder distinguirlo/excluirlo (`hogar_id like 'HH-%'`).
+Resultado en prod: **38 filas en 14 hogares** (mayor = 5); 76 sin hogar. Es una
+**inferencia aproximada** (riesgo de fusionar dos hogares con dirección idéntica
+e incompleta): úsese con análisis de sensibilidad con/sin `HH-`. Idempotente
+(solo NULL) y reversible (`update … set hogar_id=null where hogar_id like 'HH-%'`).
+
 ## Cumplimiento (Habeas Data, Ley 1581)
 
 - Export analítico minimizado (mejores prácticas, sin restar poder analítico):
@@ -106,11 +117,12 @@ restaurado), y la vista expone las 5 columnas nuevas**.
 1. **ATC oficial.** `atc.ts` es un mapeo **curado, no oficial** (documentado como
    tal). Para uso regulatorio, sustituir por un diccionario ATC de la OMS
    versionado y verificable cuando se disponga de licencia/fuente.
-2. **Aplicación de migraciones.** Aplicar `016`–`018` al proyecto Supabase del
-   estudio (orden y timing indicados arriba). No se hizo automáticamente.
-3. **`hogar_id` histórico.** Quedó NULL en el piloto (decisión aprobada). Si se
-   desea agrupar retrospectivamente, definir la regla (p. ej. `dir`+`ciudad`) —
-   es heurística y toca interpretación del dato.
+2. ~~**Aplicación de migraciones.**~~ ✅ `016`–`020` **aplicadas a producción**
+   (2026-07-22), verificadas read-only (114 intactas, 0 versiones nulas, sync
+   restaurado, vista con clúster).
+3. ~~**`hogar_id` histórico.**~~ ✅ Back-filleado con la heurística `dir`+`ciudad`
+   (migración `020`): 38 filas en 14 hogares, marcadas `HH-`. Es aproximado —
+   analizar con sensibilidad con/sin los hogares inferidos.
 4. **Depuración de texto libre** antes de difundir el export analítico a terceros
    (ver cumplimiento).
 5. **Método de selección «Otro»** no captura texto libre asociado (se dejó como
