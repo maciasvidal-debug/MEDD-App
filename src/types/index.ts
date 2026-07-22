@@ -12,6 +12,9 @@ export type NvEstu    = 'Ninguno' | 'Primaria' | 'Secundaria' | 'Bachiller' | 'T
 export type NvPosg    = 'Especialización' | 'Maestría' | 'Doctorado' | ''
 export type PercSalud = 'Buena' | 'Regular' | 'Mala' | ''
 export type UnidadConc = 'mcg' | 'mg' | 'g' | 'UI' | '%' | ''
+// Método de selección muestral (diseño). Registrado por encuesta para dejar el
+// diseño identificable en el export (soporte a análisis ponderado/agrupado).
+export type MetodoSeleccion = 'Aleatorio simple' | 'Sistemático' | 'Por conglomerados' | 'Por conveniencia' | 'Otro' | ''
 
 // Surveyor (encuestador) profile — controlled vocabularies. Captured once per
 // surveyor and stamped onto each survey to support interviewer-effect analysis.
@@ -52,6 +55,15 @@ export interface Survey {
   fEta:   string        // F_ETA   : Fecha de la entrevista YYYY-MM-DD
   nuiEtr: number | null // NUI_ETR : ID Único del Encuestador (entero positivo)
   nui:    number        // NUI     : N° de registro correlativo (auto-increment)
+  // HOGAR_ID: identificador de hogar estable y explícito. Personas del mismo
+  // hogar comparten el código (el asistente autogenera uno y el encuestador lo
+  // reutiliza para los co-residentes). Habilita modelar el agrupamiento por hogar
+  // (ICC) que hoy no es identificable desde el dato. Vacío en históricos.
+  hogarId: string        // HOGAR_ID
+  // METODO_SEL: método de selección muestral con el que se eligió el hogar/
+  // persona. Registra el diseño para el análisis ponderado/agrupado. Vacío en
+  // históricos.
+  metodoSeleccion: MetodoSeleccion // METODO_SEL
 
   // Perfil del encuestador (snapshot al momento de la recolección)
   etrPrograma:    EtrPrograma // ETR_PROGRAMA  : Programa académico del encuestador

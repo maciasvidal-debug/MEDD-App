@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { toCSV, toCodebookCSV } from './csv'
+import { toCSV, toAnalyticalCSV, toCodebookCSV, assertVersioned, encuestadorCluster } from './csv'
 import type { Survey } from '../types'
 
 describe('toCSV', () => {
   it('emits a header row plus one row per survey', () => {
     const surveys = [
-      { id: 'a', nui: 1, fEta: '2026-01-01', medications: [] },
-      { id: 'b', nui: 2, fEta: '2026-01-02', medications: [] },
+      { id: 'a', nui: 1, instrumentVersion: 2, fEta: '2026-01-01', medications: [] },
+      { id: 'b', nui: 2, instrumentVersion: 2, fEta: '2026-01-02', medications: [] },
     ] as unknown as Survey[]
     const lines = toCSV(surveys).trim().split('\n')
     expect(lines.length).toBe(3) // header + 2 data rows
@@ -18,7 +18,7 @@ describe('toCSV', () => {
 
   it('escapes fields containing commas, quotes or newlines', () => {
     const surveys = [
-      { id: 'a', nui: 1, dir: 'Calle 1, #2', obs: 'dijo "hola"', medications: [] },
+      { id: 'a', nui: 1, instrumentVersion: 2, dir: 'Calle 1, #2', obs: 'dijo "hola"', medications: [] },
     ] as unknown as Survey[]
     const dataRow = toCSV(surveys).trim().split('\n')[1]
     expect(dataRow).toContain('"Calle 1, #2"')
@@ -27,9 +27,9 @@ describe('toCSV', () => {
 
   it('exports the para-data columns and derives interview duration (s)', () => {
     const surveys = [
-      { id: 'a', nui: 1, medications: [],
+      { id: 'a', nui: 1, instrumentVersion: 2, medications: [],
         startedAt: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:03:00.000Z', dataEnv: 'pilot' },
-      { id: 'b', nui: 2, medications: [] }, // no para-data → empty duration
+      { id: 'b', nui: 2, instrumentVersion: 2, medications: [] }, // no para-data → empty duration
     ] as unknown as Survey[]
     const [header, r1, r2] = toCSV(surveys).trim().split('\n')
     expect(header).toContain('startedAt,dataEnv,duracion_s')
@@ -52,19 +52,43 @@ describe('toCSV', () => {
     expect(row.split(',')[ci]).toBe('Sí')
   })
 
-  it('serialises multiple medications with ; field and | record separators', () => {
+  it('serialises multiple medications with ; field and | record separators, incl. derived expiry state', () => {
     const surveys = [
-      { id: 'a', nui: 1, medications: [
-        { nmMed: 'A', dci: 'x', concMed: 500, undConc: 'mg', fVto: '2027-01-01' },
-        { nmMed: 'B', dci: 'y', concMed: 250, undConc: 'mg', fVto: '2027-02-01' },
+      { id: 'a', nui: 1, instrumentVersion: 2, fEta: '2026-01-01', medications: [
+        { nmMed: 'A', dci: 'x', concMed: 500, undConc: 'mg', fVto: '2027-01-01' }, // future → vigente
+        { nmMed: 'B', dci: 'y', concMed: 250, undConc: 'mg', fVto: '2025-02-01' }, // past → vencido
       ] },
     ] as unknown as Survey[]
     const dataRow = toCSV(surveys).trim().split('\n')[1]
-    expect(dataRow).toContain('A;x;500;mg;2027-01-01|B;y;250;mg;2027-02-01')
+    expect(dataRow).toContain('A;x;500;mg;2027-01-01;vigente|B;y;250;mg;2025-02-01;vencido')
+  })
+
+  it('leaves estadoVencimiento blank when fVto or fEta is missing (Rec. 4)', () => {
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 2, fEta: '2026-01-01', medications: [
+        { nmMed: 'C', dci: 'z', concMed: null, undConc: '', fVto: '' }, // sin fVto → indeterminado
+      ] },
+    ] as unknown as Survey[]
+    const dataRow = toCSV(surveys).trim().split('\n')[1]
+    expect(dataRow).toContain('C;z;;;;') // seis subcampos, estado vacío
   })
 
   it('exports departamento as its own column right after ciudad', () => {
     expect(toCSV([]).trim().split('\n')[0]).toContain('ciudad,departamento,dir')
+  })
+
+  it('exports the household id and sampling method columns (Rec. 5)', () => {
+    const header = toCSV([]).trim().split('\n')[0]
+    expect(header).toContain('hogarId')
+    expect(header).toContain('metodoSeleccion')
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 2, hogarId: 'H-ABC123',
+        metodoSeleccion: 'Aleatorio simple', medications: [] },
+    ] as unknown as Survey[]
+    const [h, row] = toCSV(surveys).trim().split('\n')
+    const cols = h.split(',')
+    expect(row.split(',')[cols.indexOf('hogarId')]).toBe('H-ABC123')
+    expect(row.split(',')[cols.indexOf('metodoSeleccion')]).toBe('Aleatorio simple')
   })
 
   it('packs all stored products into the single "medications" column', () => {
@@ -87,18 +111,83 @@ describe('toCSV', () => {
     }
     const surveys = [
       // multiple meds + a multi-select
-      { id: 'a', nui: 1, motNoConsumo: ['Sobró de la dosis', 'Automedicación'], medications: [
+      { id: 'a', nui: 1, instrumentVersion: 1, motNoConsumo: ['Sobró de la dosis', 'Automedicación'], medications: [
         { nmMed: 'A', dci: 'x', concMed: 500, undConc: 'mg', fVto: '2027-01-01' },
         { nmMed: 'B', dci: 'y', concMed: 250, undConc: 'mg', fVto: '2027-02-01' },
       ] },
       // no meds at all
-      { id: 'b', nui: 2, medications: [] },
+      { id: 'b', nui: 2, instrumentVersion: 2, medications: [] },
       // free text with commas and quotes (no newline, so naive line split is safe)
-      { id: 'c', nui: 3, dir: 'Calle 1, #2', obs: 'dijo "hola"', medications: [] },
+      { id: 'c', nui: 3, instrumentVersion: 2, dir: 'Calle 1, #2', obs: 'dijo "hola"', medications: [] },
     ] as unknown as Survey[]
     const [header, ...rows] = toCSV(surveys).trim().split('\n')
     const cols = fieldCount(header)
     for (const r of rows) expect(fieldCount(r)).toBe(cols)
+  })
+})
+
+describe('versioning guard (Rec. 1)', () => {
+  it('assertVersioned throws when any survey has a null/undefined instrumentVersion', () => {
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 2, medications: [] },
+      { id: 'b', nui: 2, medications: [] }, // sin versión → mezcla no declarada
+    ] as unknown as Survey[]
+    expect(() => assertVersioned(surveys)).toThrow(/sin versión/i)
+    expect(() => assertVersioned(surveys)).toThrow(/b/) // reporta el id ofensor
+  })
+
+  it('assertVersioned passes when every survey declares a version (mixed 1 and 2 is OK)', () => {
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 1, medications: [] },
+      { id: 'b', nui: 2, instrumentVersion: 2, medications: [] },
+    ] as unknown as Survey[]
+    expect(() => assertVersioned(surveys)).not.toThrow()
+  })
+
+  it('toCSV refuses to emit a dataset with a null-version record', () => {
+    const surveys = [
+      { id: 'a', nui: 1, medications: [] }, // instrumentVersion ausente
+    ] as unknown as Survey[]
+    expect(() => toCSV(surveys)).toThrow(/Export bloqueado/i)
+  })
+})
+
+describe('toAnalyticalCSV — de-identified export (Rec. 6)', () => {
+  const surveys = [
+    { id: 'a', nui: 1, instrumentVersion: 2, nuiEtr: 1012345678,
+      dir: 'Calle 1 # 2-3', prbSalud: 'hipertensión', hogarId: 'H-ABC123', medications: [] },
+  ] as unknown as Survey[]
+
+  it('omits the exact address (dir) column entirely', () => {
+    const header = toAnalyticalCSV(surveys).trim().split('\n')[0].split(',')
+    expect(header).not.toContain('dir')
+  })
+
+  it('pseudonymizes nuiEtr into a stable encuestadorCluster code (raw id absent)', () => {
+    const [header, row] = toAnalyticalCSV(surveys).trim().split('\n')
+    const cols = header.split(',')
+    expect(cols).toContain('encuestadorCluster')
+    expect(cols).not.toContain('nuiEtr')
+    const cell = row.split(',')[cols.indexOf('encuestadorCluster')]
+    expect(cell).toBe(encuestadorCluster(1012345678))
+    expect(cell).toMatch(/^E-/)
+    expect(row).not.toContain('1012345678') // raw surveyor id never appears
+  })
+
+  it('is deterministic and collision-stable per surveyor', () => {
+    expect(encuestadorCluster(1012345678)).toBe(encuestadorCluster(1012345678))
+    expect(encuestadorCluster(1)).not.toBe(encuestadorCluster(2))
+    expect(encuestadorCluster(null)).toBe('')
+  })
+
+  it('keeps analytical variables incl. free-text health (no loss of analytical power)', () => {
+    expect(toAnalyticalCSV(surveys)).toContain('hipertensión')
+    expect(toAnalyticalCSV(surveys).trim().split('\n')[0]).toContain('prbSalud')
+  })
+
+  it('still enforces the version guard', () => {
+    const bad = [{ id: 'x', nui: 1, medications: [] }] as unknown as Survey[]
+    expect(() => toAnalyticalCSV(bad)).toThrow(/Export bloqueado/i)
   })
 })
 

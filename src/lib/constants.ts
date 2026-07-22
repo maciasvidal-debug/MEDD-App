@@ -15,6 +15,9 @@ export const OPT = {
   estrato: [1, 2, 3, 4, 5, 6] as const,
   etrPrograma: ['Medicina', 'Enfermería', 'Regencia en Farmacia', 'Química Farmacéutica', 'Odontología', 'Bacteriología', 'Nutrición y Dietética', 'Otra'] as const,
   etrTipoInst: ['Pública', 'Privada'] as const,
+  // Método de selección muestral (diseño). Cierra el vacío del piloto: sin
+  // registrar el diseño, el agrupamiento por hogar/encuestador no era modelable.
+  metodoSeleccion: ['Aleatorio simple', 'Sistemático', 'Por conglomerados', 'Por conveniencia', 'Otro'] as const,
   // Motivos / disposición (instrumento v2). El valor «Otro» habilita un texto libre.
   motNoConsumo: ['No terminó el tratamiento', 'Mejoró / cedieron los síntomas', 'Efectos adversos', 'Cambio de tratamiento médico', 'Sobró de la dosis', 'Automedicación', 'Fallecimiento de un familiar', 'Otro'] as const,
   motVencimiento: ['Olvido', 'Acopio preventivo', 'Compró de más', 'Dosis sobrante', 'No sabía dónde desecharlos', 'Otro'] as const,
@@ -25,6 +28,13 @@ export const OPT = {
 // survey questions so analytics can scope denominators to records that were
 // actually asked the question (see Survey.instrumentVersion).
 export const INSTRUMENT_VERSION = 2
+
+// Earliest plausible interview date (F_ETA). Fieldwork for this study cannot
+// predate 2024, so a date before this — or in the future — is a capture error
+// (the pilot exported a record with F_ETA in 2012). Validated at capture in Zod
+// so the implausible date never enters. Kept as a constant (not hard-coded in
+// the schema) so a future wave can move the window in one place.
+export const STUDY_START = '2024-01-01'
 
 // Main Colombian cities (CIUDAD dropdown)
 export const CIUDADES = [
@@ -53,6 +63,8 @@ export const EMPTY_DRAFT: SurveyDraft = {
   fEta:       '',
   nuiEtr:     null,
   nui:        0,
+  hogarId:    '',
+  metodoSeleccion: '',
   etrPrograma:    '',
   etrTipoInst:    '',
   etrSemestre:    null,
@@ -140,7 +152,9 @@ export const CODEBOOK: CodebookEntry[] = [
   { variable: 'id',            etiqueta: 'Identificador único del registro', tipo: 'texto (UUID)', valores: '—' },
   { variable: 'fEta',          etiqueta: 'Fecha de la entrevista', tipo: 'fecha', valores: 'AAAA-MM-DD' },
   { variable: 'nui',           etiqueta: 'Número de encuesta', tipo: 'entero', valores: 'consecutivo' },
-  { variable: 'nuiEtr',        etiqueta: 'ID del encuestador', tipo: 'entero', valores: '—' },
+  { variable: 'nuiEtr',        etiqueta: 'ID del encuestador (clúster de encuestador)', tipo: 'entero', valores: '—' },
+  { variable: 'hogarId',       etiqueta: 'Identificador de hogar (clúster de hogar; co-residentes comparten código)', tipo: 'texto', valores: '— (vacío en históricos)' },
+  { variable: 'metodoSeleccion', etiqueta: 'Método de selección muestral (diseño)', tipo: 'categórico', valores: 'Aleatorio simple; Sistemático; Por conglomerados; Por conveniencia; Otro (vacío en históricos)' },
   { variable: 'etrPrograma',   etiqueta: 'Programa académico del encuestador', tipo: 'categórico', valores: 'Medicina; Enfermería; Regencia en Farmacia; Química Farmacéutica; Odontología; Bacteriología; Nutrición y Dietética; Otra' },
   { variable: 'etrTipoInst',   etiqueta: 'Tipo de institución del encuestador', tipo: 'categórico', valores: 'Pública; Privada' },
   { variable: 'etrSemestre',   etiqueta: 'Semestre académico del encuestador', tipo: 'entero', valores: '1–12' },
@@ -177,7 +191,7 @@ export const CODEBOOK: CodebookEntry[] = [
   { variable: 'startedAt',     etiqueta: 'Para-data: inicio de la captura (apertura del asistente)', tipo: 'datetime ISO', valores: '— (vacío en registros previos)' },
   { variable: 'dataEnv',       etiqueta: 'Ambiente de datos (piloto vs producción)', tipo: 'categórico', valores: 'pilot; prod' },
   { variable: 'duracion_s',    etiqueta: 'Para-data: duración de la entrevista en segundos (createdAt − startedAt)', tipo: 'entero', valores: '≥ 0 (vacío si no hay startedAt)' },
-  { variable: 'instrumentVersion', etiqueta: 'Versión del instrumento al capturar (1 = sin batería de motivos)', tipo: 'entero', valores: '1; 2 (vacío = 1)' },
+  { variable: 'instrumentVersion', etiqueta: 'Versión del instrumento al capturar (1 = sin batería de motivos)', tipo: 'entero', valores: '1; 2 (obligatorio, no nulo)' },
   { variable: 'motNoConsumo',      etiqueta: 'Motivos de no consumo (selección múltiple)', tipo: 'multivalor', valores: 'No terminó el tratamiento; Mejoró / cedieron los síntomas; Efectos adversos; Cambio de tratamiento médico; Sobró de la dosis; Automedicación; Fallecimiento de un familiar; Otro' },
   { variable: 'motNoConsumoOtro',  etiqueta: 'Motivo de no consumo — otro (texto)', tipo: 'texto', valores: '—' },
   { variable: 'motVencimiento',    etiqueta: 'Razones de acumulación/vencimiento (selección múltiple)', tipo: 'multivalor', valores: 'Olvido; Acopio preventivo; Compró de más; Dosis sobrante; No sabía dónde desecharlos; Otro' },
@@ -186,10 +200,11 @@ export const CODEBOOK: CodebookEntry[] = [
   { variable: 'dispFinalOtro',     etiqueta: 'Conducta de disposición — otro (texto)', tipo: 'texto', valores: '—' },
   { variable: 'conocePuntos',      etiqueta: 'Conoce puntos de recolección posconsumo', tipo: 'binario', valores: 'Sí; No (vacío = no preguntado)' },
   { variable: 'cualPunto',         etiqueta: 'Cuál punto de recolección conoce', tipo: 'texto', valores: '—' },
-  { variable: 'medications',   etiqueta: 'Medicamentos almacenados (lista; productos separados por |, campos por ;)', tipo: 'compuesto', valores: 'nmMed;dci;concMed;undConc;fVto' },
+  { variable: 'medications',   etiqueta: 'Medicamentos almacenados (lista; productos separados por |, campos por ;)', tipo: 'compuesto', valores: 'nmMed;dci;concMed;undConc;fVto;estadoVencimiento' },
   { variable: '  nmMed',       etiqueta: '— Nombre comercial del medicamento', tipo: 'texto', valores: '—' },
   { variable: '  dci',         etiqueta: '— Principio activo (DCI)', tipo: 'texto', valores: '—' },
   { variable: '  concMed',     etiqueta: '— Concentración', tipo: 'decimal', valores: '≥ 0' },
   { variable: '  undConc',     etiqueta: '— Unidad de concentración', tipo: 'categórico', valores: 'mcg; mg; g; UI; %' },
   { variable: '  fVto',        etiqueta: '— Fecha de vencimiento', tipo: 'fecha', valores: 'AAAA-MM-DD' },
+  { variable: '  estadoVencimiento', etiqueta: '— Estado de vencimiento derivado contra F_ETA', tipo: 'categórico', valores: 'vencido; vigente; (vacío = sin F_VTO/F_ETA)' },
 ]

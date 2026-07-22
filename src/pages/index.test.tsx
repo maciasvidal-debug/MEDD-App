@@ -43,7 +43,7 @@ describe('page smoke renders', () => {
     useStore.setState({ userRole: 'encuestador', surveys: [] })
     render(<ExportarPage />)
     expect(screen.getByText('Exportar datos')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Descargar \.csv/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Descargar .csv' })).toBeDisabled()
   })
 
   it('BuscarPage renders the CUM search input', () => {

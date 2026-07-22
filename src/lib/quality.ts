@@ -58,6 +58,13 @@ function collectErrors(d: SurveyDraft): string[] {
     const age = dayDiff(d.fEta, d.fNac)
     if (age != null && age <= 0) errors.push('La fecha de nacimiento es posterior (o igual) a la de la entrevista.')
   }
+  // Edad implausible = bloqueo (Rec. 2): la edad derivada debe caer en [0,110].
+  // El piloto exportó edades derivadas ≈0 y fechas incoherentes; validarlo en
+  // captura (error, no solo warning) impide que el registro entre.
+  const edadErr = calcEdad(d.fEta, d.fNac)
+  if (edadErr != null && (edadErr < 0 || edadErr > 110)) {
+    errors.push(`Edad implausible (${edadErr} años): verifique las fechas de nacimiento y entrevista.`)
+  }
   if (d.fDisp && d.fEta) {
     const diff = dayDiff(d.fEta, d.fDisp)
     if (diff != null && diff < 0) errors.push('La fecha de dispensación es posterior a la de la entrevista.')
@@ -74,8 +81,8 @@ function collectErrors(d: SurveyDraft): string[] {
 // Soft plausibility flags that are surfaced but don't block the save.
 function collectWarnings(d: SurveyDraft): string[] {
   const warnings: string[] = []
-  const edad = calcEdad(d.fEta, d.fNac)
-  if (edad != null && (edad < 0 || edad > 110)) warnings.push(`Edad atípica (${edad} años): verifique las fechas.`)
+  // Edad implausible se trató como ERROR en collectErrors (Rec. 2); aquí solo
+  // quedan las plausibilidades blandas.
   if (d.pesoMedNc != null && d.pesoMedNc > 5000) warnings.push(`Peso muy alto (${d.pesoMedNc} g): confirme la unidad (gramos).`)
   if (d.fPrc && d.fDisp) {
     const diff = dayDiff(d.fDisp, d.fPrc)

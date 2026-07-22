@@ -10,6 +10,7 @@ function s(obs: string): Survey {
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     fEta: '2024-01-15', nuiEtr: 1, nui: _uid,
+    hogarId: '', metodoSeleccion: '',
     etrPrograma: 'Medicina', etrTipoInst: 'Pública',
     etrSemestre: 5, etrInstitucion: 'Universidad',
     fNac: '1980-01-01', ciudad: 'Bogotá', dir: 'Calle 1',

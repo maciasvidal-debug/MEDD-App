@@ -76,6 +76,42 @@ describe('therapeuticSubgroup (ATC level 2)', () => {
     expect(therapeuticSubgroup('')).toBe(SIN_CLASIFICAR)
     expect(therapeuticSubgroup('xyz sustancia inexistente')).toBe(SIN_CLASIFICAR)
   })
+
+  it('classifies the expanded curated set (levels 1 and 2 stay consistent)', () => {
+    const cases: Array<[string, string, string]> = [
+      ['losartan', 'IECA / ARA-II (C09)', 'Cardiovascular'],
+      ['atenolol', 'Betabloqueantes (C07)', 'Cardiovascular'],
+      ['simvastatina', 'Hipolipemiantes (C10)', 'Cardiovascular'],
+      ['digoxina', 'Terapia cardíaca (C01)', 'Cardiovascular'],
+      ['rivaroxaban', 'Antitrombóticos (B01)', 'Sangre'],
+      ['escitalopram', 'Psicoanalépticos (N06)', 'Sistema nervioso'],
+      ['diazepam', 'Psicolépticos (N05)', 'Sistema nervioso'],
+      ['carbamazepina', 'Antiepilépticos (N03)', 'Sistema nervioso'],
+      ['acido valproico', 'Antiepilépticos (N03)', 'Sistema nervioso'],
+      ['metocarbamol', 'Relajantes musculares (M03)', 'Musculoesquelético'],
+      ['alopurinol', 'Antigotosos (M04)', 'Musculoesquelético'],
+      ['alendronato de sodio', 'Óseo / bifosfonatos (M05)', 'Musculoesquelético'],
+      ['rifampicina', 'Antimicobacterianos (J04)', 'Antiinfecciosos'],
+      ['ketoconazol', 'Antimicóticos (J02)', 'Antiinfecciosos'],
+      ['tinidazol', 'Antiprotozoarios (P01)', 'Antiparasitarios'],
+      ['tamoxifeno', 'Terapia endocrina oncológica (L02)', 'Antineoplásicos e inmunomoduladores'],
+      ['metotrexato', 'Inmunosupresores (L04)', 'Antineoplásicos e inmunomoduladores'],
+      ['latanoprost', 'Oftalmológicos (S01)', 'Órganos de los sentidos'],
+      ['naloxona', 'Otros productos terapéuticos (V03)', 'Varios'],
+      ['etinilestradiol', 'Hormonas sexuales (G03)', 'Genitourinario'],
+      ['metformina', 'Antidiabéticos (A10)', 'Digestivo y metabolismo'],
+      ['ondansetron', 'Antieméticos (A04)', 'Digestivo y metabolismo'],
+    ]
+    for (const [dci, sub, group] of cases) {
+      expect(therapeuticSubgroup(dci)).toBe(sub)
+      expect(therapeuticGroup(dci)).toBe(group)
+    }
+  })
+
+  it('does not misclassify tinidazol/secnidazol as the J01 metronidazol rule', () => {
+    // Distinct nitroimidazoles must not be swallowed by the earlier J01 rule.
+    expect(therapeuticGroup('tinidazol 500 mg')).toBe('Antiparasitarios')
+  })
 })
 
 describe('matchCode memoization is transparent', () => {

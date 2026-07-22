@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import type { Settings, Survey } from '../types'
+import { STUDY_START } from './constants'
+import { todayISO } from './date'
 
 // ─── Surveyor profile completeness ──────────────────────────────────────────
 // The profile is stamped onto every captured survey, so an incomplete profile
@@ -33,14 +35,29 @@ const optStr  = z.string()
 const siNo    = z.string()
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD inválido').or(z.literal(''))
 
+// F_ETA plausible-range check (Rec. 2): the interview date must fall within the
+// study window — no earlier than STUDY_START, no later than today. ISO strings
+// compare lexicographically, so a plain string comparison is correct. The empty
+// / malformed cases are already handled by the min+regex rules, so this refine
+// only judges well-formed dates and passes anything it can't parse (to avoid a
+// duplicate/contradictory message).
+const fEtaInStudyWindow = (v: string): boolean =>
+  !/^\d{4}-\d{2}-\d{2}$/.test(v) || (v >= STUDY_START && v <= todayISO())
+
 // ─── Step 1 — Identificación ──────────────────────────────────────────────
 export const step1Schema = z.object({
   fEta:   z.string().min(1, 'La fecha de la entrevista es obligatoria')
-           .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD inválido'),
+           .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD inválido')
+           .refine(fEtaInStudyWindow, `La fecha debe estar entre ${STUDY_START} y hoy (no puede ser anterior al estudio ni futura)`),
   nuiEtr: z.number()
             .int('Debe ser un entero')
             .positive('Debe ser un entero positivo'),
   nui:    z.number(),
+  // Diseño muestral (Rec. 5): identificador de hogar obligatorio (autogenerado
+  // por el asistente, editable) y método de selección obligatorio, para dejar el
+  // agrupamiento y el diseño identificables desde la captura.
+  hogarId:         z.string().min(1, 'El identificador de hogar es obligatorio'),
+  metodoSeleccion: z.string().min(1, 'Seleccione el método de selección muestral'),
 })
 
 // ─── Step 2 — Demografía ─────────────────────────────────────────────────
@@ -114,6 +131,20 @@ const step4Refine = (d: z.infer<typeof step4Object>, ctx: z.RefinementCtx) => {
   reqOtro(d.motNoConsumo, d.motNoConsumoOtro, 'motNoConsumoOtro', 'Especifique el otro motivo de no consumo')
   reqOtro(d.motVencimiento, d.motVencimientoOtro, 'motVencimientoOtro', 'Especifique la otra razón de acumulación/vencimiento')
   reqOtro(d.dispFinal, d.dispFinalOtro, 'dispFinalOtro', 'Especifique la otra conducta de disposición')
+
+  // Bloque de disposición obligatorio (Rec. 2): cuando el hogar guarda
+  // medicamentos sin consumir (medSob='Sí'), las dos preguntas núcleo de
+  // disposición deben responderse — su ausencia no aleatoria fue un hallazgo del
+  // piloto. Solo aplican cuando ese bloque se muestra (medSob='Sí'), así que un
+  // registro sin medicamentos (medSob='No') no queda bloqueado.
+  if (d.medSob === 'Sí') {
+    if (!d.dispMedVc) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['dispMedVc'], message: 'Responda si sabe qué hacer con los vencidos' })
+    }
+    if (!d.vtoMedNc) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['vtoMedNc'], message: 'Responda si hay unidades vencidas entre lo almacenado' })
+    }
+  }
 }
 
 export const step4Schema = step4Object.superRefine(step4Refine)

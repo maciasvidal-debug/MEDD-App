@@ -78,6 +78,10 @@ async function getDB(): Promise<IDBPDatabase<MEDDSchema>> {
 export async function getAllSurveys(): Promise<Survey[]> {
   const db  = await getDB()
   const all = await db.getAll('surveys')
+  // Invariante Rec. 1 (versionado no nulo): un registro local sin versión es un
+  // histórico del instrumento v1 (capturado antes de existir el campo) → se
+  // normaliza a 1 al leer, de modo que la app y el export nunca ven un nulo.
+  for (const s of all) if (s.instrumentVersion == null) s.instrumentVersion = 1
   // Guard against rows with a missing createdAt (e.g. a malformed remote row):
   // calling .localeCompare on undefined would throw and break the whole load.
   return all.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))

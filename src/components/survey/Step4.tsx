@@ -70,8 +70,8 @@ function MedSobSection({ control, register, watch, errors }: {
       </RevealNote>
       <Divider label="Conocimiento del entrevistado" />
 
-      <YesNoField control={control} name="dispMedVc" help={FIELD_HELP.dispMedVc}
-        label="¿Sabe qué hacer con los medicamentos vencidos?" />
+      <YesNoField control={control} name="dispMedVc" required help={FIELD_HELP.dispMedVc}
+        label="¿Sabe qué hacer con los medicamentos vencidos?" error={errors.dispMedVc?.message} />
 
       {dispMedVc === 'Sí' && (
         <div className="fade-in" ref={dispVcRef}>
@@ -87,8 +87,8 @@ function MedSobSection({ control, register, watch, errors }: {
 
       <Divider label="Observación directa — encuestador" />
 
-      <YesNoField control={control} name="vtoMedNc" help={FIELD_HELP.vtoMedNc}
-        label="¿Hay unidades vencidas entre los almacenados?" />
+      <YesNoField control={control} name="vtoMedNc" required help={FIELD_HELP.vtoMedNc}
+        label="¿Hay unidades vencidas entre los almacenados?" error={errors.vtoMedNc?.message} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Cant. sin consumir" help={FIELD_HELP.cantMed} error={errors.cantMed?.message}>

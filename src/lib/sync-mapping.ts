@@ -56,6 +56,8 @@ export function toRow(survey: Survey, userId: string): SupabaseRow {
     f_eta:        survey.fEta   || null,
     nui_etr:      survey.nuiEtr,
     nui:          survey.nui,
+    hogar_id:         survey.hogarId         || null,
+    metodo_seleccion: survey.metodoSeleccion || null,
     etr_programa:    survey.etrPrograma    || null,
     etr_tipo_inst:   survey.etrTipoInst    || null,
     etr_semestre:    survey.etrSemestre,
@@ -107,10 +109,15 @@ export function fromRow(row: SupabaseRow): Survey {
     startedAt:   (row.started_at as string) ?? undefined,
     dataEnv:     (row.data_env as DataEnv) ?? undefined,
     backcheckOf: (row.backcheck_of as string) ?? undefined,
-    instrumentVersion: (row.instrument_version as number) ?? undefined,
+    // Invariante Rec. 1: todo registro lleva versión. Un registro remoto sin
+    // versión es, por definición, del instrumento v1 (previo a la batería de
+    // motivos) → se normaliza a 1, nunca undefined. Espeja el back-fill 017.
+    instrumentVersion: (row.instrument_version as number) ?? 1,
     fEta:        (row.f_eta as string)  ?? '',
     nuiEtr:      row.nui_etr as number | null,
     nui:         row.nui as number,
+    hogarId:         (row.hogar_id as string) ?? '',
+    metodoSeleccion: ((row.metodo_seleccion as string) ?? '') as Survey['metodoSeleccion'],
     etrPrograma:    ((row.etr_programa as string)  ?? '') as Survey['etrPrograma'],
     etrTipoInst:    ((row.etr_tipo_inst as string) ?? '') as Survey['etrTipoInst'],
     etrSemestre:    row.etr_semestre as number | null,

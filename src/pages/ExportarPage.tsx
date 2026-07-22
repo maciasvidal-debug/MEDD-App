@@ -2,7 +2,7 @@ import { TopBar } from '../components/layout'
 import { Card, Button, IconChip, C } from '../components/ui'
 import { useStore } from '../lib/store'
 import { dateTag } from '../lib/date'
-import { toCSV, toCodebookCSV } from '../lib/csv'
+import { toCSV, toAnalyticalCSV, toCodebookCSV } from '../lib/csv'
 import { downloadBlob } from '../lib/utils'
 
 // ─── EXPORT PAGE ──────────────────────────────────────────────────────────
@@ -16,8 +16,25 @@ export function ExportarPage() {
   // (especially on mobile, where it drops silently into the download tray), so
   // confirm the action fired and how many records it covered.
   function exportCSV() {
-    downloadBlob(toCSV(surveys), `MEDD_${dateTag()}.csv`, 'text/csv;charset=utf-8')
-    pushToast(`CSV exportado · ${n} registro${n !== 1 ? 's' : ''}`, 'success')
+    // toCSV aplica la barrera de versión (Rec. 1): si un registro llegara sin
+    // versión declarada, lanza en vez de emitir un dataset ambiguo. Se surfacea
+    // como error en lugar de descargar dato dudoso o romper la app.
+    try {
+      downloadBlob(toCSV(surveys), `MEDD_${dateTag()}.csv`, 'text/csv;charset=utf-8')
+      pushToast(`CSV exportado · ${n} registro${n !== 1 ? 's' : ''}`, 'success')
+    } catch (e) {
+      pushToast(e instanceof Error ? e.message : 'No se pudo exportar el CSV', 'error')
+    }
+  }
+  function exportAnalyticalCSV() {
+    // Export des-identificado (Rec. 6 / Ley 1581): omite la dirección exacta y
+    // seudonimiza el ID del encuestador, conservando el resto de variables.
+    try {
+      downloadBlob(toAnalyticalCSV(surveys), `MEDD_analitico_${dateTag()}.csv`, 'text/csv;charset=utf-8')
+      pushToast(`CSV analítico (des-identificado) exportado · ${n} registro${n !== 1 ? 's' : ''}`, 'success')
+    } catch (e) {
+      pushToast(e instanceof Error ? e.message : 'No se pudo exportar el CSV analítico', 'error')
+    }
   }
   function exportCodebook() {
     downloadBlob(toCodebookCSV(), `MEDD_codebook_${dateTag()}.csv`, 'text/csv;charset=utf-8')
@@ -52,6 +69,14 @@ export function ExportarPage() {
             onClick={exportCSV}
           >
             Descargar .csv
+          </Button>
+          <Button
+            fullWidth variant="ghost"
+            style={{ marginTop: 8 }}
+            icon="ti-shield-lock"
+            onClick={exportAnalyticalCSV}
+          >
+            Descargar .csv analítico (des-identificado)
           </Button>
           <Button
             fullWidth variant="ghost"

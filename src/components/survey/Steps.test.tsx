@@ -29,12 +29,17 @@ describe('Step1 — Identificación (RHF + zod integration)', () => {
   it('submits parsed values (nuiEtr as a number) when valid', async () => {
     const onNext = vi.fn()
     const { container } = render(
-      <Step1 draft={draft({ fEta: '', nui: 7 })} onNext={onNext} onBack={vi.fn()} isFirst />,
+      // hogarId is prefilled (the wizard autogenerates it); metodoSeleccion is
+      // chosen below — both are required (sampling design, Rec. 5).
+      <Step1 draft={draft({ fEta: '', nui: 7, hogarId: 'H-TEST01' })} onNext={onNext} onBack={vi.fn()} isFirst />,
     )
     fireEvent.change(container.querySelector('input[type="date"]')!, { target: { value: '2026-01-10' } })
     fireEvent.change(screen.getByPlaceholderText('Ej: 1012345678'), { target: { value: '123' } })
+    fireEvent.change(container.querySelector('select')!, { target: { value: 'Aleatorio simple' } })
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }))
     await waitFor(() => expect(onNext).toHaveBeenCalledTimes(1))
-    expect(onNext).toHaveBeenCalledWith(expect.objectContaining({ fEta: '2026-01-10', nuiEtr: 123, nui: 7 }))
+    expect(onNext).toHaveBeenCalledWith(expect.objectContaining({
+      fEta: '2026-01-10', nuiEtr: 123, nui: 7, hogarId: 'H-TEST01', metodoSeleccion: 'Aleatorio simple',
+    }))
   })
 })
