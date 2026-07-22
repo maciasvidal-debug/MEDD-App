@@ -65,8 +65,8 @@ La app es **offline-first**: las encuestas se guardan primero en **IndexedDB** d
 
 La app sincroniza las encuestas y el perfil del encuestador con el proyecto **Supabase** del estudio (Postgres con RLS por usuario). Además, realiza consultas opcionales a la API pública **CUM-INVIMA** (`datos.gov.co`) para la búsqueda de medicamentos. No comparte datos con otros terceros.
 
-## Backend (`backend/`) — API Express independiente, **no usada por la app web**
+## Backend Express — archivado
 
-El directorio `backend/` contiene un API Express (encuestas + analítica) con autenticación JWT de Supabase, validación y SQL parametrizado, además de su propia suite de tests y CI (`backend-ci.yml`).
+Existió un API Express independiente en `backend/` (encuestas + analítica, JWT de Supabase, SQL parametrizado y su propia CI). **La app web nunca lo consumió** —el frontend accede directamente a Supabase con RLS— y no tenía configuración de despliegue, así que se **archivó** (auditoría 5S) para reducir mantenimiento y superficie de credenciales (accedía a Postgres con un pool que omitía RLS).
 
-**La app web (`src/`) no lo consume**: el frontend accede directamente a Supabase con RLS. Este backend es un servicio servidor *separado* —accede a Postgres con un pool privilegiado que **omite RLS**, por lo que autoriza cada petición por su cuenta— pensado para consumidores de servidor (p. ej. analítica/exportación). Actualmente **no tiene configuración de despliegue**. Si no hay un plan para usarlo, considérese archivarlo para reducir mantenimiento y superficie de credenciales.
+Se eliminó del árbol activo junto con su workflow `backend-ci.yml`. **La historia se conserva en git**: para recuperarlo, `git checkout a2f4425 -- backend .github/workflows/backend-ci.yml` (o revisar el commit previo a su archivado). Si en el futuro se necesita un servicio de servidor, retómese desde ahí en lugar de reescribirlo.
