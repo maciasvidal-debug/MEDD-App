@@ -28,15 +28,4 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
     },
   },
-  {
-    files: ['backend/src/**/*.js'],
-    languageOptions: {
-      globals: globals.node,
-      ecmaVersion: 2022,
-      sourceType: 'commonjs',
-    },
-    rules: {
-      'no-await-in-loop': 'error',
-    },
-  },
 ])
