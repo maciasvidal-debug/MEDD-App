@@ -112,6 +112,31 @@ export function toCSV(surveys: Survey[]): string {
   return '﻿' + [header, ...rows].join('\n')
 }
 
+// Redacta identificadores INCIDENTALES de alto riesgo del texto libre del export
+// analítico (Rec. 6 · Habeas Data). Estrategia de ALTA PRECISIÓN para no restar
+// poder analítico: solo se redactan patrones inequívocos de identificador —
+// correos y secuencias con ≥6 dígitos (cédulas, teléfonos)— dejando intacto el
+// texto clínico/cualitativo (síntomas, prácticas, dosis cortas < 6 dígitos).
+// No intenta detectar nombres (baja precisión → destruiría contenido útil): eso
+// queda para una revisión humana previa a difundir a terceros.
+export function scrubFreeText(value: unknown): string {
+  const s = String(value ?? '')
+  if (!s) return ''
+  return s
+    // Correos electrónicos.
+    .replace(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/gi, '[correo]')
+    // Cualquier grupo de dígitos (con separadores internos . - / espacio) cuyo
+    // total de dígitos sea ≥6 → cédula/teléfono. Los números cortos (dosis,
+    // cantidades) se conservan.
+    .replace(/\d[\d .\-/]*\d|\d/g, m => (m.replace(/\D/g, '').length >= 6 ? '[núm]' : m))
+}
+
+// Columnas de texto libre que pueden arrastrar identificadores incidentales.
+const FREE_TEXT_COLS = new Set<keyof Survey>([
+  'prbSalud', 'ctoDispVc', 'obs',
+  'motNoConsumoOtro', 'motVencimientoOtro', 'dispFinalOtro', 'cualPunto',
+])
+
 /**
  * Export analítico DES-IDENTIFICADO (Sec. 7 Rec. 6 · Habeas Data, Ley 1581).
  * Mejores prácticas de minimización SIN restar poder analítico:
@@ -121,21 +146,23 @@ export function toCSV(surveys: Survey[]): string {
  *   - Seudonimiza `nuiEtr` → `encuestadorCluster` (código estable): conserva el
  *     clúster de encuestador para el modelado del efecto-encuestador sin exponer
  *     el identificador personal.
- *   - CONSERVA el resto de variables analíticas, incluido el texto de salud
- *     (prbSalud, ctoDispVc, obs…) que alimenta el análisis cualitativo — para no
- *     restar poder analítico. El riesgo residual del texto libre se documenta.
+ *   - DEPURA el texto libre (prbSalud, ctoDispVc, obs, «Otro»…) redactando
+ *     identificadores incidentales (correos, cédulas/teléfonos) vía scrubFreeText,
+ *     conservando el contenido clínico/cualitativo.
  * Cada fila mantiene versión, hogar_id y clúster limpios (denominadores listos).
  */
 const ANALYTICAL_COLUMNS = CSV_COLUMNS.filter(c => c !== 'dir')
 export function toAnalyticalCSV(surveys: Survey[]): string {
   assertVersioned(surveys)
+  const cell = (s: Survey, col: keyof Survey): string => {
+    if (col === 'nuiEtr') return escapeCSV(encuestadorCluster(s.nuiEtr))
+    return FREE_TEXT_COLS.has(col) ? escapeCSV(scrubFreeText(s[col])) : escapeCSV(s[col])
+  }
   const headerCols = ANALYTICAL_COLUMNS.map(c => (c === 'nuiEtr' ? 'encuestadorCluster' : c))
   const header = [...headerCols, 'duracion_s', ...MOTIVE_COLUMNS, 'medications'].join(',')
   const rows = surveys.map(s => {
-    const base = ANALYTICAL_COLUMNS
-      .map(col => (col === 'nuiEtr' ? escapeCSV(encuestadorCluster(s.nuiEtr)) : escapeCSV(s[col])))
-      .join(',')
-    const motives = MOTIVE_COLUMNS.map(col => escapeCSV(s[col])).join(',')
+    const base = ANALYTICAL_COLUMNS.map(col => cell(s, col)).join(',')
+    const motives = MOTIVE_COLUMNS.map(col => cell(s, col)).join(',')
     return `${base},${durationCell(s)},${motives},${escapeCSV(medicationsCell(s))}`
   })
   return '﻿' + [header, ...rows].join('\n')

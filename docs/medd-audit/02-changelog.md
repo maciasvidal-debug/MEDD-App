@@ -106,11 +106,14 @@ e incompleta): úsese con análisis de sensibilidad con/sin `HH-`. Idempotente
 - Export analítico minimizado (mejores prácticas, sin restar poder analítico):
   se omite el localizador directo `dir` y se seudonimiza el identificador de
   encuestador; se conservan las variables analíticas, incluido el texto de salud
-  (valor cualitativo). **Riesgo residual**: el texto libre (`prbSalud`,
-  `ctoDispVc`, `obs`) puede contener identificadores incidentales — se recomienda
-  una revisión/depuración antes de compartir con terceros.
-- El export **completo** (con PII) se mantiene para uso interno controlado,
-  claramente rotulado.
+  (valor cualitativo). El texto libre (`prbSalud`, `ctoDispVc`, `obs`, «Otro»,
+  `cualPunto`) pasa por `scrubFreeText`, que **redacta identificadores incidentales
+  de alto riesgo** (correos → `[correo]`; secuencias de ≥6 dígitos como cédulas/
+  teléfonos → `[núm]`) conservando el contenido clínico (dosis/cifras cortas, p. ej.
+  presión `120/80`, se preservan). **Riesgo residual**: no detecta nombres (baja
+  precisión) — para difundir a terceros, revisión humana adicional.
+- El export **completo** (con PII, sin depurar) se mantiene para uso interno
+  controlado, claramente rotulado.
 
 ## Pendiente / requiere tu decisión
 
@@ -123,7 +126,9 @@ e incompleta): úsese con análisis de sensibilidad con/sin `HH-`. Idempotente
 3. ~~**`hogar_id` histórico.**~~ ✅ Back-filleado con la heurística `dir`+`ciudad`
    (migración `020`): 38 filas en 14 hogares, marcadas `HH-`. Es aproximado —
    analizar con sensibilidad con/sin los hogares inferidos.
-4. **Depuración de texto libre** antes de difundir el export analítico a terceros
-   (ver cumplimiento).
+4. ~~**Depuración de texto libre.**~~ ✅ El export analítico redacta identificadores
+   incidentales (`scrubFreeText`: correos, cédulas/teléfonos). Queda pendiente
+   **revisión humana de nombres** antes de difundir a terceros (no automatizable
+   con alta precisión).
 5. **Método de selección «Otro»** no captura texto libre asociado (se dejó como
    opción simple para acotar el incremento); ampliar si se requiere el detalle.
