@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toCSV, toAnalyticalCSV, toCodebookCSV, assertVersioned, encuestadorCluster } from './csv'
+import { toCSV, toAnalyticalCSV, toCodebookCSV, assertVersioned, encuestadorCluster, scrubFreeText } from './csv'
 import type { Survey } from '../types'
 
 describe('toCSV', () => {
@@ -188,6 +188,52 @@ describe('toAnalyticalCSV — de-identified export (Rec. 6)', () => {
   it('still enforces the version guard', () => {
     const bad = [{ id: 'x', nui: 1, medications: [] }] as unknown as Survey[]
     expect(() => toAnalyticalCSV(bad)).toThrow(/Export bloqueado/i)
+  })
+
+  it('scrubs incidental identifiers from free-text fields but keeps clinical content', () => {
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 2, medications: [],
+        prbSalud: 'hipertensión, presión 120/80, cel 300 123 4567',
+        obs: 'contactar juan@correo.com, cédula 12.345.678' },
+    ] as unknown as Survey[]
+    const out = toAnalyticalCSV(surveys)
+    expect(out).toContain('hipertensión')      // contenido clínico conservado
+    expect(out).toContain('120/80')            // presión (5 dígitos) conservada
+    expect(out).toContain('[correo]')          // email redactado
+    expect(out).toContain('[núm]')             // teléfono / cédula redactados
+    expect(out).not.toContain('3001234567')
+    expect(out).not.toContain('300 123 4567')
+    expect(out).not.toContain('juan@correo.com')
+    expect(out).not.toContain('12.345.678')
+  })
+
+  it('does NOT scrub the full (internal) export — only the analytical one', () => {
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 2, medications: [], prbSalud: 'cédula 12345678' },
+    ] as unknown as Survey[]
+    expect(toCSV(surveys)).toContain('12345678')       // export completo intacto
+    expect(toAnalyticalCSV(surveys)).not.toContain('12345678')
+  })
+})
+
+describe('scrubFreeText', () => {
+  it('redacts emails and ≥6-digit sequences (cédulas/teléfonos), incl. separators', () => {
+    expect(scrubFreeText('escribe a a.b+x@mail.co')).toBe('escribe a [correo]')
+    expect(scrubFreeText('cc 12.345.678')).toBe('cc [núm]')
+    expect(scrubFreeText('tel 300 123 4567')).toBe('tel [núm]')
+    expect(scrubFreeText('3001234567')).toBe('[núm]')
+  })
+
+  it('preserves short numbers (dosages, quantities, blood pressure)', () => {
+    expect(scrubFreeText('acetaminofén 500 mg cada 8 horas')).toBe('acetaminofén 500 mg cada 8 horas')
+    expect(scrubFreeText('presión 120/80')).toBe('presión 120/80')
+    expect(scrubFreeText('12345')).toBe('12345') // 5 dígitos → se conserva
+  })
+
+  it('is empty-safe', () => {
+    expect(scrubFreeText('')).toBe('')
+    expect(scrubFreeText(null)).toBe('')
+    expect(scrubFreeText(undefined)).toBe('')
   })
 })
 
