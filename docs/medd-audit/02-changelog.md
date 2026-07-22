@@ -61,6 +61,7 @@ esquema resultante y valida:
 | F | 4 | `estado_vencimiento` derivado por producto en el export; ampliación curada (no oficial) de ATC (grupos L/V, +12 subgrupos, ~120 reglas DCI) | — | clasificación ATC nueva; estado en export |
 | Fase 4 | — | Parser `parseSurveysCSV` + fixture + test de regresión del CSV histórico | — | regresión histórica (8 tests) |
 | Analítica | 5 · 6 | `v_product_metrics` expone `nui_etr`, `hogar_id`, `metodo_seleccion`, `instrument_version` y `departamento`, para modelar el agrupamiento (ICC) y separar denominadores por versión desde SQL (rol investigador) | `019_metrics_view_clustering.sql` | vista (sin test JS) |
+| ATC | 4 | `atc.ts` migra de reglas de memoria a diccionario DCI→ATC **de fuente verificable** (CUM INVIMA, `atc-cum.data.ts` + `scripts/gen_atc_lookup.py`) con extracción de principio activo canónico y preferencia por monofármaco (corrige el sesgo por combinado); capa anotada de correcciones/FITO | — | 18 tests: set sourced, DCIs reales del piloto, procedencia |
 
 ### Migraciones — idempotencia, rollback y aplicación
 
@@ -117,9 +118,16 @@ e incompleta): úsese con análisis de sensibilidad con/sin `HH-`. Idempotente
 
 ## Pendiente / requiere tu decisión
 
-1. **ATC oficial.** `atc.ts` es un mapeo **curado, no oficial** (documentado como
-   tal). Para uso regulatorio, sustituir por un diccionario ATC de la OMS
-   versionado y verificable cuando se disponga de licencia/fuente.
+1. ~~**ATC oficial.**~~ ✅ `atc.ts` ya **no** es un mapeo de memoria: consulta un
+   diccionario DCI→ATC nivel 2 **derivado de fuente verificable y abierta** — el
+   CUM de INVIMA (datos.gov.co i7cb-raxc, 157.789 filas), vía el generador
+   reproducible `scripts/gen_atc_lookup.py` (`atc-cum.data.ts`, 2.761
+   ingredientes). Sobre esa base hay una capa pequeña y anotada de correcciones
+   (sesgo por combinado del CUM y huecos del snapshot «vigentes»), cada una con su
+   ATC oficial. Cobertura del piloto ≈91% (excluye homeopáticos y marcas sin DCI,
+   que quedan `SIN_CLASIFICAR`, nunca adivinados). **Nota**: el CUM no es el índice
+   ATC/DDD de la OMS (no redistribuible), pero es una fuente oficial colombiana
+   trazable; para uso regulatorio estricto, contrastar con WHOCC.
 2. ~~**Aplicación de migraciones.**~~ ✅ `016`–`020` **aplicadas a producción**
    (2026-07-22), verificadas read-only (114 intactas, 0 versiones nulas, sync
    restaurado, vista con clúster).

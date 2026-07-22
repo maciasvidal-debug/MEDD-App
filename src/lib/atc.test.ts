@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { therapeuticGroup, therapeuticSubgroup, normalizeDci, SIN_CLASIFICAR } from './atc'
+import { therapeuticGroup, therapeuticSubgroup, normalizeDci, canonical, SIN_CLASIFICAR } from './atc'
+import { ATC_LEVEL2_BY_INGREDIENT } from './atc-cum.data'
 
 describe('normalizeDci', () => {
   it('lowercases, strips accents and collapses whitespace', () => {
@@ -92,7 +93,9 @@ describe('therapeuticSubgroup (ATC level 2)', () => {
       ['alopurinol', 'Antigotosos (M04)', 'Musculoesquelético'],
       ['alendronato de sodio', 'Óseo / bifosfonatos (M05)', 'Musculoesquelético'],
       ['rifampicina', 'Antimicobacterianos (J04)', 'Antiinfecciosos'],
-      ['ketoconazol', 'Antimicóticos (J02)', 'Antiinfecciosos'],
+      // ketoconazol: el CUM lo clasifica mayoritariamente tópico (D01) — en
+      // Colombia predominan shampoo/crema — no el sistémico J02. Valor sourced.
+      ['ketoconazol', 'Antifúngicos tópicos (D01)', 'Dermatológicos'],
       ['tinidazol', 'Antiprotozoarios (P01)', 'Antiparasitarios'],
       ['tamoxifeno', 'Terapia endocrina oncológica (L02)', 'Antineoplásicos e inmunomoduladores'],
       ['metotrexato', 'Inmunosupresores (L04)', 'Antineoplásicos e inmunomoduladores'],
@@ -111,6 +114,47 @@ describe('therapeuticSubgroup (ATC level 2)', () => {
   it('does not misclassify tinidazol/secnidazol as the J01 metronidazol rule', () => {
     // Distinct nitroimidazoles must not be swallowed by the earlier J01 rule.
     expect(therapeuticGroup('tinidazol 500 mg')).toBe('Antiparasitarios')
+  })
+})
+
+describe('CUM-sourced dictionary (provenance)', () => {
+  it('loads a non-trivial verifiable lookup from the CUM export', () => {
+    expect(Object.keys(ATC_LEVEL2_BY_INGREDIENT).length).toBeGreaterThan(2000)
+    // Todas las entradas son códigos de subgrupo ATC nivel 2 (letra + 2 dígitos).
+    for (const code of Object.values(ATC_LEVEL2_BY_INGREDIENT)) {
+      expect(code).toMatch(/^[A-Z]\d{2}$/)
+    }
+  })
+
+  it('canonical() extracts the active ingredient from noisy CUM/DCI text', () => {
+    expect(canonical('AMOXICILINA TRIHIDRATO (1048.97) EQUIVALENTE A AMOXICILINA')).toBe('amoxicilina')
+    expect(canonical('SALBUTAMOL SULFATO (100 MCG DE SALBUTAMOL/DOSIS)')).toBe('salbutamol')
+    expect(canonical('losartan 50 mg potasico')).toBe('losartan')
+  })
+})
+
+// Regresión sobre DCI REALES del piloto (texto libre ruidoso tal como lo teclean
+// los encuestadores). Confirma que el pipeline sourced clasifica el dato real.
+describe('classifies real pilot DCIs (noisy free text)', () => {
+  const cases: Array<[string, string]> = [
+    ['AMOXICILINA TRIHIDRATO (1048.97) EQUIVALENTE A AMOXICILINA', 'Antiinfecciosos'],
+    ['SALBUTAMOL SULFATO (100 MCG DE SALBUTAMOL/DOSIS)', 'Respiratorio'],
+    ['losartan 50 mg potasico', 'Cardiovascular'],
+    ['HIDROCLOROTIAZIDA', 'Cardiovascular'],          // C03, no el combo C09
+    ['AMLODIPINO BESILATO 13.87 MGEQUIVALENTE A AMLODIPINO BASE', 'Cardiovascular'],
+    ['ACETAMINOFEN, FENILEFRINA, CLORFENIRAMINA', 'Respiratorio'], // combo → componente reconocido
+    ['CALAMINA (OXIDO DE ZINC: 5G + ARIABEL SIENNA: 0.02G)', 'Dermatológicos'], // override
+    ['ÁCIDO ACETILSALICÍLICO', 'Sistema nervioso'],   // override N02
+    ['CAFEINA', 'Sistema nervioso'],                  // override N06 (no M01 de combos)
+    ['1.5 G DE CARBONATO DE CALCIO EQUIVALENTE A CALCIO', 'Digestivo y metabolismo'], // override A12
+    ['Complejo b', 'Digestivo y metabolismo'],        // override A11
+    ['METRONIDAZOL Y NIFUROXAZIDA', 'Antiparasitarios'],
+    ['Chancapiedra', 'Fitoterapéutico/homeopático'],
+    ['Homeopatico complejo', 'Fitoterapéutico/homeopático'],
+    ['VITACERVIN-A', SIN_CLASIFICAR],                 // marca sin DCI → no se adivina
+  ]
+  it('maps each to the expected anatomical group', () => {
+    for (const [dci, group] of cases) expect(therapeuticGroup(dci)).toBe(group)
   })
 })
 
