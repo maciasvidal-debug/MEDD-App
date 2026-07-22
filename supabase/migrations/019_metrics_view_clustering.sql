@@ -9,34 +9,37 @@
 --   hogar/encuestador y la versión no eran identificables desde SQL.
 --
 --   Esta migración recrea la vista (definición idéntica a 004 + hardening) y
---   AÑADE columnas, sin quitar ni cambiar ninguna existente:
+--   AÑADE columnas al FINAL:
 --     * nui_etr           → clúster de encuestador (efecto-encuestador)
 --     * hogar_id           → clúster de hogar (ICC por hogar)
---     * departamento       → geografía DANE (además de ciudad)
---     * instrument_version → para acotar denominadores por versión
 --     * metodo_seleccion   → diseño muestral
+--     * instrument_version → para acotar denominadores por versión
+--     * departamento       → geografía DANE (además de ciudad)
+--
+-- ⚠️ ORDEN DE COLUMNAS: `create or replace view` NO puede renombrar ni reordenar
+-- las columnas existentes de una vista ya creada — solo permite AÑADIR columnas
+-- nuevas AL FINAL. Por eso las 19 columnas originales (004) se mantienen en su
+-- posición y nombre exactos, y las 5 nuevas se anexan después. (No usar `drop
+-- view` para no arrastrar dependencias/permisos.)
 --
 -- Puramente aditiva: los consumidores existentes que seleccionan columnas por
 -- nombre no se ven afectados. SECURITY INVOKER se preserva (la RLS de surveys
 -- sigue aplicando por usuario que consulta). Idempotente (create or replace).
 --
 -- Rollback: re-aplicar 004_harden_metrics_view.sql (recrea la vista sin las
--- columnas añadidas). No hay pérdida de datos: una vista no almacena.
+-- columnas añadidas — al ser una reducción de columnas requiere primero
+-- `drop view if exists public.v_product_metrics;`). No hay pérdida de datos.
 -- =====================================================================
 
 create or replace view public.v_product_metrics
   with (security_invoker = true)
 as
 select
+  -- ── Columnas originales (004), en su orden y nombre exactos ──
   s.id          as survey_id,
   s.user_id,
-  s.nui_etr,                                            -- clúster de encuestador
-  s.hogar_id,                                           -- clúster de hogar
-  s.metodo_seleccion,                                   -- diseño muestral
-  s.instrument_version,                                 -- versión (denominadores)
   s.f_eta,
   s.ciudad,
-  s.departamento,
   s.estrato,
   s.as_salud,
   s.cant_med,
@@ -59,6 +62,12 @@ select
   end                                                   as t_disp,   -- ciclo total desde dispensación
   case when nullif(m.value ->> 'fVto', '') is not null and s.f_disp is not null
        then (nullif(m.value ->> 'fVto', '')::date - s.f_disp)
-  end                                                   as v_util    -- vida útil remanente al dispensar
+  end                                                   as v_util,   -- vida útil remanente al dispensar
+  -- ── Columnas AÑADIDAS al final (auditoría Rec. 5·6) ──
+  s.nui_etr,                                            -- clúster de encuestador
+  s.hogar_id,                                           -- clúster de hogar (ICC)
+  s.metodo_seleccion,                                   -- diseño muestral
+  s.instrument_version,                                 -- denominadores por versión
+  s.departamento                                        -- geografía DANE
 from public.surveys s,
      jsonb_array_elements(s.medications) as m;
