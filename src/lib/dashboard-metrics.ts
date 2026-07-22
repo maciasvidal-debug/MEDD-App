@@ -248,6 +248,65 @@ export function buildSurveyorQC(surveys: Survey[]): SurveyorQC | null {
   return { rows, poolVencPct, digit }
 }
 
+// ─── Household clustering (hogar_id) — Rec. 5 ───────────────────────────────
+// El agrupamiento por hogar (ICC≈0,27 en el piloto) sólo es modelable si el dato
+// trae `hogar_id`. Este resumen mide (a) la COBERTURA del identificador —clave de
+// preparación: los históricos del piloto no lo tienen— y (b), cuando hay hogares
+// identificados, su tamaño y el ICC del desenlace por hogar.
+const homeKey = (s: Survey) => (s.hogarId ?? '').trim()
+
+export interface HouseholdClustering {
+  nSurveys: number              // total de encuestas consideradas
+  nWithHogar: number            // encuestas con hogar_id
+  coverage: number              // nWithHogar / nSurveys (0..1)
+  nHouseholds: number           // hogares distintos identificados
+  meanSize: number | null       // encuestas por hogar (media, de los identificados)
+  maxSize: number               // mayor nº de encuestas en un mismo hogar
+  multiPersonHouseholds: number // hogares con ≥2 encuestas
+  icc: ICCResult | null         // agrupamiento del desenlace (vtoMedNc) por hogar
+}
+
+// Devuelve el resumen SIEMPRE que haya encuestas (aunque 0 tengan hogar_id), para
+// que el dashboard muestre la brecha de cobertura como indicador de preparación.
+export function buildHouseholdClustering(surveys: Survey[]): HouseholdClustering | null {
+  const nSurveys = surveys.length
+  if (nSurveys === 0) return null
+  const nWithHogar = surveys.filter(s => homeKey(s) !== '').length
+  // groupCases omite claves vacías → sólo cuenta hogares identificados.
+  const byHome = groupCases(surveys, s => homeKey(s) || null, s => s.vtoMedNc === 'Sí')
+  const sizes = Array.from(byHome.values()).map(g => g.total)
+  const nHouseholds = sizes.length
+  return {
+    nSurveys,
+    nWithHogar,
+    coverage: nWithHogar / nSurveys,
+    nHouseholds,
+    meanSize: nHouseholds ? nWithHogar / nHouseholds : null,
+    maxSize: sizes.length ? Math.max(...sizes) : 0,
+    multiPersonHouseholds: sizes.filter(n => n >= 2).length,
+    icc: iccBinary(Array.from(byHome.values()).map(g => ({ n: g.total, cases: g.cases }))),
+  }
+}
+
+// ─── Sampling-method distribution (metodoSeleccion) — Rec. 5 ────────────────
+// Deja el diseño muestral visible. Null cuando ningún registro declara método
+// (p. ej. el histórico del piloto), de modo que su tarjeta simplemente no aparece.
+export interface SamplingMethod { n: number; byMethod: Array<{ name: string; value: number }> }
+
+export function buildSamplingMethod(surveys: Survey[]): SamplingMethod | null {
+  const counts = new Map<string, number>()
+  for (const s of surveys) {
+    const m = (s.metodoSeleccion ?? '').trim()
+    if (m) counts.set(m, (counts.get(m) ?? 0) + 1)
+  }
+  const n = Array.from(counts.values()).reduce((a, b) => a + b, 0)
+  if (n === 0) return null
+  const byMethod = OPT.metodoSeleccion
+    .map(name => ({ name, value: counts.get(name) ?? 0 }))
+    .filter(x => x.value > 0)
+  return { n, byMethod }
+}
+
 // ─── Product-level analytics (medications[]) ────────────────────────────────
 
 export interface MedStats {

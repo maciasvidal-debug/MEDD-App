@@ -20,9 +20,11 @@ import {
   buildRetention, buildEstratoAssociation, buildSurveyorEffect, buildSurveyorQC,
   buildMedicationStats, buildMotiveStats, buildDisposalStats, buildClassMotiveCross,
   buildBackcheckAgreement, buildEstratoAdjusted, FAST_SECONDS,
+  buildHouseholdClustering, buildSamplingMethod,
   type DaysSummary, type AssocGroup, type Association, type SurveyorEffect,
   type SurveyorQC, type MedStats, type MotiveStats, type DisposalStats,
   type ClassMotiveCross, type BackcheckAgreement, type AdjustedAssoc,
+  type HouseholdClustering, type SamplingMethod,
 } from '../lib/dashboard-metrics'
 import type { Survey } from '../types'
 
@@ -305,6 +307,8 @@ export default function DashboardPage() {
   const retention = useMemo(() => buildRetention(data), [data])
   const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
   const surveyorQC = useMemo(() => buildSurveyorQC(data), [data])
+  const household = useMemo(() => buildHouseholdClustering(data), [data])
+  const samplingMethod = useMemo(() => buildSamplingMethod(data), [data])
   // Product-level (medications[]) aggregation — the analytics that were missing.
   const medStats = useMemo(() => buildMedicationStats(data), [data])
   // Motives battery (instrument v2) — denominator scoped to records that were
@@ -516,6 +520,11 @@ export default function DashboardPage() {
 
         {/* Control de calidad operativo por encuestador (para-data / antifraude) */}
         {isInvestigador && surveyorQC && <SurveyorQCCard qc={surveyorQC} />}
+
+        {/* Diseño muestral: agrupamiento por hogar y método de selección (Rec. 5) */}
+        {isInvestigador && household && (
+          <HouseholdClusteringCard h={household} method={samplingMethod} />
+        )}
 
         {/* Integridad: vencidos declarados sin detalle de producto vencido */}
         {isInvestigador && integrityIssues.length > 0 && <IntegrityCard issues={integrityIssues} />}
@@ -1056,6 +1065,68 @@ function SurveyorEffectCard({ s }: { s: SurveyorEffect }) {
           </div>
         )}
       </div>
+    </Card>
+  )
+}
+
+// ─── Household clustering + sampling design (Rec. 5) ────────────────────────
+
+function HouseholdClusteringCard({ h, method }: { h: HouseholdClustering; method: SamplingMethod | null }) {
+  const covPct = Math.round(h.coverage * 100)
+  const noHogar = h.nWithHogar === 0
+  const iccHigh = h.icc !== null && h.icc.icc >= 0.05
+  const tiles: Array<{ v: string; label: string; accent?: string }> = [
+    { v: `${covPct}%`, label: `con hogar_id (${h.nWithHogar}/${h.nSurveys})`, accent: noHogar ? C.amber : C.green },
+    { v: String(h.nHouseholds), label: 'hogares identificados' },
+    { v: h.meanSize ? h.meanSize.toFixed(1) : '—', label: 'encuestas/hogar (media)' },
+    { v: String(h.multiPersonHouseholds), label: 'hogares multipersona' },
+  ]
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel help={STAT_GLOSSARY.icc}>Diseño muestral — hogar y método</SectionLabel>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        El agrupamiento por <strong>hogar</strong> sólo es modelable cuando el dato trae{' '}
+        <code>hogar_id</code>. Este panel mide la <strong>cobertura</strong> del identificador
+        (indicador de preparación para la próxima ola) y, cuando hay hogares identificados, su
+        tamaño y el <strong>ICC</strong> del desenlace por hogar.
+      </p>
+
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', padding: '10px 12px', background: C.bg, borderRadius: 8 }}>
+        {tiles.map(t => (
+          <div key={t.label} style={{ flex: 1, minWidth: 90 }}>
+            <div className="fd tnum" style={{ fontSize: 22, fontWeight: 600, lineHeight: 1, color: t.accent ?? C.text }}>{t.v}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{t.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {h.icc && (
+        <div style={{ marginTop: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+          <strong style={{ color: iccHigh ? C.amber : C.text }}>
+            ICC por hogar = {h.icc.icc.toFixed(3)} (deff {h.icc.designEffect.toFixed(2)}, {h.icc.clusters} hogares)
+          </strong>
+          {' — '}
+          {iccHigh
+            ? 'el desenlace se agrupa dentro de los hogares: el diseño debe corregir por efecto de conglomerado'
+            : 'agrupamiento por hogar despreciable con los datos actuales'}.
+        </div>
+      )}
+
+      {noHogar && (
+        <div style={{ marginTop: 10, color: C.amber, fontSize: 11.5, lineHeight: 1.5 }}>
+          ⚠ Ninguna encuesta del conjunto actual trae <code>hogar_id</code> (histórico del piloto).
+          El asistente lo autogenera en cada captura nueva, así que la cobertura crecerá desde la próxima ola.
+        </div>
+      )}
+
+      {method && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 6 }}>
+            Método de selección declarado (n = {method.n})
+          </div>
+          <DistBar data={method.byMethod} dataKey="value" color={CHART.teal} yWidth={150} barName="Encuestas" />
+        </div>
+      )}
     </Card>
   )
 }

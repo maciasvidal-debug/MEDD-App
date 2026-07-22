@@ -3,6 +3,7 @@ import {
   buildRetention, buildEstratoAssociation, buildSurveyorEffect, buildSurveyorQC,
   buildMedicationStats, buildMotiveStats, buildDisposalStats, buildClassMotiveCross,
   buildBackcheckAgreement, buildEstratoAdjusted,
+  buildHouseholdClustering, buildSamplingMethod,
 } from './dashboard-metrics'
 import type { Survey, Medication, EtrPrograma } from '../types'
 
@@ -234,5 +235,59 @@ describe('buildEstratoAdjusted', () => {
     expect(adj.exposedTotal).toBe(4)   // 2 high per program × 2 programs
     expect(adj.unexposedTotal).toBe(4)
     expect(typeof adj.pctChange).toBe('number')
+  })
+})
+
+describe('buildHouseholdClustering (Rec. 5)', () => {
+  it('returns null only when there are no surveys', () => {
+    expect(buildHouseholdClustering([])).toBeNull()
+  })
+
+  it('reports 0 coverage for historical data without hogar_id (readiness gap)', () => {
+    const r = buildHouseholdClustering([mkSurvey({ hogarId: '' }), mkSurvey({ hogarId: '' })])!
+    expect(r).not.toBeNull()
+    expect(r.nSurveys).toBe(2)
+    expect(r.nWithHogar).toBe(0)
+    expect(r.coverage).toBe(0)
+    expect(r.nHouseholds).toBe(0)
+    expect(r.meanSize).toBeNull()
+    expect(r.icc).toBeNull()
+  })
+
+  it('summarises household size and coverage when hogar_id is populated', () => {
+    const surveys = [
+      mkSurvey({ hogarId: 'H-1', vtoMedNc: 'Sí' }),
+      mkSurvey({ hogarId: 'H-1', vtoMedNc: 'No' }), // same home → multi-person
+      mkSurvey({ hogarId: 'H-2', vtoMedNc: 'No' }),
+      mkSurvey({ hogarId: '' }),                     // sin hogar_id
+    ]
+    const r = buildHouseholdClustering(surveys)!
+    expect(r.nSurveys).toBe(4)
+    expect(r.nWithHogar).toBe(3)
+    expect(r.coverage).toBeCloseTo(0.75)
+    expect(r.nHouseholds).toBe(2)     // H-1, H-2
+    expect(r.meanSize).toBeCloseTo(1.5) // 3 encuestas / 2 hogares
+    expect(r.maxSize).toBe(2)
+    expect(r.multiPersonHouseholds).toBe(1) // solo H-1
+  })
+})
+
+describe('buildSamplingMethod (Rec. 5)', () => {
+  it('returns null when no survey declares a sampling method', () => {
+    expect(buildSamplingMethod([mkSurvey({ metodoSeleccion: '' })])).toBeNull()
+  })
+
+  it('tallies the declared methods in catalogue order', () => {
+    const r = buildSamplingMethod([
+      mkSurvey({ metodoSeleccion: 'Aleatorio simple' }),
+      mkSurvey({ metodoSeleccion: 'Aleatorio simple' }),
+      mkSurvey({ metodoSeleccion: 'Por conveniencia' }),
+      mkSurvey({ metodoSeleccion: '' }),
+    ])!
+    expect(r.n).toBe(3)
+    expect(r.byMethod).toEqual([
+      { name: 'Aleatorio simple', value: 2 },
+      { name: 'Por conveniencia', value: 1 },
+    ])
   })
 })
