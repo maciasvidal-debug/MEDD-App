@@ -62,14 +62,33 @@ esquema resultante y valida:
 | Fase 4 | — | Parser `parseSurveysCSV` + fixture + test de regresión del CSV histórico | — | regresión histórica (8 tests) |
 | Analítica | 5 · 6 | `v_product_metrics` expone `nui_etr`, `hogar_id`, `metodo_seleccion`, `instrument_version` y `departamento`, para modelar el agrupamiento (ICC) y separar denominadores por versión desde SQL (rol investigador) | `019_metrics_view_clustering.sql` | vista (sin test JS) |
 
-### Migraciones — idempotencia y rollback
+### Migraciones — idempotencia, rollback y aplicación
 
 Todas usan guardas (`add column if not exists`, chequeo de `pg_constraint`,
 back-fill solo sobre NULLs; la vista `019` es `create or replace`) y son seguras
-de re-ejecutar. Rollback documentado en cada archivo (`016`–`019`). **No se
-aplicaron a ningún proyecto Supabase en vivo**: son SQL versionado; su despliegue
-es un paso de operaciones (aplicar en orden 016→017→018→019, antes de desplegar
-el frontend, para no romper el upsert).
+de re-ejecutar. Rollback documentado en cada archivo (`016`–`019`).
+
+**Aplicadas a producción el 2026-07-22** (proyecto Supabase `MEDD-App`), en orden
+016→017→018→019. El plan Free no permite branches de base de datos, así que la
+validación previa se hizo en un **Postgres local desechable** sembrado como
+producción (105 filas versión-NULL + 9 v2): aplican limpio, son idempotentes
+(2ª pasada sin efecto) y el back-fill deja 0 nulos. Verificación read-only
+post-aplicación en prod: **114 encuestas intactas, 0 `instrument_version` nulas,
+`NOT NULL`+`DEFAULT 1` activos, `hogar_id`/`metodo_seleccion` presentes (sync
+restaurado), y la vista expone las 5 columnas nuevas**.
+
+> **Corrección de `019`:** la primera versión reordenaba las columnas de la vista
+> e insertaba las nuevas antes de `f_eta`; `create or replace view` **no** puede
+> renombrar/reordenar columnas existentes (solo añadir al final), así que fallaba
+> sobre la vista `004` preexistente. El test local inicial dio un falso positivo
+> porque recreaba la vista desde cero. Corregido: las 19 columnas originales se
+> preservan en su posición y las 5 nuevas se anexan al final. Re-validado contra
+> la vista preexistente antes de aplicar.
+
+> **Nota de orden de despliegue:** el frontend que escribe `hogar_id`/
+> `metodo_seleccion` se mergeó a `main` **antes** de aplicar `018`, invirtiendo el
+> orden recomendado; mientras tanto las capturas nuevas quedaban en local y
+> reintentaban el sync (sin pérdida de dato). `018` restauró el sync.
 
 ## Cumplimiento (Habeas Data, Ley 1581)
 
