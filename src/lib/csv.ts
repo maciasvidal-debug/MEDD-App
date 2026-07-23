@@ -1,6 +1,6 @@
 import type { Survey } from '../types'
 import { CODEBOOK } from './constants'
-import { productMetrics } from './date'
+import { isProductExpired } from './date'
 
 // CSV serialization for data export, in codebook column order, plus the
 // self-describing data-dictionary export.
@@ -81,7 +81,7 @@ function medicationsCell(s: Survey): string {
   return s.medications?.length
     ? s.medications.map(m => {
         const estado = (m.fVto && s.fEta)
-          ? (productMetrics(s.fEta, s.fDisp, m).isExpired ? 'vencido' : 'vigente')
+          ? (isProductExpired(s.fEta, m.fVto) ? 'vencido' : 'vigente')
           : ''
         return [m.nmMed, m.dci, m.concMed, m.undConc, m.fVto, estado].map(escapeCSV).join(';')
       }).join('|')

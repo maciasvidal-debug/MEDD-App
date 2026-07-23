@@ -161,36 +161,47 @@ export function canonical(raw: string): string {
 const TABLE: Record<string, string> = { ...ATC_LEVEL2_BY_INGREDIENT, ...ATC_OVERRIDES }
 const KEYS_BY_LEN: string[] = Object.keys(TABLE).sort((a, b) => b.length - a.length)
 
-// Memoización LRU del subgrupo por DCI canónico.
+// Emparejadores de respaldo por subcadena de palabra completa (combos / DCI
+// compuestos): la clave más larga gana. Las ~2,7k expresiones se compilan UNA
+// sola vez al cargar el módulo —claves ≥4 chars, en el mismo orden longitud-desc
+// que antes— en lugar de reconstruir un `RegExp` por clave en CADA DCI no
+// encontrado (el paso dominante del costo al clasificar miles de medicamentos).
+const FALLBACK_MATCHERS: ReadonlyArray<readonly [RegExp, string]> = KEYS_BY_LEN
+  .filter(k => k.length >= 4)
+  .map(k => [new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`), TABLE[k]] as const)
+
+// Memoización LRU del subgrupo por DCI de ENTRADA (texto crudo). Cachear por el
+// texto tal cual llega —no por su forma canónica— evita repetir `canonical()`
+// (varias pasadas de regex) cuando un mismo DCI se consulta más de una vez: el
+// dashboard pide grupo y subgrupo del mismo producto y agrega miles de ítems.
 const CACHE_MAX = 2000
 const codeCache = new Map<string, string | null>()
 
 /** Subgrupo ATC nivel 2 (3 chars) del DCI, el centinela FITO, o null. */
 function matchCode(dci: string): string | null {
-  const c = canonical(dci)
-  if (!c) return null
-
-  const cached = codeCache.get(c)
+  const cached = codeCache.get(dci)
   if (cached !== undefined) {
-    codeCache.delete(c); codeCache.set(c, cached) // refresca LRU
+    codeCache.delete(dci); codeCache.set(dci, cached) // refresca LRU
     return cached
   }
 
+  const c = canonical(dci)
   let code: string | null = null
-  if (FITO_TOKENS.some(t => c.includes(t))) {
-    code = FITO
-  } else if (TABLE[c]) {
-    code = TABLE[c]
-  } else {
-    // Subcadena por palabra completa, la clave más larga gana (clasifica un combo
-    // por su componente reconocido más específico). Se ignoran claves < 4 chars.
-    for (const k of KEYS_BY_LEN) {
-      if (k.length < 4) break
-      if (new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(c)) { code = TABLE[k]; break }
+  if (c) {
+    if (FITO_TOKENS.some(t => c.includes(t))) {
+      code = FITO
+    } else if (TABLE[c]) {
+      code = TABLE[c]
+    } else {
+      // Subcadena por palabra completa, la clave más larga gana (clasifica un
+      // combo por su componente reconocido más específico).
+      for (const [re, mapped] of FALLBACK_MATCHERS) {
+        if (re.test(c)) { code = mapped; break }
+      }
     }
   }
 
-  codeCache.set(c, code)
+  codeCache.set(dci, code)
   if (codeCache.size > CACHE_MAX) codeCache.delete(codeCache.keys().next().value as string)
   return code
 }
