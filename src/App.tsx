@@ -3,19 +3,49 @@ import { useStore } from './lib/store'
 import { useShallow } from 'zustand/react/shallow'
 import { BottomNav, SideNav, ToastContainer } from './components/layout'
 import { C, Spinner, PageSkeleton } from './components/ui'
-import {
-  WizardPage, EncuestasPage,
-  BuscarPage, ExportarPage, AjustesPage,
-} from './pages'
 import AuthPage from './pages/auth'
 import ProfileOnboarding from './pages/ProfileOnboarding'
 import Welcome from './pages/Welcome'
 import { isProfileComplete } from './lib/validators'
 import { useNetworkStatus } from './hooks/useNetworkStatus'
 
-// Dashboard pulls in Recharts (heavy); load it on demand so it stays out of the
-// initial bundle and only downloads when the user opens the panel.
-const DashboardPage = React.lazy(() => import('./pages/Dashboard'))
+// ⚡ Bolt: every route is code-split, not just the Dashboard. The app opens on
+// one view at a time, so eagerly bundling all pages into the initial JS made the
+// first paint download/parse code for screens the user may never open. Each page
+// now loads on demand (mirrors the existing Dashboard split), shrinking the
+// initial bundle to the app shell + the first view. Named exports are adapted to
+// the default export React.lazy expects.
+//
+// One loader per route, shared by React.lazy (below) and the offline prefetch
+// (in the App effect). This is an offline-first field app whose service worker
+// caches assets on first fetch (stale-while-revalidate) — so a route that is
+// never opened while online would NOT be cached and would fail to load offline.
+// Prefetching every chunk on idle after first paint keeps them off the initial
+// critical path yet ensures the capture Wizard (and the rest) work with no signal.
+const loadRoute = {
+  dashboard: () => import('./pages/Dashboard'),
+  encuestas: () => import('./pages/EncuestasPage').then(m => ({ default: m.EncuestasPage })),
+  wizard:    () => import('./pages/WizardPage').then(m => ({ default: m.WizardPage })),
+  buscar:    () => import('./pages/BuscarPage').then(m => ({ default: m.BuscarPage })),
+  exportar:  () => import('./pages/ExportarPage').then(m => ({ default: m.ExportarPage })),
+  ajustes:   () => import('./pages/AjustesPage').then(m => ({ default: m.AjustesPage })),
+}
+const DashboardPage = React.lazy(loadRoute.dashboard)
+const EncuestasPage = React.lazy(loadRoute.encuestas)
+const WizardPage    = React.lazy(loadRoute.wizard)
+const BuscarPage    = React.lazy(loadRoute.buscar)
+const ExportarPage  = React.lazy(loadRoute.exportar)
+const AjustesPage   = React.lazy(loadRoute.ajustes)
+
+// Warm every route chunk in the background after first paint, so the service
+// worker caches them while online and the offline-first flows stay available
+// with no signal. Deferred to idle so it never competes with the initial load;
+// dynamic imports are deduped, so a later navigation reuses the warmed module.
+function prefetchRoutes() {
+  const warm = () => { for (const load of Object.values(loadRoute)) load().catch(() => {}) }
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(warm)
+  else setTimeout(warm, 2000)
+}
 
 function PageLoader() {
   return (
@@ -71,6 +101,10 @@ export default function App() {
     const unsub = initAuth()
     return unsub
   }, [])
+
+  // Prefetch the code-split route chunks on idle so they're service-worker
+  // cached while online and remain available offline (see loadRoute above).
+  useEffect(() => { prefetchRoutes() }, [])
 
   // Load local data once authenticated
   useEffect(() => {
@@ -147,17 +181,16 @@ export default function App() {
             {/* Resume an in-progress survey saved before a reload */}
             {view !== 'wizard' && <ResumeDraftBanner />}
 
-            {/* Pages */}
-            {view === 'dashboard'  && (
-              <Suspense fallback={<PageLoader />}>
-                <DashboardPage />
-              </Suspense>
-            )}
-            {view === 'encuestas'  && <EncuestasPage />}
-            {view === 'wizard'     && <WizardPage />}
-            {view === 'buscar'     && <BuscarPage />}
-            {view === 'exportar'   && <ExportarPage />}
-            {view === 'ajustes'    && <AjustesPage />}
+            {/* Pages — each route is a separate lazy chunk; one Suspense covers
+                the brief fetch while a newly-opened view's chunk loads. */}
+            <Suspense fallback={<PageLoader />}>
+              {view === 'dashboard'  && <DashboardPage />}
+              {view === 'encuestas'  && <EncuestasPage />}
+              {view === 'wizard'     && <WizardPage />}
+              {view === 'buscar'     && <BuscarPage />}
+              {view === 'exportar'   && <ExportarPage />}
+              {view === 'ajustes'    && <AjustesPage />}
+            </Suspense>
           </>
         )}
 
