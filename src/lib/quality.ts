@@ -1,5 +1,5 @@
 import type { SurveyDraft, Survey } from '../types'
-import { calcEdad, dayDiff, productMetrics } from './date'
+import { calcEdad, dayDiff, productMetrics, isProductExpired } from './date'
 
 export interface QualityReport {
   errors:       string[]  // hard logical impossibilities → block save
@@ -40,7 +40,7 @@ export function declaresExpiredWithoutDetail(
   const declaresExpired = d.vtoMedNc === 'Sí' || (d.cantMedVto ?? 0) > 0
   if (!declaresExpired) return false
   const hasExpiredDetail = (d.medications ?? []).some(
-    m => productMetrics(d.fEta, d.fDisp, m).isExpired,
+    m => isProductExpired(d.fEta, m.fVto),
   )
   return !hasExpiredDetail
 }

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { TopBar } from '../components/layout'
 import { Card, Button, Badge, EmptyState, Dialog, C } from '../components/ui'
 import { useStore } from '../lib/store'
-import { calcEdad, fmtDate, fmtTimestamp, productMetrics } from '../lib/date'
+import { calcEdad, fmtDate, fmtTimestamp, productMetrics, isProductExpired } from '../lib/date'
 import { compareSortable } from '../lib/utils'
 import { declaresExpiredWithoutDetail } from '../lib/quality'
 import type { Survey } from '../types'
@@ -45,7 +45,7 @@ const SurveyCardItem = React.memo(function SurveyCardItem({
   survey: sv, isInvestigador, confirming, onConfirm, onRemove, onEdit, onDetail, onBackcheck,
 }: SurveyCardItemProps) {
   const edad = calcEdad(sv.fEta, sv.fNac)
-  const expiredMeds = sv.medications?.filter(m => productMetrics(sv.fEta, sv.fDisp, m).isExpired).length ?? 0
+  const expiredMeds = sv.medications?.filter(m => isProductExpired(sv.fEta, m.fVto)).length ?? 0
 
   return (
     <Card className="lift" style={{ display: 'flex', flexDirection: 'column', cursor: 'default' }}>

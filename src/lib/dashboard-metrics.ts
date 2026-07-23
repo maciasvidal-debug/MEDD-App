@@ -4,7 +4,7 @@ import {
   type Proportion, type RiskRatio, type ChiSquare, type TrendTest,
   type MHResult, type ICCResult, type Stratum2x2, type DigitTest, type KappaResult,
 } from './stats'
-import { productMetrics } from './date'
+import { productMetrics, isProductExpired } from './date'
 import { pct } from './utils'
 import { therapeuticGroup, therapeuticSubgroup, SIN_CLASIFICAR } from './atc'
 import { disposalCategories } from './disposal'
@@ -324,7 +324,7 @@ export function buildMedicationStats(surveys: Survey[]): MedStats | null {
   for (const s of surveys) {
     for (const m of s.medications ?? []) {
       totalProducts++
-      const expired = productMetrics(s.fEta, s.fDisp, m).isExpired
+      const expired = isProductExpired(s.fEta, m.fVto)
       if (expired) expiredProducts++
       if (m.fVto) withVto++
 

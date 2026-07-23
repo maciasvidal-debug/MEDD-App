@@ -46,6 +46,18 @@ export function productMetrics(fEta: string, fDisp: string, med: Medication): Pr
   }
 }
 
+/**
+ * ¿El producto está vencido a la fecha de la entrevista? (F_ETA − F_VTO > 0).
+ * Atajo de `productMetrics(...).isExpired` para los recorridos que sólo miran el
+ * estado de vencimiento (agregados del dashboard, listado de encuestas, export):
+ * calcula UNA sola resta de fechas en vez de tres, evitando T_DISP y V_UTIL —dos
+ * pares de `new Date()` por producto— que allí se descartan. Misma semántica.
+ */
+export function isProductExpired(fEta: string, fVto: string): boolean {
+  const tVto = dayDiff(fEta, fVto)
+  return tVto !== null && tVto > 0
+}
+
 /** Formatea YYYY-MM-DD a DD/MM/YYYY para visualización. */
 export function fmtDate(iso: string): string {
   if (!iso) return '—'
