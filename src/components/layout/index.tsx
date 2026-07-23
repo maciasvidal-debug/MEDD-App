@@ -1,6 +1,7 @@
 import React from 'react'
 import { C, IconButton, Logo } from '../ui'
 import { useStore } from '../../lib/store'
+import { useShallow } from 'zustand/react/shallow'
 import { STEP_LABELS, TOTAL_STEPS } from '../../lib/constants'
 import type { AppView } from '../../types'
 
@@ -78,7 +79,17 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 export function BottomNav() {
-  const { view, setView, surveys, openWizard, userRole } = useStore()
+  // ⚡ Bolt: always-mounted shell — a bare `useStore()` re-rendered it on every
+  // state change (each toast/sync toggle). Subscribe only to the nav slices.
+  const { view, setView, surveys, openWizard, userRole } = useStore(
+    useShallow(s => ({
+      view: s.view,
+      setView: s.setView,
+      surveys: s.surveys,
+      openWizard: s.openWizard,
+      userRole: s.userRole,
+    })),
+  )
   const isInvestigador = userRole === 'investigador'
 
   function handleNav(id: NavItem['id']) {
@@ -154,7 +165,20 @@ export function BottomNav() {
 // Reuses the same NAV_ITEMS + store state so navigation stays in sync across both.
 
 export function SideNav() {
-  const { view, setView, surveys, openWizard, userRole, user, theme, toggleTheme } = useStore()
+  // ⚡ Bolt: always-mounted left rail — same rationale as BottomNav; subscribe
+  // only to the slices it renders instead of the whole store.
+  const { view, setView, surveys, openWizard, userRole, user, theme, toggleTheme } = useStore(
+    useShallow(s => ({
+      view: s.view,
+      setView: s.setView,
+      surveys: s.surveys,
+      openWizard: s.openWizard,
+      userRole: s.userRole,
+      user: s.user,
+      theme: s.theme,
+      toggleTheme: s.toggleTheme,
+    })),
+  )
   const isInvestigador = userRole === 'investigador'
 
   const items = NAV_ITEMS.filter(item => item.id !== 'nueva')

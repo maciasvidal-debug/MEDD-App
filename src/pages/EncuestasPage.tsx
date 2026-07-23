@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { TopBar } from '../components/layout'
 import { Card, Button, Badge, EmptyState, Dialog, C } from '../components/ui'
 import { useStore } from '../lib/store'
+import { useShallow } from 'zustand/react/shallow'
 import { calcEdad, fmtDate, fmtTimestamp, productMetrics, isProductExpired } from '../lib/date'
 import { compareSortable } from '../lib/utils'
 import { declaresExpiredWithoutDetail } from '../lib/quality'
@@ -139,7 +140,20 @@ const SurveyCardItem = React.memo(function SurveyCardItem({
 })
 
 export function EncuestasPage() {
-  const { surveys, removeSurvey, openEditWizard, openWizard, openBackcheckWizard, userRole } = useStore()
+  // ⚡ Bolt: this view renders the full records list (N cards or table rows); even
+  // though each row is React.memo'd, a parent re-render re-creates all N elements.
+  // A bare `useStore()` did that on every unrelated state change (toast auto-remove
+  // every 3.2s, `syncing` toggles). Subscribe only to the slices this page uses.
+  const { surveys, removeSurvey, openEditWizard, openWizard, openBackcheckWizard, userRole } = useStore(
+    useShallow(s => ({
+      surveys: s.surveys,
+      removeSurvey: s.removeSurvey,
+      openEditWizard: s.openEditWizard,
+      openWizard: s.openWizard,
+      openBackcheckWizard: s.openBackcheckWizard,
+      userRole: s.userRole,
+    })),
+  )
   const isInvestigador = userRole === 'investigador'
   const [filter, setFilter]     = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
