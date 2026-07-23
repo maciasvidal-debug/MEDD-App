@@ -1,5 +1,6 @@
 import React, { useEffect, Suspense } from 'react'
 import { useStore } from './lib/store'
+import { useShallow } from 'zustand/react/shallow'
 import { BottomNav, SideNav, ToastContainer } from './components/layout'
 import { C, Spinner, PageSkeleton } from './components/ui'
 import {
@@ -25,12 +26,38 @@ function PageLoader() {
 }
 
 export default function App() {
+  // ⚡ Bolt: App is the router at the root of the tree, so any re-render here
+  // reconciles the whole page tree (SideNav, the active page, BottomNav) — and
+  // the pages aren't memoized, so a parent re-render even defeats the per-page
+  // useShallow tuning below it. A bare `useStore()` re-rendered App on EVERY
+  // state change, notably every transient toast push/auto-remove (~every 3.2s).
+  // App never reads `toasts` (the ToastContainer owns those), so we subscribe
+  // only to the slices App actually uses; toast churn no longer re-renders the app.
   const {
     view, loadSurveys, loadSettings, loadDraft, surveysLoaded, surveys,
     user, authReady, initAuth, syncing,
     settings, settingsLoaded, userRole, userActive,
     welcomeOpen, maybeOpenWelcome,
-  } = useStore()
+  } = useStore(
+    useShallow(s => ({
+      view: s.view,
+      loadSurveys: s.loadSurveys,
+      loadSettings: s.loadSettings,
+      loadDraft: s.loadDraft,
+      surveysLoaded: s.surveysLoaded,
+      surveys: s.surveys,
+      user: s.user,
+      authReady: s.authReady,
+      initAuth: s.initAuth,
+      syncing: s.syncing,
+      settings: s.settings,
+      settingsLoaded: s.settingsLoaded,
+      userRole: s.userRole,
+      userActive: s.userActive,
+      welcomeOpen: s.welcomeOpen,
+      maybeOpenWelcome: s.maybeOpenWelcome,
+    })),
+  )
 
   // Whether an encuestador still owes a complete surveyor profile. Computed here
   // (before any early return) so the welcome effect below can avoid popping over
