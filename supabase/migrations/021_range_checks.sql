@@ -64,7 +64,8 @@ end $$;
 
 -- 3) f_eta no futura (current_date no es inmutable → trigger, no CHECK).
 create or replace function public.medd_check_f_eta_not_future()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = public, pg_temp as $$
 begin
   if new.f_eta is not null and new.f_eta > current_date then
     raise exception 'f_eta (%) no puede ser una fecha futura', new.f_eta

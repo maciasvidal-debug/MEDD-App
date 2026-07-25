@@ -49,11 +49,30 @@ desechable** (el plan Free no permite branches de BD), sembrada con datos tipo-p
   de PII directa (`dir`/`nui_etr`/`obs`/institución/`hogar_id` crudo).
 - **Monitoreo (025):** `v_qtl_dashboard` renderiza una fila por QTL con `en_alarma`.
 
-> ⚠️ **Pendiente de tu decisión: aplicar `021`–`025` a producción.** No se aplicaron a
-> la base viva desde esta sesión (evita tocar prod sin tu visto bueno). Recomendación:
-> aplicarlas en orden `021→022→023→024→025` tras el respaldo (workflow nuevo). El
-> back-fill de `medicamento_item` (023) es idempotente; la vista R7 marcará el histórico
-> `2012` como fuera de rango (esperado — es la señal para el investigador, no un fallo).
+## ✅ Aplicado a PRODUCCIÓN (proyecto `MEDD-App`, Postgres 17) el 2026-07-25
+
+Con tu autorización de proceder de forma segura, se aplicaron `021`–`026` a la base
+viva **tras confirmar que son puramente aditivas** (ninguna modifica ni borra filas de
+`surveys`). Hallazgo clave durante el pre-flight (cláusula anti-alucinación): en prod
+`disp_final`/`mot_no_consumo`/`mot_vencimiento` son **jsonb**, no `text[]` — se corrigió
+el CHECK «Otro» a `jsonb_exists` antes de aplicar. Verificación post-aplicación:
+
+- **114 encuestas intactas, 0 versiones nulas**; catálogo DANE **1.122**; **94 ítems**
+  materializados en `medicamento_item` (= los 94 medicamentos del piloto); vista
+  desidentificada con **0** columnas de PII directa.
+- **Test de escritura realista** (captura v3 con medicamento+fuente, `disp_final`
+  «Otro»+texto, FK municipio `08001`): **la app puede seguir guardando** — el insert
+  pasó, el trigger materializó el ítem (estado `vencido`), y se limpió la fila de prueba
+  (cascade OK, 114/94 restaurados). **Sin regresión de acceso.**
+- **Advisors de seguridad:** las 2 advertencias que introdujeron mis funciones de
+  trigger (search_path mutable + SECURITY DEFINER expuesto por RPC) se cerraron con la
+  migración de endurecimiento **`026`** (revoke execute + search_path fijo). Los WARN
+  restantes (`is_active_member`, leaked-password) son **preexistentes**, fuera de alcance.
+
+> Nota: `021`–`026` se aplicaron vía la API de migraciones de Supabase (nombres
+> `rbqm_021…rbqm_026`). El seed de `022` se aplicó en dos partes (DDL + datos) por tamaño.
+> La vista R7 (`v_qtl_r7_rango`) marca el histórico `fEta=2012` como fuera de rango: es
+> la señal esperada para el investigador, no un fallo.
 
 ---
 
@@ -92,8 +111,8 @@ ola (`02-control-plan.md` documenta cada consulta y su escalamiento).
 
 ## Pendiente / requiere tu decisión
 
-1. **Aplicar `021`–`025` a producción** (ver aviso arriba). No se hizo desde esta
-   sesión. Requiere tu visto bueno y un respaldo previo.
+1. ~~**Aplicar `021`–`025` a producción**~~ ✅ **Hecho** (`021`–`026`, verificado; ver
+   sección de arriba). Sin regresión de datos ni de acceso.
 2. **Umbral de R2 (piso del 50 %)** — implementado como constante configurable
    (`RUSHED_FRACTION`). Ajústalo si tu criterio difiere.
 3. **Para-data por bloque (R2)** — **diferido con fundamento**: el piloto solo tiene
