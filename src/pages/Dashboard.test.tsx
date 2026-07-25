@@ -52,6 +52,20 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/#42/)).toBeInTheDocument()
   })
 
+  it('renders the RBQM verification card (read-only QC) for an investigador', () => {
+    useStore.setState({
+      userRole: 'investigador',
+      surveys: [
+        mkSurvey('a', { instrumentVersion: 3, medSob: 'Sí', dispMedVc: 'Sí', vtoMedNc: 'No' } as Partial<Survey>),
+        mkSurvey('b', { instrumentVersion: 1, medSob: 'No' } as Partial<Survey>),
+      ],
+    })
+    render(<DashboardPage />)
+    expect(screen.getByText(/Verificación RBQM/i)).toBeInTheDocument()
+    // Un control identificable de la lista (R1 versionado).
+    expect(screen.getByText(/Versión de instrumento no nula/i)).toBeInTheDocument()
+  })
+
   it('renders the per-product medication analytics when surveys carry medications', () => {
     useStore.setState({
       userRole: 'investigador',

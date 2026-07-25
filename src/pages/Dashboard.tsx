@@ -20,11 +20,11 @@ import {
   buildRetention, buildEstratoAssociation, buildSurveyorEffect, buildSurveyorQC,
   buildMedicationStats, buildMotiveStats, buildDisposalStats, buildClassMotiveCross,
   buildBackcheckAgreement, buildEstratoAdjusted, FAST_SECONDS,
-  buildHouseholdClustering,
+  buildHouseholdClustering, buildRbqmVerification,
   type DaysSummary, type AssocGroup, type Association, type SurveyorEffect,
   type SurveyorQC, type MedStats, type MotiveStats, type DisposalStats,
   type ClassMotiveCross, type BackcheckAgreement, type AdjustedAssoc,
-  type HouseholdClustering,
+  type HouseholdClustering, type RbqmVerification,
 } from '../lib/dashboard-metrics'
 import type { Survey } from '../types'
 
@@ -308,6 +308,9 @@ export default function DashboardPage() {
   const surveyorEffect = useMemo(() => buildSurveyorEffect(data), [data])
   const surveyorQC = useMemo(() => buildSurveyorQC(data), [data])
   const household = useMemo(() => buildHouseholdClustering(data), [data])
+  // Verificación RBQM (solo lectura): evidencia agregada de que los controles
+  // aplicados están surtiendo efecto sobre el dato que ve el investigador.
+  const rbqm = useMemo(() => buildRbqmVerification(data), [data])
   // Product-level (medications[]) aggregation — the analytics that were missing.
   const medStats = useMemo(() => buildMedicationStats(data), [data])
   // Motives battery (instrument v2) — denominator scoped to records that were
@@ -365,7 +368,7 @@ export default function DashboardPage() {
       list.push({ id: 'sec-medicamentos', label: 'Medicamentos', icon: 'ti-pill' })
     list.push({ id: 'sec-inferencia', label: 'Prevalencia', icon: 'ti-chart-dots' })
     if (surveyorEffect || adjusted || retention ||
-        (isInvestigador && (surveyorQC || integrityIssues.length > 0 || backcheck)))
+        (isInvestigador && (rbqm || surveyorQC || integrityIssues.length > 0 || backcheck)))
       list.push({ id: 'sec-calidad', label: 'Calidad', icon: 'ti-shield-check' })
     if (ciudadVenc.length || barEstrato.length || barAsSalud.length ||
         barNvEstu.length || barNvPosg.length || barEtnia.length)
@@ -374,7 +377,7 @@ export default function DashboardPage() {
       list.push({ id: 'sec-cualitativo', label: 'Cualitativo', icon: 'ti-message-2' })
     return list
   }, [medStats, motiveStats, disposal, classMotive, surveyorEffect, adjusted, retention,
-      isInvestigador, surveyorQC, integrityIssues.length, backcheck, textAnalysis,
+      isInvestigador, rbqm, surveyorQC, integrityIssues.length, backcheck, textAnalysis,
       ciudadVenc.length, barEstrato.length, barAsSalud.length, barNvEstu.length, barNvPosg.length, barEtnia.length])
 
   // No data at all (vs. "filters returned nothing", handled further down)
@@ -515,6 +518,10 @@ export default function DashboardPage() {
 
         {/* Control de calidad: efecto del encuestador */}
         <SectionAnchor id="sec-calidad" />
+
+        {/* Verificación RBQM (solo lectura): estado de los controles aplicados */}
+        {isInvestigador && rbqm && <RbqmVerificationCard v={rbqm} />}
+
         {surveyorEffect && <SurveyorEffectCard s={surveyorEffect} />}
 
         {/* Control de calidad operativo por encuestador (para-data / antifraude) */}
@@ -1410,6 +1417,50 @@ function ClassMotiveCard({ c }: { c: ClassMotiveCross }) {
 // positive expired-unit count) that carry no medication entry with a past
 // expiry date. These can't be analysed at the product level and should be
 // re-captured or back-checked. Investigator-only, read-only.
+// Verificación RBQM (QC de solo lectura): una fila por control aplicado, con su
+// valor y un semáforo. Verde = cumple; ámbar = no cumple pero tolerado por diseño
+// (p. ej. histórico grandfathered, o variable v3 aún sin capturar); rojo = revisar.
+function RbqmVerificationCard({ v }: { v: RbqmVerification }) {
+  const dist = v.versionDist.map(d => `v${d.version}: ${d.n}`).join(' · ')
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>Verificación RBQM — controles aplicados</SectionLabel>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+        Estado de solo lectura de los controles de calidad sobre las <strong>{v.n}</strong> encuesta(s)
+        en análisis. Distribución de versión del instrumento — {dist}.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {v.checks.map(c => {
+          const color = c.ok ? C.green : (c.tolerated ? C.amber : C.red)
+          const icon = c.ok ? 'ti-circle-check' : (c.tolerated ? 'ti-alert-triangle' : 'ti-circle-x')
+          return (
+            <div
+              key={c.id}
+              title={c.note ?? ''}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '7px 0', borderBottom: `0.5px solid ${C.border}`,
+              }}
+            >
+              <i className={`ti ${icon}`} style={{ fontSize: 16, color, flexShrink: 0 }} aria-hidden />
+              <span style={{ fontSize: 12.5, color: C.text, flex: 1, minWidth: 0 }}>
+                <span style={{ color: C.hint, fontWeight: 700, marginRight: 6 }}>{c.id}</span>
+                {c.label}
+                {c.note && (
+                  <span style={{ display: 'block', fontSize: 11, color: C.muted, marginTop: 1 }}>{c.note}</span>
+                )}
+              </span>
+              <span className="tnum" style={{ fontSize: 13, fontWeight: 600, color, flexShrink: 0 }}>
+                {c.display}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </Card>
+  )
+}
+
 function IntegrityCard({ issues }: { issues: Survey[] }) {
   return (
     <Card style={{ marginBottom: 14 }}>
