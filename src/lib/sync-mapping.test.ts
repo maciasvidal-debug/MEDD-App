@@ -164,6 +164,13 @@ describe('sync mapping toRow/fromRow', () => {
     expect(fromRow(toRow(survey, 'u')).departamento).toBeUndefined()
   })
 
+  it('deriva municipio_codigo (código DANE) del par canónico para la FK (RBQM R4)', () => {
+    const s = { ...survey, ciudad: 'Barranquilla', departamento: 'Atlántico' }
+    expect(toRow(s, 'u').municipio_codigo).toBe('08001')
+    // Par que no resuelve unívocamente → NULL (la FK admite NULL, no inventa código).
+    expect(toRow({ ...survey, ciudad: 'Ciudad Inexistente', departamento: 'Atlántico' }, 'u').municipio_codigo).toBeNull()
+  })
+
   it('round-trips the medication sub-records (nested 1:N) losslessly', () => {
     const meds: Survey['medications'] = [
       // Fuente de obtención (RBQM R8) debe round-trippear por medicamento.

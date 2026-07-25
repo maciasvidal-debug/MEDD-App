@@ -4,6 +4,7 @@
 // so it loads without env vars and can be unit-tested in isolation.
 // =====================================================================
 import type { Survey, Medication, DataEnv } from '../types'
+import { lookupCodigo } from './divipola'
 
 export type SupabaseRow = Record<string, unknown>
 
@@ -68,6 +69,9 @@ export function toRow(survey: Survey, userId: string): SupabaseRow {
     f_nac:        survey.fNac   || null,
     ciudad:       survey.ciudad || null,
     departamento: survey.departamento || null,
+    // RBQM R4: código DANE derivado del par canónico (ciudad, departamento) para
+    // dar integridad referencial a la geografía (FK municipio_dane). '' → NULL.
+    municipio_codigo: lookupCodigo(survey.ciudad, survey.departamento) || null,
     dir:          survey.dir    || null,
     estrato:      survey.estrato,
     etnia:        survey.etnia  || null,

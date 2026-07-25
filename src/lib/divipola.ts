@@ -60,3 +60,18 @@ export function lookupDepartamento(municipio: string): string {
   const matches = INDEX.filter(e => e.key === q)
   return matches.length === 1 ? matches[0].departamento : ''
 }
+
+/**
+ * Código DANE del municipio a partir del par canónico (municipio, departamento)
+ * — RBQM R4. El departamento desambigua homónimos (Sabanalarga en Atlántico vs
+ * Casanare). Devuelve '' si el par no resuelve a una única entrada del catálogo,
+ * para no sembrar un código erróneo (la FK admite NULL). Acento/mayúscula-
+ * insensible en el municipio; el departamento se compara exacto (viene del catálogo).
+ */
+export function lookupCodigo(municipio: string, departamento?: string): string {
+  if (!municipio) return '' // guarda defensiva: municipio ausente/'' → sin código
+  const q = fold(municipio)
+  if (!q) return ''
+  const matches = INDEX.filter(e => e.key === q && (!departamento || e.departamento === departamento))
+  return matches.length === 1 ? matches[0].codigo : ''
+}
