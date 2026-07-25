@@ -24,15 +24,15 @@ describe('validateDraft — hard errors', () => {
     const r = validateDraft(draft({
       fEta: '2026-01-10', fNac: '1990-01-01', cantMed: 5, cantMedVto: 2,
       // Expired units are declared, so a past-dated product must back them up.
-      medications: [{ nmMed: 'X', dci: '', concMed: null, undConc: '', fVto: '2025-12-01' }],
+      medications: [{ nmMed: 'X', dci: '', concMed: null, undConc: '', fVto: '2025-12-01', fuenteObtencion: '' }],
     }))
     expect(r.errors).toHaveLength(0)
   })
 })
 
 describe('validateDraft — expired-without-detail integrity', () => {
-  const expiredMed = { nmMed: 'X', dci: '', concMed: null, undConc: '' as const, fVto: '2025-12-01' }
-  const liveMed    = { nmMed: 'Y', dci: '', concMed: null, undConc: '' as const, fVto: '2030-01-01' }
+  const expiredMed = { nmMed: 'X', dci: '', concMed: null, undConc: '' as const, fVto: '2025-12-01', fuenteObtencion: '' as const }
+  const liveMed    = { nmMed: 'Y', dci: '', concMed: null, undConc: '' as const, fVto: '2030-01-01', fuenteObtencion: '' as const }
 
   it('errors when vtoMedNc is Sí but no product is expired', () => {
     const r = validateDraft(draft({ fEta: '2026-01-10', medSob: 'Sí', vtoMedNc: 'Sí' }))
@@ -60,7 +60,7 @@ describe('validateDraft — warnings', () => {
   it('warns when a medication expired before it was dispensed', () => {
     const r = validateDraft(draft({
       fEta: '2026-06-01', fDisp: '2026-05-01',
-      medications: [{ nmMed: 'X', dci: '', concMed: null, undConc: '', fVto: '2026-04-01' }],
+      medications: [{ nmMed: 'X', dci: '', concMed: null, undConc: '', fVto: '2026-04-01', fuenteObtencion: '' }],
     }))
     expect(r.warnings.some(w => w.includes('vida útil negativa'))).toBe(true)
   })
@@ -108,7 +108,7 @@ describe('validateDraft — warning thresholds', () => {
   })
 
   it('warns when a medication is expired by more than 10 years', () => {
-    const med = (fVto: string) => ({ nmMed: 'X', dci: '', concMed: null, undConc: '' as const, fVto })
+    const med = (fVto: string) => ({ nmMed: 'X', dci: '', concMed: null, undConc: '' as const, fVto, fuenteObtencion: '' as const })
     // fEta - fVto > 3650 days.
     const over = validateDraft(draft({ fEta: '2026-01-01', medications: [med('2010-01-01')] }))
     expect(over.warnings.some(w => w.includes('más de 10 años'))).toBe(true)

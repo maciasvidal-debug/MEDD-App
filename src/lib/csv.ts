@@ -71,19 +71,22 @@ function durationCell(s: Survey): string {
 }
 
 // medications packed into a SINGLE cell: every stored product joined by '|', the
-// SIX fields per product by ';' (nmMed;dci;concMed;undConc;fVto;estadoVencimiento).
+// SEVEN fields per product by ';'
+// (nmMed;dci;concMed;undConc;fVto;estadoVencimiento;fuenteObtencion).
 // Keeps the header and every data row at the same column count.
 //
 // estadoVencimiento (Rec. 4) es DERIVADO contra la fecha de la entrevista
 // (F_ETA) — no se re-calcula a mano en el análisis: 'vencido' si F_ETA > F_VTO,
 // 'vigente' si no, '' cuando falta F_VTO o F_ETA (indeterminado).
+// fuenteObtencion (RBQM R8): fuente de obtención capturada por medicamento.
 function medicationsCell(s: Survey): string {
   return s.medications?.length
     ? s.medications.map(m => {
         const estado = (m.fVto && s.fEta)
           ? (isProductExpired(s.fEta, m.fVto) ? 'vencido' : 'vigente')
           : ''
-        return [m.nmMed, m.dci, m.concMed, m.undConc, m.fVto, estado].map(escapeCSV).join(';')
+        return [m.nmMed, m.dci, m.concMed, m.undConc, m.fVto, estado, m.fuenteObtencion]
+          .map(escapeCSV).join(';')
       }).join('|')
     : ''
 }

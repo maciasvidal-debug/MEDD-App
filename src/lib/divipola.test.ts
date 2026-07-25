@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { DIVIPOLA } from './divipola.data'
-import { searchMunicipios, DEPARTAMENTOS } from './divipola'
+import { searchMunicipios, DEPARTAMENTOS, lookupCodigo } from './divipola'
 
 describe('DIVIPOLA catalogue', () => {
   it('bundles the full DANE catalogue (1,122 entries) with clean fields', () => {
@@ -55,5 +55,27 @@ describe('cascade (department-scoped) search', () => {
     expect(inAtl.every(r => r.departamento === 'Atlántico')).toBe(true)
     const inCas = searchMunicipios('sabanalarga', 50, 'Casanare')
     expect(inCas.every(r => r.departamento === 'Casanare')).toBe(true)
+  })
+})
+
+describe('lookupCodigo (RBQM R4 — código DANE para la FK)', () => {
+  it('resuelve el código oficial DANE de un municipio inequívoco', () => {
+    expect(lookupCodigo('Barranquilla', 'Atlántico')).toBe('08001')
+    expect(lookupCodigo('Medellín', 'Antioquia')).toBe('05001')
+  })
+  it('es insensible a acentos/mayúsculas en el municipio', () => {
+    expect(lookupCodigo('medellin', 'Antioquia')).toBe('05001')
+  })
+  it('desambigua homónimos por departamento', () => {
+    const atl = lookupCodigo('Sabanalarga', 'Atlántico')
+    const cas = lookupCodigo('Sabanalarga', 'Casanare')
+    expect(atl).not.toBe('')
+    expect(cas).not.toBe('')
+    expect(atl).not.toBe(cas)
+  })
+  it('devuelve "" (→ NULL en la FK) cuando el par no resuelve unívocamente', () => {
+    expect(lookupCodigo('', 'Atlántico')).toBe('')
+    expect(lookupCodigo('Ciudad Inexistente', 'Atlántico')).toBe('')
+    expect(lookupCodigo('Sabanalarga')).toBe('') // homónimo sin departamento
   })
 })

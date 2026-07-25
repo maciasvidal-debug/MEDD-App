@@ -9,7 +9,7 @@ import { WizardNavBar, GroupLabel, type StepProps } from './_shared'
 // ─── Step 5 — Medicamentos 1:N ────────────────────────────────────────────
 // Dynamic list: NM_MED, DCI, CONC_MED, UND_CONC, F_VTO (+ CUM search).
 
-const EMPTY_MED: Medication = { nmMed: '', dci: '', concMed: null, undConc: '', fVto: '' }
+const EMPTY_MED: Medication = { nmMed: '', dci: '', concMed: null, undConc: '', fVto: '', fuenteObtencion: '' }
 
 // CUM-INVIMA lookup panel. Owns its own query / selection / network state and
 // only reports the chosen record to the parent via `onPick`, which prefills the
@@ -135,6 +135,13 @@ function MedicationEntryForm({ entry, setEntry, addErr, onAdd }: {
           type="date"
           value={entry.fVto}
           onChange={e => setEntry(v => ({ ...v, fVto: e.target.value }))}
+        />
+      </Field>
+      <Field label="¿Cómo obtuvo este medicamento?" help={FIELD_HELP.fuenteObtencion}>
+        <ChipGroup
+          options={OPT.fuenteObtencion}
+          value={entry.fuenteObtencion}
+          onChange={v => setEntry(e => ({ ...e, fuenteObtencion: v as Medication['fuenteObtencion'] }))}
         />
       </Field>
 

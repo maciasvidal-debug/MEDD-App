@@ -11,6 +11,8 @@ export const OPT = {
   nvPosg:  ['Especialización', 'Maestría', 'Doctorado'] as const,
   perSalud:['Buena', 'Regular', 'Mala'] as const,
   undConc: ['mcg', 'mg', 'g', 'UI', '%'] as const,
+  // Fuente de obtención por medicamento (RBQM R8). Catálogo cerrado con «Otro».
+  fuenteObtencion: ['Dispensación EPS/IPS', 'Compra fraccionada en farmacia', 'Muestra médica', 'Donación', 'Otro'] as const,
   sino:    ['Sí', 'No'] as const,
   estrato: [1, 2, 3, 4, 5, 6] as const,
   etrPrograma: ['Medicina', 'Enfermería', 'Regencia en Farmacia', 'Química Farmacéutica', 'Odontología', 'Bacteriología', 'Nutrición y Dietética', 'Otra'] as const,
@@ -19,15 +21,19 @@ export const OPT = {
   // registrar el diseño, el agrupamiento por hogar/encuestador no era modelable.
   metodoSeleccion: ['Aleatorio simple', 'Sistemático', 'Por conglomerados', 'Por conveniencia', 'Otro'] as const,
   // Motivos / disposición (instrumento v2). El valor «Otro» habilita un texto libre.
-  motNoConsumo: ['No terminó el tratamiento', 'Mejoró / cedieron los síntomas', 'Efectos adversos', 'Cambio de tratamiento médico', 'Sobró de la dosis', 'Automedicación', 'Fallecimiento de un familiar', 'Otro'] as const,
-  motVencimiento: ['Olvido', 'Acopio preventivo', 'Compró de más', 'Dosis sobrante', 'No sabía dónde desecharlos', 'Otro'] as const,
-  dispFinal: ['Basura', 'Inodoro / desagüe', 'Devuelve a farmacia / punto azul', 'Regala', 'Los guarda', 'Otro'] as const,
+  // «No sabe» (RBQM R3): opción explícita para que la obligatoriedad del bloque no
+  // fuerce respuestas inventadas — distingue «no preguntado» (celda vacía) de
+  // «preguntado, el entrevistado no sabe». El «No aplica» está cubierto por el
+  // gateado del bloque (no se muestra si medSob='No' / no hay vencidos).
+  motNoConsumo: ['No terminó el tratamiento', 'Mejoró / cedieron los síntomas', 'Efectos adversos', 'Cambio de tratamiento médico', 'Sobró de la dosis', 'Automedicación', 'Fallecimiento de un familiar', 'No sabe', 'Otro'] as const,
+  motVencimiento: ['Olvido', 'Acopio preventivo', 'Compró de más', 'Dosis sobrante', 'No sabía dónde desecharlos', 'No sabe', 'Otro'] as const,
+  dispFinal: ['Basura', 'Inodoro / desagüe', 'Devuelve a farmacia / punto azul', 'Regala', 'Los guarda', 'No sabe', 'Otro'] as const,
 } as const
 
 // Instrument version stamped on every new capture. Bump when adding/removing
 // survey questions so analytics can scope denominators to records that were
 // actually asked the question (see Survey.instrumentVersion).
-export const INSTRUMENT_VERSION = 2
+export const INSTRUMENT_VERSION = 3
 
 // Earliest plausible interview date (F_ETA). Fieldwork for this study cannot
 // predate 2024, so a date before this — or in the future — is a capture error
@@ -138,6 +144,7 @@ export const FIELD_GUIDE = [
   { key: 'pesoMedNc',  term: 'Peso (g)', def: 'Peso aproximado en gramos del total de medicamentos no consumidos (incluido el empaque).' },
   { key: 'fDisp',      term: 'Fecha de dispensación', def: 'Día en que el medicamento fue entregado/dispensado en la farmacia.' },
   { key: 'fVto',       term: 'Fecha de vencimiento', def: 'Fecha de vencimiento impresa en el empaque del medicamento.' },
+  { key: 'fuenteObtencion', term: 'Fuente de obtención', def: 'Cómo obtuvo el hogar este medicamento: dispensación en EPS/IPS, compra fraccionada en farmacia, muestra médica, donación u otra vía. Se registra por cada medicamento.' },
 ] as const
 
 export const FIELD_HELP: Record<string, string> =
@@ -191,20 +198,21 @@ export const CODEBOOK: CodebookEntry[] = [
   { variable: 'startedAt',     etiqueta: 'Para-data: inicio de la captura (apertura del asistente)', tipo: 'datetime ISO', valores: '— (vacío en registros previos)' },
   { variable: 'dataEnv',       etiqueta: 'Ambiente de datos (piloto vs producción)', tipo: 'categórico', valores: 'pilot; prod' },
   { variable: 'duracion_s',    etiqueta: 'Para-data: duración de la entrevista en segundos (createdAt − startedAt)', tipo: 'entero', valores: '≥ 0 (vacío si no hay startedAt)' },
-  { variable: 'instrumentVersion', etiqueta: 'Versión del instrumento al capturar (1 = sin batería de motivos)', tipo: 'entero', valores: '1; 2 (obligatorio, no nulo)' },
-  { variable: 'motNoConsumo',      etiqueta: 'Motivos de no consumo (selección múltiple)', tipo: 'multivalor', valores: 'No terminó el tratamiento; Mejoró / cedieron los síntomas; Efectos adversos; Cambio de tratamiento médico; Sobró de la dosis; Automedicación; Fallecimiento de un familiar; Otro' },
+  { variable: 'instrumentVersion', etiqueta: 'Versión del instrumento al capturar (1 = sin batería de motivos; 2 = con motivos; 3 = con fuente de obtención por medicamento)', tipo: 'entero', valores: '1; 2; 3 (obligatorio, no nulo)' },
+  { variable: 'motNoConsumo',      etiqueta: 'Motivos de no consumo (selección múltiple)', tipo: 'multivalor', valores: 'No terminó el tratamiento; Mejoró / cedieron los síntomas; Efectos adversos; Cambio de tratamiento médico; Sobró de la dosis; Automedicación; Fallecimiento de un familiar; No sabe; Otro' },
   { variable: 'motNoConsumoOtro',  etiqueta: 'Motivo de no consumo — otro (texto)', tipo: 'texto', valores: '—' },
-  { variable: 'motVencimiento',    etiqueta: 'Razones de acumulación/vencimiento (selección múltiple)', tipo: 'multivalor', valores: 'Olvido; Acopio preventivo; Compró de más; Dosis sobrante; No sabía dónde desecharlos; Otro' },
+  { variable: 'motVencimiento',    etiqueta: 'Razones de acumulación/vencimiento (selección múltiple)', tipo: 'multivalor', valores: 'Olvido; Acopio preventivo; Compró de más; Dosis sobrante; No sabía dónde desecharlos; No sabe; Otro' },
   { variable: 'motVencimientoOtro',etiqueta: 'Razón de acumulación — otro (texto)', tipo: 'texto', valores: '—' },
-  { variable: 'dispFinal',         etiqueta: 'Conducta real de disposición (selección múltiple)', tipo: 'multivalor', valores: 'Basura; Inodoro / desagüe; Devuelve a farmacia / punto azul; Regala; Los guarda; Otro' },
+  { variable: 'dispFinal',         etiqueta: 'Conducta real de disposición (selección múltiple)', tipo: 'multivalor', valores: 'Basura; Inodoro / desagüe; Devuelve a farmacia / punto azul; Regala; Los guarda; No sabe; Otro' },
   { variable: 'dispFinalOtro',     etiqueta: 'Conducta de disposición — otro (texto)', tipo: 'texto', valores: '—' },
   { variable: 'conocePuntos',      etiqueta: 'Conoce puntos de recolección posconsumo', tipo: 'binario', valores: 'Sí; No (vacío = no preguntado)' },
   { variable: 'cualPunto',         etiqueta: 'Cuál punto de recolección conoce', tipo: 'texto', valores: '—' },
-  { variable: 'medications',   etiqueta: 'Medicamentos almacenados (lista; productos separados por |, campos por ;)', tipo: 'compuesto', valores: 'nmMed;dci;concMed;undConc;fVto;estadoVencimiento' },
+  { variable: 'medications',   etiqueta: 'Medicamentos almacenados (lista; productos separados por |, campos por ;)', tipo: 'compuesto', valores: 'nmMed;dci;concMed;undConc;fVto;estadoVencimiento;fuenteObtencion' },
   { variable: '  nmMed',       etiqueta: '— Nombre comercial del medicamento', tipo: 'texto', valores: '—' },
   { variable: '  dci',         etiqueta: '— Principio activo (DCI)', tipo: 'texto', valores: '—' },
   { variable: '  concMed',     etiqueta: '— Concentración', tipo: 'decimal', valores: '≥ 0' },
   { variable: '  undConc',     etiqueta: '— Unidad de concentración', tipo: 'categórico', valores: 'mcg; mg; g; UI; %' },
   { variable: '  fVto',        etiqueta: '— Fecha de vencimiento', tipo: 'fecha', valores: 'AAAA-MM-DD' },
   { variable: '  estadoVencimiento', etiqueta: '— Estado de vencimiento derivado contra F_ETA', tipo: 'categórico', valores: 'vencido; vigente; (vacío = sin F_VTO/F_ETA)' },
+  { variable: '  fuenteObtencion',   etiqueta: '— Fuente de obtención del medicamento (RBQM R8)', tipo: 'categórico', valores: 'Dispensación EPS/IPS; Compra fraccionada en farmacia; Muestra médica; Donación; Otro (vacío = no preguntado, ítem < v3)' },
 ]
