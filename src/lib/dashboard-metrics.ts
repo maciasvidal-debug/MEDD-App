@@ -4,11 +4,11 @@ import {
   type Proportion, type RiskRatio, type ChiSquare, type TrendTest,
   type MHResult, type ICCResult, type Stratum2x2, type DigitTest, type KappaResult,
 } from './stats'
-import { productMetrics, isProductExpired } from './date'
+import { productMetrics, isProductExpired, calcEdad, todayISO } from './date'
 import { pct } from './utils'
 import { therapeuticGroup, therapeuticSubgroup, SIN_CLASIFICAR } from './atc'
 import { disposalCategories } from './disposal'
-import { OPT } from './constants'
+import { OPT, STUDY_START } from './constants'
 import type { Survey } from '../types'
 
 // Pure data-derivation layer for the analytics dashboard. Each build* function
@@ -578,6 +578,111 @@ export function buildBackcheckAgreement(surveys: Survey[]): BackcheckAgreement |
     catAgreement: catTotal > 0 ? catMatch / catTotal : null,
     pesoMAD: pesoDiffs.length ? pesoDiffs.reduce((a, c) => a + c, 0) / pesoDiffs.length : null,
   }
+}
+
+// ─── Verificación RBQM (QC de solo lectura de los controles aplicados) ──────
+// Agrega, sobre el dato que ve el investigador, evidencia de que los controles
+// RBQM están surtiendo efecto. Es SOLO LECTURA y AGREGADO (conteos/porcentajes,
+// sin PII). Cada check corresponde a un riesgo del registro de riesgos y a su QTL.
+
+export interface RbqmCheck {
+  id: string          // 'R1', 'R3', 'R4', 'R5', 'R7', 'R8'
+  label: string
+  display: string     // valor legible ("113/114", "97%", …)
+  ok: boolean         // cumple el QTL
+  tolerated?: boolean // !ok pero esperado por diseño (p. ej. histórico grandfathered)
+  note?: string
+}
+
+export interface RbqmVerification {
+  n: number
+  versionDist: Array<{ version: number; n: number }>  // R1: distribución de versiones
+  checks: RbqmCheck[]
+}
+
+// Construye la verificación. Devuelve null si no hay encuestas (la tarjeta se oculta).
+export function buildRbqmVerification(surveys: Survey[]): RbqmVerification | null {
+  const n = surveys.length
+  if (n === 0) return null
+
+  // R1 — versionado: ningún registro sin versión (la lectura normaliza NULL→1).
+  const sinVersion = surveys.filter(s => s.instrumentVersion == null).length
+  const versionMap = new Map<number, number>()
+  for (const s of surveys) {
+    const v = s.instrumentVersion ?? 1
+    versionMap.set(v, (versionMap.get(v) ?? 0) + 1)
+  }
+  const versionDist = Array.from(versionMap.entries())
+    .map(([version, cnt]) => ({ version, n: cnt }))
+    .sort((a, b) => a.version - b.version)
+
+  // R7 — rango: F_ETA en ventana [STUDY_START, hoy], F_NAC ≤ F_ETA, edad 0..110.
+  // Cualquier fuera-de-rango es necesariamente HISTÓRICO: la captura nueva no puede
+  // entrar (constraint en BD + validación en cliente), así que se marca tolerado.
+  const today = todayISO()
+  const isoRe = /^\d{4}-\d{2}-\d{2}$/
+  const fueraRango = surveys.filter(s => {
+    if (isoRe.test(s.fEta) && (s.fEta < STUDY_START || s.fEta > today)) return true
+    if (isoRe.test(s.fNac) && isoRe.test(s.fEta) && s.fNac > s.fEta) return true
+    const edad = calcEdad(s.fEta, s.fNac)
+    return edad != null && (edad < 0 || edad > 110)
+  }).length
+
+  // R3 — completitud del bloque de disposición (medSob='Sí', instrumento ≥ v2).
+  const dispBase = surveys.filter(s => s.medSob === 'Sí' && (s.instrumentVersion ?? 1) >= 2)
+  const dispCompleto = dispBase.filter(s => !!s.dispMedVc && !!s.vtoMedNc).length
+  const dispPct = dispBase.length ? dispCompleto / dispBase.length : 1
+
+  // R4 — geografía DANE: proporción con departamento derivado (proxy de catálogo).
+  const conDepto = surveys.filter(s => (s.departamento ?? '').trim() !== '').length
+
+  // R5 — inventario: proporción de ítems con fecha de vencimiento.
+  let items = 0, itemsConVto = 0
+  for (const s of surveys) for (const m of s.medications ?? []) { items++; if (m.fVto) itemsConVto++ }
+
+  // R8 — fuente de obtención: proporción de ítems capturados en v3 con fuente.
+  let itemsV3 = 0, itemsV3ConFuente = 0
+  for (const s of surveys) {
+    if ((s.instrumentVersion ?? 1) < 3) continue
+    for (const m of s.medications ?? []) { itemsV3++; if (m.fuenteObtencion) itemsV3ConFuente++ }
+  }
+
+  const checks: RbqmCheck[] = [
+    {
+      id: 'R1', label: 'Versión de instrumento no nula',
+      display: `${n - sinVersion}/${n}`, ok: sinVersion === 0,
+    },
+    {
+      id: 'R7', label: 'Fechas y edad en rango',
+      display: `${n - fueraRango}/${n}`, ok: fueraRango === 0,
+      tolerated: fueraRango > 0,
+      note: fueraRango > 0
+        ? `${fueraRango} registro(s) histórico(s) fuera de rango (tolerado por diseño; la captura nueva ya no puede entrar)`
+        : undefined,
+    },
+    {
+      id: 'R3', label: 'Bloque de disposición completo (≥95%)',
+      display: dispBase.length ? `${Math.round(dispPct * 100)}%` : '—',
+      ok: dispBase.length === 0 || dispPct >= 0.95,
+    },
+    {
+      id: 'R4', label: 'Departamento (catálogo DANE)',
+      display: `${Math.round((conDepto / n) * 100)}%`, ok: true, note: 'informativo',
+    },
+    {
+      id: 'R5', label: 'Ítems con fecha de vencimiento',
+      display: items ? `${Math.round((itemsConVto / items) * 100)}%` : '—', ok: true,
+    },
+    {
+      id: 'R8', label: 'Fuente de obtención capturada (v3)',
+      display: itemsV3 ? `${Math.round((itemsV3ConFuente / itemsV3) * 100)}%` : 'sin capturas v3 aún',
+      ok: itemsV3 === 0 || itemsV3ConFuente / itemsV3 >= 0.95,
+      tolerated: itemsV3 === 0,
+      note: itemsV3 === 0 ? 'la variable se captura desde la próxima ola (instrumento v3)' : undefined,
+    },
+  ]
+
+  return { n, versionDist, checks }
 }
 
 // ─── Confounding-adjusted association (Mantel–Haenszel) ─────────────────────

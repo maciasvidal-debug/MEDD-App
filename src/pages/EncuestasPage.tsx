@@ -462,6 +462,7 @@ function SurveyDetailModal({ survey: s, onClose }: { survey: Survey; onClose: ()
         {edad != null && <DetailRow label="Edad" value={`${edad} años`} />}
         {s.fNac && <DetailRow label="Fecha nacimiento" value={fmtDate(s.fNac)} />}
         {s.ciudad && <DetailRow label="Ciudad" value={s.ciudad} />}
+        {s.departamento && <DetailRow label="Departamento" value={s.departamento} />}
         {s.dir && <DetailRow label="Dirección" value={s.dir} />}
         {s.estrato != null && <DetailRow label="Estrato" value={String(s.estrato)} />}
         {s.etnia && <DetailRow label="Etnia" value={s.etnia} />}
@@ -525,6 +526,9 @@ function SurveyDetailModal({ survey: s, onClose }: { survey: Survey; onClose: ()
                   {m.fVto && (
                     <Badge label={`Vence: ${fmtDate(m.fVto)}`} variant={mx.isExpired ? 'amber' : 'teal'} />
                   )}
+                  {m.fuenteObtencion && (
+                    <Badge label={`Fuente: ${m.fuenteObtencion}`} variant="gray" />
+                  )}
                 </div>
                 {/* Time metrics (Excel logic) */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
@@ -545,6 +549,7 @@ function SurveyDetailModal({ survey: s, onClose }: { survey: Survey; onClose: ()
       )}
 
       <DetailSection icon="ti-clipboard-data" title="Para-data / control de calidad">
+        {s.instrumentVersion != null && <DetailRow label="Versión del instrumento" value={`v${s.instrumentVersion}`} />}
         {s.backcheckOf && <DetailRow label="Back-check" value="Re-entrevista de control" accent={C.teal} />}
         {s.startedAt && <DetailRow label="Inicio de captura" value={fmtTimestamp(s.startedAt)} />}
         {s.createdAt && <DetailRow label="Guardada" value={fmtTimestamp(s.createdAt)} />}

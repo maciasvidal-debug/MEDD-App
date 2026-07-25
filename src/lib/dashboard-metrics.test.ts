@@ -3,7 +3,7 @@ import {
   buildRetention, buildEstratoAssociation, buildSurveyorEffect, buildSurveyorQC,
   buildMedicationStats, buildMotiveStats, buildDisposalStats, buildClassMotiveCross,
   buildBackcheckAgreement, buildEstratoAdjusted,
-  buildHouseholdClustering,
+  buildHouseholdClustering, buildRbqmVerification,
 } from './dashboard-metrics'
 import type { Survey, Medication, EtrPrograma } from '../types'
 
@@ -272,3 +272,72 @@ describe('buildHouseholdClustering (Rec. 5)', () => {
   })
 })
 
+
+describe('buildRbqmVerification (QC de solo lectura de los controles RBQM)', () => {
+  const check = (r: NonNullable<ReturnType<typeof buildRbqmVerification>>, id: string) =>
+    r.checks.find(c => c.id === id)!
+
+  it('devuelve null sin encuestas', () => {
+    expect(buildRbqmVerification([])).toBeNull()
+  })
+
+  it('R1: reporta 0 sin versión y la distribución de versiones', () => {
+    const surveys = [
+      mkSurvey({ instrumentVersion: 1 }),
+      mkSurvey({ instrumentVersion: 2 }),
+      mkSurvey({ instrumentVersion: 3 }),
+      mkSurvey({ instrumentVersion: 1 }),
+    ]
+    const r = buildRbqmVerification(surveys)!
+    expect(check(r, 'R1').ok).toBe(true)
+    expect(check(r, 'R1').display).toBe('4/4')
+    expect(r.versionDist).toEqual([
+      { version: 1, n: 2 }, { version: 2, n: 1 }, { version: 3, n: 1 },
+    ])
+  })
+
+  it('R7: marca el histórico fuera de rango como NO ok pero TOLERADO', () => {
+    const surveys = [
+      mkSurvey({ instrumentVersion: 1, fEta: '2012-06-01', fNac: '2011-01-01' }), // histórico
+      mkSurvey({ instrumentVersion: 3, fEta: '2026-05-01', fNac: '1990-01-01' }), // válido
+    ]
+    const r = buildRbqmVerification(surveys)!
+    const r7 = check(r, 'R7')
+    expect(r7.ok).toBe(false)
+    expect(r7.tolerated).toBe(true)
+    expect(r7.display).toBe('1/2')
+    expect(r7.note).toMatch(/tolerado/i)
+  })
+
+  it('R3: completitud del bloque de disposición ≥95%', () => {
+    const ok = buildRbqmVerification([
+      mkSurvey({ instrumentVersion: 2, medSob: 'Sí', dispMedVc: 'Sí', vtoMedNc: 'No' }),
+    ])!
+    expect(check(ok, 'R3').ok).toBe(true)
+    const bad = buildRbqmVerification([
+      mkSurvey({ instrumentVersion: 2, medSob: 'Sí', dispMedVc: '', vtoMedNc: '' }),
+    ])!
+    expect(check(bad, 'R3').ok).toBe(false)
+  })
+
+  it('R8: 100% cuando el ítem v3 lleva fuente; sin v3 → tolerado', () => {
+    const conFuente = buildRbqmVerification([
+      mkSurvey({ instrumentVersion: 3, medications: [med({ fuenteObtencion: 'Donación' })] }),
+    ])!
+    expect(check(conFuente, 'R8').display).toBe('100%')
+    expect(check(conFuente, 'R8').ok).toBe(true)
+
+    const sinV3 = buildRbqmVerification([
+      mkSurvey({ instrumentVersion: 2, medications: [med({})] }),
+    ])!
+    expect(check(sinV3, 'R8').tolerated).toBe(true)
+    expect(check(sinV3, 'R8').ok).toBe(true) // tolerado no bloquea
+  })
+
+  it('R5: proporción de ítems con fecha de vencimiento', () => {
+    const r = buildRbqmVerification([
+      mkSurvey({ instrumentVersion: 3, medications: [med({ fVto: '2027-01-01' }), med({ fVto: '' })] }),
+    ])!
+    expect(check(r, 'R5').display).toBe('50%')
+  })
+})
