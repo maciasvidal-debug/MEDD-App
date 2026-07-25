@@ -168,11 +168,13 @@ from public.surveys where data_env = 'prod';
 
 ---
 
-## PUNTO DE CONTROL — requiere tu visto bueno antes de implementar
+## PUNTO DE CONTROL — ✅ APROBADO (2026-07-25) e implementado
 
-Este es el **único punto de aprobación obligatorio** del prompt. Detengo aquí la
-implementación. Las decisiones abiertas (varias disparan reglas de parada) están en la
-respuesta del chat y resumidas aquí:
+> El stakeholder aprobó el alcance y resolvió las decisiones abiertas el 2026-07-25.
+> La implementación (I1–I9) está en `phase2-backlog.md` y `03-changelog.md`. Las
+> vistas de monitoreo de este plan viven ahora en la migración `025_qtl_monitoring.sql`
+> (`v_qtl_dashboard`, `v_qtl_r2_duracion_encuestador`). Lo que sigue queda como registro
+> de las decisiones tomadas:
 
 1. **Alcance:** ¿confirmas limitar la implementación a los huecos reales (R2 por bloque,
    R3 enums, R8, R7 al esquema, y evaluar R5/R4 a DB), sin rehacer lo ya en producción?

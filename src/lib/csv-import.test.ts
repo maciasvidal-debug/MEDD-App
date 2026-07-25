@@ -63,6 +63,18 @@ describe('historical CSV regression', () => {
     expect(s.medications[1].dci).toBe('amoxicilina')
   })
 
+  it('parses the 7-subfield medications cell (v3, con fuenteObtencion — RBQM R8)', () => {
+    const csv =
+      'id,instrumentVersion,medications\n' +
+      'v3,3,Dolex;acetaminofén;500;mg;2027-01-01;vigente;Dispensación EPS/IPS'
+    const [s] = parseSurveysCSV(csv)
+    expect(s.medications).toHaveLength(1)
+    expect(s.medications[0].nmMed).toBe('Dolex')
+    expect(s.medications[0].fVto).toBe('2027-01-01')
+    // el 6º subcampo (estadoVencimiento, derivado) se ignora; el 7º se conserva.
+    expect(s.medications[0].fuenteObtencion).toBe('Dispensación EPS/IPS')
+  })
+
   it('keeps the historical free-text ciudad readable and canonicalizable', () => {
     // The pilot stored ciudad free-text; a raw "Barranquilla ,Atlántico" folds to
     // the same municipality as "BARRANQUILLA".

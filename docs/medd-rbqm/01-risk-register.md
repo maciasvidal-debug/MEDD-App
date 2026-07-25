@@ -6,6 +6,10 @@
 > riesgo **inherente** (antes del control), sustentados en la evidencia del piloto
 > (n=114). La última columna, **Estado**, es lo que distingue este registro de un
 > plan en blanco: dice qué ya está controlado en el código y qué es hueco real.
+>
+> **Estado post-implementación (2026-07-25):** los huecos R2/R3/R4/R5/R7/R8 y PII se
+> cerraron en los incrementos I1–I9 (ver `03-changelog.md`). La columna «Estado» de
+> abajo refleja el diagnóstico previo a la implementación.
 
 ## Paso 1 — Factores críticos para la calidad (CtQ), confirmados con el código
 
