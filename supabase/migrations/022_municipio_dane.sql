@@ -1190,20 +1190,25 @@ end $$;
 create index if not exists idx_surveys_municipio_codigo on public.surveys(municipio_codigo);
 
 -- Regla «Otro» (anexo R4): el texto libre solo con contenido si «Otro» seleccionado.
+-- NOTA DE ESQUEMA REAL: disp_final / mot_no_consumo / mot_vencimiento son JSONB
+-- (arreglos de strings, p. ej. ["Basura","Otro"]) — NO text[]. Por eso se usa
+-- jsonb_exists(col,'Otro') (equivalente funcional del operador `?`) en lugar de
+-- `= any(col)`. Si la columna es NULL (histórico), jsonb_exists → NULL y el CHECK
+-- pasa (grandfathering).
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'chk_disp_final_otro') then
     alter table public.surveys add constraint chk_disp_final_otro check (
-      ('Otro' = any(disp_final)) = (disp_final_otro is not null and length(trim(disp_final_otro)) > 0)
+      jsonb_exists(disp_final, 'Otro') = (disp_final_otro is not null and length(trim(disp_final_otro)) > 0)
     ) not valid;
   end if;
   if not exists (select 1 from pg_constraint where conname = 'chk_mot_no_consumo_otro') then
     alter table public.surveys add constraint chk_mot_no_consumo_otro check (
-      ('Otro' = any(mot_no_consumo)) = (mot_no_consumo_otro is not null and length(trim(mot_no_consumo_otro)) > 0)
+      jsonb_exists(mot_no_consumo, 'Otro') = (mot_no_consumo_otro is not null and length(trim(mot_no_consumo_otro)) > 0)
     ) not valid;
   end if;
   if not exists (select 1 from pg_constraint where conname = 'chk_mot_venc_otro') then
     alter table public.surveys add constraint chk_mot_venc_otro check (
-      ('Otro' = any(mot_vencimiento)) = (mot_vencimiento_otro is not null and length(trim(mot_vencimiento_otro)) > 0)
+      jsonb_exists(mot_vencimiento, 'Otro') = (mot_vencimiento_otro is not null and length(trim(mot_vencimiento_otro)) > 0)
     ) not valid;
   end if;
 end $$;
