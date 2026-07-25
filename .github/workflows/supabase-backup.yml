@@ -1,0 +1,96 @@
+name: Supabase Backup
+
+# RBQM · Respaldo y continuidad (compensa la ausencia de backups del plan Free).
+# El plan Free de Supabase NO ofrece backups automáticos ni PITR. Un dataset de
+# investigación no puede depender solo de la base viva: esta rutina exporta los
+# datos con marca de tiempo a un almacén externo (artefacto de GitHub, retenido),
+# de forma idempotente (los nombres con timestamp nunca colisionan ni duplican) y
+# reejecutable. Opcionalmente sube también a Supabase Storage si hay credenciales.
+#
+# Requisitos (secrets del repo):
+#   - SUPABASE_DB_URL  : cadena de conexión Postgres del proyecto (Settings →
+#                        Database → Connection string, modo "session"/URI).
+#   Opcionales (para copia adicional a Storage):
+#   - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_BACKUP_BUCKET
+
+on:
+  schedule:
+    # Diario a las 07:30 UTC (antes del keepalive de los lunes; cadencia de ola).
+    - cron: '30 7 * * *'
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: supabase-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — required secret present
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::Falta el secret SUPABASE_DB_URL. Configúralo en Settings → Secrets."
+            exit 1
+          fi
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Dump database (roles + schema + data)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +'%Y-%m-%dT%H-%M-%SZ')"
+          OUT="backup"
+          mkdir -p "$OUT"
+          # Dump de datos (el esquema vive versionado en supabase/migrations).
+          # --data-only mantiene el respaldo enfocado en el dato de investigación.
+          supabase db dump --db-url "$SUPABASE_DB_URL" --data-only -f "$OUT/medd_data_${STAMP}.sql"
+          # Dump de esquema como referencia de punto en el tiempo.
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f "$OUT/medd_schema_${STAMP}.sql"
+          gzip "$OUT"/*.sql
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          ls -lh "$OUT"
+
+      - name: Upload backup artifact (retención 90 días)
+        uses: actions/upload-artifact@v4
+        with:
+          name: medd-backup-${{ env.STAMP }}
+          path: backup/
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Optional — copy to Supabase Storage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BUCKET: ${{ secrets.SUPABASE_BACKUP_BUCKET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SERVICE_KEY:-}" ] || [ -z "${BUCKET:-}" ]; then
+            echo "Storage opcional no configurado (faltan secrets) — se omite; el artefacto ya respalda el dato."
+            exit 0
+          fi
+          for f in backup/*.gz; do
+            name="$(basename "$f")"
+            # x-upsert:false → no sobrescribe (idempotente: los nombres con timestamp son únicos).
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              "$SUPABASE_URL/storage/v1/object/$BUCKET/$name" \
+              -H "Authorization: Bearer $SERVICE_KEY" \
+              -H "x-upsert: false" \
+              -H "Content-Type: application/gzip" \
+              --data-binary "@$f")
+            echo "Storage $name → HTTP $code"
+            # 200 = subido; 409 = ya existe (reejecución) — ambos aceptables.
+            if [ "$code" != "200" ] && [ "$code" != "409" ]; then
+              echo "::error::Fallo subiendo $name a Storage (HTTP $code)"; exit 1
+            fi
+          done
