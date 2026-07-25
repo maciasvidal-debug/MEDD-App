@@ -56,17 +56,20 @@ const toNumOrNull = (v: string | undefined): number | null => {
 }
 
 // Un producto histórico trae 5 subcampos (nmMed;dci;concMed;undConc;fVto); el
-// export nuevo añade un 6º (estadoVencimiento) que aquí se ignora (es derivado).
+// export v2 añadió un 6º (estadoVencimiento, derivado, aquí ignorado) y el v3 un
+// 7º (fuenteObtencion, RBQM R8). El mapeo por posición tolera celdas más cortas:
+// los campos ausentes quedan '' (histórico ⇒ fuenteObtencion vacía = no preguntado).
 function parseMedications(cell: string | undefined): Medication[] {
   if (!cell || cell.trim() === '') return []
   return cell.split('|').map(part => {
-    const [nmMed = '', dci = '', concMed = '', undConc = '', fVto = ''] = part.split(';')
+    const [nmMed = '', dci = '', concMed = '', undConc = '', fVto = '', , fuenteObtencion = ''] = part.split(';')
     return {
       nmMed,
       dci,
       concMed: toNumOrNull(concMed),
       undConc: (undConc as UnidadConc) ?? '',
       fVto,
+      fuenteObtencion: fuenteObtencion as Medication['fuenteObtencion'],
     }
   })
 }

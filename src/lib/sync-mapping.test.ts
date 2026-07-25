@@ -40,7 +40,7 @@ const survey: Survey = {
   cantMed: 5,
   cantMedVto: 2,
   pesoMedNc: 12.5,
-  medications: [{ nmMed: 'Acetaminofén', dci: 'Paracetamol', concMed: null, undConc: '', fVto: '' }],
+  medications: [{ nmMed: 'Acetaminofén', dci: 'Paracetamol', concMed: null, undConc: '', fVto: '', fuenteObtencion: '' }],
   motNoConsumo: ['Sobró de la dosis'],
   motNoConsumoOtro: '',
   motVencimiento: ['Olvido'],
@@ -166,9 +166,10 @@ describe('sync mapping toRow/fromRow', () => {
 
   it('round-trips the medication sub-records (nested 1:N) losslessly', () => {
     const meds: Survey['medications'] = [
-      { nmMed: 'Dolex', dci: 'Acetaminofén', concMed: 500, undConc: 'mg', fVto: '2027-03-01' },
+      // Fuente de obtención (RBQM R8) debe round-trippear por medicamento.
+      { nmMed: 'Dolex', dci: 'Acetaminofén', concMed: 500, undConc: 'mg', fVto: '2027-03-01', fuenteObtencion: 'Dispensación EPS/IPS' },
       // A partially-filled row (blank concentration/unit/vencimiento) must survive intact.
-      { nmMed: 'Amoxil', dci: 'Amoxicilina', concMed: null, undConc: '', fVto: '' },
+      { nmMed: 'Amoxil', dci: 'Amoxicilina', concMed: null, undConc: '', fVto: '', fuenteObtencion: '' },
     ]
     const back = fromRow(toRow({ ...survey, medications: meds }, 'u'))
     expect(back.medications).toEqual(meds)
@@ -179,14 +180,14 @@ describe('sync mapping toRow/fromRow', () => {
     // casts them to date/numeric and "" is not NULL. Store null instead, then
     // restore the local invariant (fVto: '', concMed: null) on the way back.
     const meds: Survey['medications'] = [
-      { nmMed: 'Amoxil', dci: 'Amoxicilina', concMed: null, undConc: '', fVto: '' },
+      { nmMed: 'Amoxil', dci: 'Amoxicilina', concMed: null, undConc: '', fVto: '', fuenteObtencion: '' },
     ]
     const stored = toRow({ ...survey, medications: meds }, 'u').medications as Record<string, unknown>[]
     expect(stored[0].fVto).toBeNull()
     expect(stored[0].concMed).toBeNull()
     // A populated expiry/concentration is stored verbatim (only empties collapse).
     const full = toRow({ ...survey, medications: [
-      { nmMed: 'Dolex', dci: 'Acetaminofén', concMed: 500, undConc: 'mg', fVto: '2027-03-01' },
+      { nmMed: 'Dolex', dci: 'Acetaminofén', concMed: 500, undConc: 'mg', fVto: '2027-03-01', fuenteObtencion: 'Compra fraccionada en farmacia' },
     ] }, 'u').medications as Record<string, unknown>[]
     expect(full[0].fVto).toBe('2027-03-01')
     expect(full[0].concMed).toBe(500)
@@ -199,7 +200,7 @@ describe('sync mapping toRow/fromRow', () => {
       ...toRow(survey, 'u'),
       medications: [{ nmMed: 'X', dci: 'Y', concMed: '', undConc: '', fVto: '' }],
     })
-    expect(back.medications).toEqual([{ nmMed: 'X', dci: 'Y', concMed: null, undConc: '', fVto: '' }])
+    expect(back.medications).toEqual([{ nmMed: 'X', dci: 'Y', concMed: null, undConc: '', fVto: '', fuenteObtencion: '' }])
   })
 })
 

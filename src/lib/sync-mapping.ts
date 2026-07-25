@@ -28,6 +28,8 @@ function toMedRow(m: Medication): SupabaseRow {
     concMed: blankToNull(m.concMed),
     undConc: m.undConc,
     fVto:    blankToNull(m.fVto),
+    // RBQM R8: fuente de obtención por medicamento. '' = no preguntado (ítem < v3).
+    fuenteObtencion: m.fuenteObtencion ?? '',
   }
 }
 
@@ -41,6 +43,7 @@ function fromMedRow(m: Record<string, unknown>): Medication {
     concMed: m.concMed == null || m.concMed === '' ? null : (m.concMed as number),
     undConc: (m.undConc as Medication['undConc']) ?? '',
     fVto:    m.fVto ? String(m.fVto) : '',
+    fuenteObtencion: (m.fuenteObtencion as Medication['fuenteObtencion']) ?? '',
   }
 }
 

@@ -12,6 +12,18 @@ export type NvEstu    = 'Ninguno' | 'Primaria' | 'Secundaria' | 'Bachiller' | 'T
 export type NvPosg    = 'Especialización' | 'Maestría' | 'Doctorado' | ''
 export type PercSalud = 'Buena' | 'Regular' | 'Mala' | ''
 export type UnidadConc = 'mcg' | 'mg' | 'g' | 'UI' | '%' | ''
+// Fuente de obtención del medicamento (RBQM R8). Catálogo cerrado. Se captura por
+// MEDICAMENTO (no por encuesta): un hogar obtiene distintos fármacos por vías
+// distintas. Habilita contrastar la hipótesis del trabajador independiente (acceso
+// por dispensación institucional vs. compra fraccionada). '' = no preguntado
+// (ítems de instrumento < v3, separable por instrumentVersion).
+export type FuenteObtencion =
+  | 'Dispensación EPS/IPS'
+  | 'Compra fraccionada en farmacia'
+  | 'Muestra médica'
+  | 'Donación'
+  | 'Otro'
+  | ''
 // Método de selección muestral (diseño). Registrado por encuesta para dejar el
 // diseño identificable en el export (soporte a análisis ponderado/agrupado).
 export type MetodoSeleccion = 'Aleatorio simple' | 'Sistemático' | 'Por conglomerados' | 'Por conveniencia' | 'Otro' | ''
@@ -28,6 +40,9 @@ export interface Medication {
   concMed: number | null    // CONC_MED
   undConc: UnidadConc       // UND_CONC
   fVto:    string           // F_VTO  : Fecha de vencimiento YYYY-MM-DD
+  // FUENTE_OBT (RBQM R8): fuente de obtención de ESTE medicamento. '' en ítems
+  // históricos (instrumento < v3) = «no preguntado».
+  fuenteObtencion: FuenteObtencion
 }
 
 // ─── Survey (1 row per encuesta) ──────────────────────────────────────────

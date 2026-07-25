@@ -60,7 +60,19 @@ describe('toCSV', () => {
       ] },
     ] as unknown as Survey[]
     const dataRow = toCSV(surveys).trim().split('\n')[1]
-    expect(dataRow).toContain('A;x;500;mg;2027-01-01;vigente|B;y;250;mg;2025-02-01;vencido')
+    // 7º subcampo (fuenteObtencion) vacío en estos ítems → ';' final por producto.
+    expect(dataRow).toContain('A;x;500;mg;2027-01-01;vigente;|B;y;250;mg;2025-02-01;vencido;')
+  })
+
+  it('serialises fuenteObtencion as the 7th medication subfield (RBQM R8)', () => {
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 3, fEta: '2026-01-01', medications: [
+        { nmMed: 'Dolex', dci: 'acetaminofén', concMed: 500, undConc: 'mg', fVto: '2027-01-01',
+          fuenteObtencion: 'Dispensación EPS/IPS' },
+      ] },
+    ] as unknown as Survey[]
+    const dataRow = toCSV(surveys).trim().split('\n')[1]
+    expect(dataRow).toContain('Dolex;acetaminofén;500;mg;2027-01-01;vigente;Dispensación EPS/IPS')
   })
 
   it('leaves estadoVencimiento blank when fVto or fEta is missing (Rec. 4)', () => {
@@ -70,7 +82,7 @@ describe('toCSV', () => {
       ] },
     ] as unknown as Survey[]
     const dataRow = toCSV(surveys).trim().split('\n')[1]
-    expect(dataRow).toContain('C;z;;;;') // seis subcampos, estado vacío
+    expect(dataRow).toContain('C;z;;;;;') // siete subcampos, estado y fuente vacíos
   })
 
   it('exports departamento as its own column right after ciudad', () => {
