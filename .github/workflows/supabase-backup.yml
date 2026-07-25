@@ -7,11 +7,18 @@ name: Supabase Backup
 # de forma idempotente (los nombres con timestamp nunca colisionan ni duplican) y
 # reejecutable. Opcionalmente sube también a Supabase Storage si hay credenciales.
 #
-# Requisitos (secrets del repo):
-#   - SUPABASE_DB_URL  : cadena de conexión Postgres del proyecto (Settings →
-#                        Database → Connection string, modo "session"/URI).
+# Requisitos (secrets del repo → Settings → Secrets and variables → Actions):
+#   - SUPABASE_DB_URL : cadena de conexión Postgres en modo SESSION o DIRECTA
+#       (Dashboard → Project Settings → Database → Connection string → URI).
+#       IMPORTANTE: NO usar el pooler en modo "transaction" (puerto 6543):
+#       pg_dump necesita sesión (puerto 5432) o la conexión directa. Incluye la
+#       contraseña de la BD (por eso solo el dueño del proyecto puede crearlo).
 #   Opcionales (para copia adicional a Storage):
 #   - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_BACKUP_BUCKET
+#
+# Comportamiento sin el secret: la ejecución PROGRAMADA avisa y termina en verde
+# (no genera fallos recurrentes); la ejecución MANUAL (workflow_dispatch) FALLA,
+# para que un intento explícito reporte claramente que falta configurar el secret.
 
 on:
   schedule:
@@ -30,20 +37,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Guard — required secret present
+        id: guard
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          if [ -z "$DB_URL" ]; then
-            echo "::error::Falta el secret SUPABASE_DB_URL. Configúralo en Settings → Secrets."
+          if [ -n "$DB_URL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          # Manual run → fallo explícito; programada → aviso sin fallar (evita ruido).
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "::error::Falta el secret SUPABASE_DB_URL. Config: Settings → Secrets and variables → Actions."
             exit 1
           fi
+          echo "::warning::Respaldo NO configurado — no se produjo copia. Define el secret SUPABASE_DB_URL para activarlo."
+          {
+            echo "### ⚠️ Respaldo NO configurado"
+            echo "No se produjo copia de seguridad porque falta el secret \`SUPABASE_DB_URL\`."
+            echo "El respaldo se activará automáticamente cuando se defina."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup Supabase CLI
+        if: steps.guard.outputs.configured == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Dump database (roles + schema + data)
+      - name: Dump database (schema + data)
+        if: steps.guard.outputs.configured == 'true'
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -61,6 +83,7 @@ jobs:
           ls -lh "$OUT"
 
       - name: Upload backup artifact (retención 90 días)
+        if: steps.guard.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: medd-backup-${{ env.STAMP }}
@@ -69,6 +92,7 @@ jobs:
           if-no-files-found: error
 
       - name: Optional — copy to Supabase Storage
+        if: steps.guard.outputs.configured == 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
