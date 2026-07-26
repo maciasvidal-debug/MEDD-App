@@ -9,7 +9,7 @@
 | Cambio | Descripción | Estado |
 |---|---|---|
 | **Cambio 3** | Invariante del margen de caducidad con signo | ✅ **Implementado** |
-| **Cambio 2a** | GPS + consentimiento + RLS + vista desidentificada | 🚧 en curso |
+| **Cambio 2a** | GPS + consentimiento + RLS + vista agregada | ✅ **Implementado** |
 | **Cambio 2b** | Código DANE de centro poblado | ⛔ bloqueado (falta archivo DANE CDCP) |
 | **Cambio 1a** | Vocabulario controlado de principio activo | ⏸️ diferido (se empareja con AWaRe) |
 | **Cambio 1b** | `aware_lookup` + `aware_categoria` derivable | ⛔ bloqueado (falta archivo OMS AWaRe 2023) |
@@ -56,10 +56,35 @@ una vista `security_invoker`), sin tocar datos.
 
 ---
 
-## Cambio 2a — Georreferenciación (en curso)
+## Cambio 2a — Georreferenciación (Sección 11 · R10/R11)
 
-En el siguiente incremento: captura GPS del hogar (lat/lng/exactitud/timestamp) **solo con
-consentimiento explícito**, aislada como dato sensible (tabla propia con RLS de dueño),
-vista analítica que **no** expone la coordenada cruda (R11 = 0 % en el export analítico),
-y consultas de monitoreo R10/R11. El código DANE de centro poblado (Cambio 2b) queda
-pendiente del archivo oficial DANE.
+**Objetivo.** Habilitar el análisis espacial (Moran/LISA, patrón de puntos) de la ola
+grande y separar el patrón territorial del efecto de encuestador, sin exponer la
+ubicación exacta del hogar como PII (Ley 1581).
+
+**Implementado:**
+- **`survey_geo`** (migración `028`): tabla PROPIA con lat/lng/exactitud/timestamp y
+  **RLS de SOLO DUEÑO** — únicamente el encuestador que capturó accede a su geo; el rol
+  analítico (investigador) NO. La coordenada cruda nunca llega al panel ni al export.
+  CHECK de rango de coordenadas. `surveys.geo_consent` (bandera NO sensible) para QC de
+  cobertura.
+- **Captura en la app** (`Step2`): consentimiento explícito (checkbox) + botón GPS
+  (`navigator.geolocation`, alta exactitud, no bloqueante); sin consentimiento o con
+  fallo del GPS → sin coordenada, sin bloquear la encuesta.
+- **Sync WRITE-ONLY** (`sync.ts:pushSurveyGeo`): el cliente sube su geo a `survey_geo`
+  (best-effort, solo encuestador, solo con consentimiento+coordenada) y **nunca la baja**
+  — la coordenada cruda no circula. El análisis de puntos lo hace un rol privilegiado
+  fuera de la app.
+- **Vista analítica agregada** `v_geo_municipio`: conteos por municipio (DANE) + cobertura
+  de consentimiento, **sin coordenada cruda**. Monitoreo `v_qtl_geo` (R10).
+- **Invariante R11** (`csv.test.ts`): test que **falla si** el export (completo o
+  analítico) contiene la coordenada cruda del hogar. `sync-mapping`: la coordenada NO
+  viaja a la fila `surveys` (solo la bandera), verificado por test.
+
+**Validación.** Migración `028` en Postgres 16 local: idempotente; CHECK rechaza lat 200;
+la vista agregada tiene **0** columnas de coordenada. RLS owner-only (patrón idéntico al
+validado en prod para `medicamento_item`); se verificará con test dueño/ajeno al aplicar a
+prod. **401 tests en verde**, tsc + build + lint OK.
+
+**Pendiente:** `028` por aplicar a producción (con tu visto bueno). El código DANE de
+centro poblado (Cambio 2b) queda a la espera del archivo oficial DANE.

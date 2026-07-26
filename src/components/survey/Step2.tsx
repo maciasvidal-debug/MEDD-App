@@ -236,6 +236,78 @@ function EducationFields({ control, nvEstu, setValue, errors }: {
   )
 }
 
+// ─── Georreferenciación del hogar (Cambio 2a) ──────────────────────────────
+interface GeoState { consent: boolean; lat: number | null; lng: number | null; acc: number | null; at: string }
+
+// Consentimiento explícito + captura GPS del dispositivo. La coordenada es dato
+// sensible de localización (Ley 1581): solo se captura CON consentimiento marcado,
+// y jamás bloquea la encuesta (si el GPS falla o no hay consentimiento → sin
+// coordenada). Se guarda local y se sincroniza aparte a la tabla aislada survey_geo.
+function GeoCaptureField({ geo, setGeo }: { geo: GeoState; setGeo: React.Dispatch<React.SetStateAction<GeoState>> }) {
+  const [status, setStatus] = useState<'idle' | 'capturing' | 'error'>('idle')
+
+  function toggleConsent(consent: boolean) {
+    // Al retirar el consentimiento se descarta cualquier coordenada capturada.
+    setGeo(consent ? { ...geo, consent } : { consent: false, lat: null, lng: null, acc: null, at: '' })
+    setStatus('idle')
+  }
+
+  function capture() {
+    if (!('geolocation' in navigator)) { setStatus('error'); return }
+    setStatus('capturing')
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setGeo(g => ({
+          ...g, consent: true,
+          lat: pos.coords.latitude, lng: pos.coords.longitude,
+          acc: Number.isFinite(pos.coords.accuracy) ? Math.round(pos.coords.accuracy) : null,
+          at: new Date().toISOString(),
+        }))
+        setStatus('idle')
+      },
+      () => setStatus('error'),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    )
+  }
+
+  const has = geo.lat != null && geo.lng != null
+  return (
+    <Field label="Ubicación del hogar (GPS)" hint="Opcional. Solo con autorización del hogar; la coordenada se protege y no aparece en exportes.">
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 13, color: C.text }}>
+        <input type="checkbox" checked={geo.consent} onChange={e => toggleConsent(e.target.checked)} style={{ marginTop: 2 }} />
+        <span>El hogar <strong>autoriza</strong> registrar la ubicación (GPS) para control de calidad.</span>
+      </label>
+      {geo.consent && (
+        <div style={{ marginTop: 8 }}>
+          <button
+            type="button" onClick={capture} disabled={status === 'capturing'}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 40, padding: '8px 14px',
+              borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.teal,
+              fontSize: 13, fontWeight: 600, cursor: status === 'capturing' ? 'wait' : 'pointer',
+            }}
+          >
+            <i className="ti ti-map-pin" style={{ fontSize: 16 }} aria-hidden />
+            {status === 'capturing' ? 'Obteniendo…' : has ? 'Actualizar ubicación' : 'Registrar ubicación'}
+          </button>
+          {has && (
+            <div style={{ marginTop: 6, fontSize: 12, color: C.muted }}>
+              <i className="ti ti-circle-check" style={{ color: C.teal, marginRight: 4 }} aria-hidden />
+              Registrada{geo.acc != null ? ` (±${geo.acc} m)` : ''}.
+            </div>
+          )}
+          {status === 'error' && (
+            <div style={{ marginTop: 6, fontSize: 12, color: C.amber }}>
+              <i className="ti ti-alert-triangle" style={{ marginRight: 4 }} aria-hidden />
+              No se pudo obtener la ubicación. Puede continuar sin ella.
+            </div>
+          )}
+        </div>
+      )}
+    </Field>
+  )
+}
+
 export function Step2({ draft, onNext, onBack }: StepProps) {
   const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm<Step2Data>({
     resolver: zodResolver(step2Schema),
@@ -260,8 +332,30 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
   const nvEstu = watch('nvEstu')
   const edad   = calcEdad(draft.fEta, fNac)
 
+  // Georreferenciación (Cambio 2a): estado local; el consentimiento y las
+  // coordenadas se fusionan en el draft al avanzar. Fuera de RHF porque no son
+  // parte del esquema sociodemográfico y la coordenada se captura por dispositivo.
+  const [geo, setGeo] = useState<GeoState>({
+    consent: draft.geoConsent ?? false,
+    lat: draft.geoLat ?? null, lng: draft.geoLng ?? null,
+    acc: draft.geoAccuracyM ?? null, at: draft.geoCapturedAt ?? '',
+  })
+
   return (
-    <form onSubmit={handleSubmit(data => onNext(data as Partial<SurveyDraft>), scrollToFirstError)} noValidate>
+    <form
+      onSubmit={handleSubmit(
+        data => onNext({
+          ...(data as Partial<SurveyDraft>),
+          geoConsent: geo.consent,
+          geoLat: geo.consent ? geo.lat : null,
+          geoLng: geo.consent ? geo.lng : null,
+          geoAccuracyM: geo.consent ? geo.acc : null,
+          geoCapturedAt: geo.consent ? geo.at : '',
+        }),
+        scrollToFirstError,
+      )}
+      noValidate
+    >
       <SectionHead icon="ti-users" label="Datos sociodemográficos" />
 
       <BirthDateField
@@ -301,6 +395,8 @@ export function Step2({ draft, onNext, onBack }: StepProps) {
       <Field label="Dirección de residencia" error={errors.dir?.message}>
         <input placeholder="Calle, carrera, barrio…" {...register('dir')} />
       </Field>
+
+      <GeoCaptureField geo={geo} setGeo={setGeo} />
 
       <EstratoField control={control} error={errors.estrato?.message} />
 

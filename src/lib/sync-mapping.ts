@@ -73,6 +73,10 @@ export function toRow(survey: Survey, userId: string): SupabaseRow {
     // dar integridad referencial a la geografía (FK municipio_dane). '' → NULL.
     municipio_codigo: lookupCodigo(survey.ciudad, survey.departamento) || null,
     dir:          survey.dir    || null,
+    // Cambio 2a: solo la BANDERA de consentimiento va a `surveys` (no sensible).
+    // Las coordenadas NUNCA viajan aquí — se sincronizan aparte a `survey_geo`
+    // (RLS de dueño), para que ni el rol analítico ni el export las vean (R11).
+    geo_consent:  survey.geoConsent ?? false,
     estrato:      survey.estrato,
     etnia:        survey.etnia  || null,
     as_salud:     survey.asSalud  || null,
@@ -133,6 +137,9 @@ export function fromRow(row: SupabaseRow): Survey {
     ciudad:      (row.ciudad as string) ?? '',
     departamento: (row.departamento as string) ?? undefined,
     dir:         (row.dir as string)    ?? '',
+    // Solo la bandera vuelve de `surveys`; las coordenadas viven aisladas en
+    // `survey_geo` (write-only desde el cliente) y no se re-hidratan aquí.
+    geoConsent:  (row.geo_consent as boolean) ?? false,
     estrato:     row.estrato as number | null,
     etnia:       ((row.etnia as string)    ?? '') as Survey['etnia'],
     asSalud:     ((row.as_salud as string) ?? '') as Survey['asSalud'],

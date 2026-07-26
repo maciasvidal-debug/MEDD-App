@@ -13,7 +13,7 @@ function s(obs: string): Survey {
     hogarId: '', metodoSeleccion: '',
     etrPrograma: 'Medicina', etrTipoInst: 'Pública',
     etrSemestre: 5, etrInstitucion: 'Universidad',
-    fNac: '1980-01-01', ciudad: 'Bogotá', dir: 'Calle 1',
+    fNac: '1980-01-01', ciudad: 'Bogotá', dir: 'Calle 1', geoConsent: false,
     estrato: 2, etnia: 'Ninguna', asSalud: 'Contributivo',
     estLab: 'Empleado', ingreso: '1-3 SMMLV',
     nvEstu: 'Profesional', nvPosg: '',

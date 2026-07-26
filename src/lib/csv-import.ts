@@ -116,6 +116,7 @@ export function parseSurveysCSV(text: string): Survey[] {
       ciudad: col(r, 'ciudad'),
       departamento: col(r, 'departamento') || undefined,
       dir:     col(r, 'dir'),
+      geoConsent: false, // histórico: sin georreferenciación (Cambio 2a)
       estrato: toNumOrNull(col(r, 'estrato')),
       etnia:   col(r, 'etnia') as Survey['etnia'],
       asSalud: col(r, 'asSalud') as Survey['asSalud'],

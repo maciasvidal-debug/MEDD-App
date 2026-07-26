@@ -92,6 +92,16 @@ export interface Survey {
   ciudad:  string        // CIUDAD  : municipio (canónico, sin departamento)
   departamento?: string  // DEPARTAMENTO : captado aparte para no contaminar CIUDAD
   dir:     string        // DIR     : Dirección de residencia
+  // Georreferenciación (Sección 11, Cambio 2a). `geoConsent` (bandera NO sensible)
+  // viaja con la encuesta; las coordenadas son PII de localización, se guardan
+  // localmente y se sincronizan a la tabla aislada `survey_geo` (RLS de dueño),
+  // nunca a la fila de `surveys` ni al export. Opcionales: sin consentimiento o en
+  // registros previos quedan sin valor.
+  geoConsent:     boolean       // GEO_CONSENT : el hogar autorizó registrar ubicación
+  geoLat?:        number | null // latitud (solo local + survey_geo)
+  geoLng?:        number | null // longitud (solo local + survey_geo)
+  geoAccuracyM?:  number | null // exactitud reportada por el dispositivo (m)
+  geoCapturedAt?: string        // timestamp ISO de la captura GPS
   estrato: number | null // ESTRATO : 1–6
   etnia:   Etnia         // ETNIA
   asSalud: AsSalud       // AS_SALUD
