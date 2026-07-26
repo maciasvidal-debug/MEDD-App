@@ -64,6 +64,22 @@ describe('toCSV', () => {
     expect(dataRow).toContain('A;x;500;mg;2027-01-01;vigente;|B;y;250;mg;2025-02-01;vencido;')
   })
 
+  it('NUNCA expone la coordenada cruda del hogar en el export (RBQM R11 · Sección 11)', () => {
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 3, geoConsent: true,
+        geoLat: 10.987654, geoLng: -74.791234, geoAccuracyM: 8,
+        geoCapturedAt: '2026-05-10T12:00:00Z', dir: 'Calle 5 #10-20', medications: [] },
+    ] as unknown as Survey[]
+    const full = toCSV(surveys)
+    const analitico = toAnalyticalCSV(surveys)
+    for (const out of [full, analitico]) {
+      expect(out).not.toContain('10.987654')  // latitud cruda
+      expect(out).not.toContain('-74.791234') // longitud cruda
+      expect(out).not.toContain('geoLat')
+      expect(out).not.toContain('geoLng')
+    }
+  })
+
   it('serialises fuenteObtencion as the 7th medication subfield (RBQM R8)', () => {
     const surveys = [
       { id: 'a', nui: 1, instrumentVersion: 3, fEta: '2026-01-01', medications: [

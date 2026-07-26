@@ -17,7 +17,7 @@ const survey: Survey = {
   etrInstitucion: 'Universidad Nacional',
   fNac: '1990-05-05',
   ciudad: 'Bogotá',
-  dir: 'Calle 1',
+  dir: 'Calle 1', geoConsent: false,
   estrato: 3,
   etnia: 'Ninguna',
   asSalud: 'Contributivo',
@@ -162,6 +162,18 @@ describe('sync mapping toRow/fromRow', () => {
     // undefined — it is captured separately and optional by design.
     expect(toRow(survey, 'u').departamento).toBeNull()
     expect(fromRow(toRow(survey, 'u')).departamento).toBeUndefined()
+  })
+
+  it('round-trips la bandera geo_consent, pero NUNCA envía coordenadas a surveys (R11)', () => {
+    const s = { ...survey, geoConsent: true, geoLat: 10.98, geoLng: -74.79, geoAccuracyM: 8 }
+    const row = toRow(s, 'u')
+    expect(row.geo_consent).toBe(true)
+    // Las coordenadas NO deben aparecer en la fila de surveys (van a survey_geo).
+    expect(row.geo_lat).toBeUndefined()
+    expect(row.geo_lng).toBeUndefined()
+    // La bandera vuelve; ausente → false.
+    expect(fromRow(row).geoConsent).toBe(true)
+    expect(fromRow(toRow(survey, 'u')).geoConsent).toBe(false)
   })
 
   it('deriva municipio_codigo (código DANE) del par canónico para la FK (RBQM R4)', () => {

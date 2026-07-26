@@ -75,6 +75,33 @@ export async function pushSurveys(surveys: Survey[], userId: string): Promise<bo
   }
 }
 
+// Cambio 2a: sincroniza las COORDENADAS a la tabla aislada `survey_geo`
+// (RLS de dueño). WRITE-ONLY por diseño: el cliente sube su geo pero NUNCA la
+// vuelve a bajar (la coordenada cruda no debe circular; el análisis de puntos lo
+// hace un rol privilegiado fuera de la app). Solo sube filas con consentimiento y
+// coordenada válida. Best-effort no-throwing como el resto del sync.
+export async function pushSurveyGeo(surveys: Survey[], userId: string): Promise<boolean> {
+  const rows = surveys
+    .filter(s => s.geoConsent && s.geoLat != null && s.geoLng != null)
+    .map(s => ({
+      survey_id:       s.id,
+      geo_lat:         s.geoLat,
+      geo_lng:         s.geoLng,
+      geo_accuracy_m:  s.geoAccuracyM ?? null,
+      geo_captured_at: s.geoCapturedAt || null,
+    }))
+  if (!rows.length) return true
+  try {
+    // Nota: no dependemos de userId aquí — la RLS de `survey_geo` valida la
+    // propiedad contra surveys.user_id = auth.uid() en el servidor.
+    void userId
+    const { error } = await supabase.from('survey_geo').upsert(rows, { onConflict: 'survey_id' })
+    return !error
+  } catch {
+    return false
+  }
+}
+
 export async function deleteSurveyRemote(id: string): Promise<boolean> {
   try {
     const { error } = await supabase.from('surveys').delete().eq('id', id)
@@ -144,6 +171,10 @@ export async function fullSync(
     const synced = ok ? local.map(survey => ({ ...survey, syncStatus: 'synced' as const })) : []
     await saveManySurveys(synced)
     pushed = synced.length
+    // Cambio 2a: sube las coordenadas a la tabla aislada (best-effort, write-only).
+    // No bloquea el sync ni cambia `pushed` (métrica de encuestas). Reintenta la
+    // próxima vez si falla.
+    await pushSurveyGeo(local, userId)
   }
 
   // 2. Pull remote surveys and merge into local IDB — single bulk write
