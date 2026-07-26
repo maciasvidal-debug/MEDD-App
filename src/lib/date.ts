@@ -47,6 +47,19 @@ export function productMetrics(fEta: string, fDisp: string, med: Medication): Pr
 }
 
 /**
+ * Margen de caducidad CON SIGNO a la fecha de la entrevista (Sección 11.2, Cambio 3):
+ *   margen = F_VTO − F_ETA  (días)
+ * Positivo = días hasta el vencimiento (aún vigente); NEGATIVO = días desde que se
+ * venció (ya vencido al momento de la encuesta). Es la variable continua que exigen
+ * los modelos correctos del margen (regresión cuantílica de la mediana; MCO robusto):
+ * INVARIANTE — se conserva el signo, NO se trunca en cero y NO se excluyen los
+ * ítems vencidos (margen negativo). Devuelve null solo si falta alguna fecha.
+ */
+export function margenDias(fEta: string, fVto: string): number | null {
+  return dayDiff(fVto, fEta)
+}
+
+/**
  * ¿El producto está vencido a la fecha de la entrevista? (F_ETA − F_VTO > 0).
  * Atajo de `productMetrics(...).isExpired` para los recorridos que sólo miran el
  * estado de vencimiento (agregados del dashboard, listado de encuestas, export):

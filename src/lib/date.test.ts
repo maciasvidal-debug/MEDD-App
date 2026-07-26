@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  calcEdad, dayDiff, productMetrics, fmtDate, fmtTimestamp, todayISO, dateTag,
+  calcEdad, dayDiff, productMetrics, fmtDate, fmtTimestamp, todayISO, dateTag, margenDias,
 } from './date'
 
 describe('calcEdad', () => {
@@ -62,5 +62,36 @@ describe('todayISO / dateTag', () => {
   it('both return a YYYY-MM-DD string', () => {
     expect(todayISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(dateTag()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
+describe('margenDias — invariante del margen con signo (Sección 11, Cambio 3)', () => {
+  it('es positivo para un ítem aún vigente (F_VTO > F_ETA)', () => {
+    expect(margenDias('2026-01-10', '2026-07-10')).toBe(181)
+  })
+
+  it('CONSERVA EL SIGNO: negativo para un ítem ya vencido (no lo trunca en 0)', () => {
+    const m = margenDias('2026-01-10', '2025-12-01')
+    expect(m).toBeLessThan(0)     // el defecto (truncar) daría 0 o null → falla
+    expect(m).toBe(-40)
+  })
+
+  it('NO excluye los ítems vencidos: devuelve un número, no null', () => {
+    expect(margenDias('2026-01-10', '2020-01-01')).not.toBeNull()
+    expect(margenDias('2026-01-10', '2020-01-01')).toBeLessThan(0)
+  })
+
+  it('es 0 el día exacto del vencimiento (frontera, sin desplazamiento)', () => {
+    expect(margenDias('2026-01-10', '2026-01-10')).toBe(0)
+  })
+
+  it('null solo si falta alguna fecha (no imputa ni desplaza)', () => {
+    expect(margenDias('', '2026-01-10')).toBeNull()
+    expect(margenDias('2026-01-10', '')).toBeNull()
+  })
+
+  it('es el opuesto exacto de tVto (F_ETA−F_VTO), sin desplazamiento por constante', () => {
+    const fEta = '2026-01-10', fVto = '2025-12-01'
+    expect(margenDias(fEta, fVto)).toBe(-dayDiff(fEta, fVto)!)
   })
 })
