@@ -10,9 +10,9 @@
 |---|---|---|
 | **Cambio 3** | Invariante del margen de caducidad con signo | ✅ **Implementado** |
 | **Cambio 2a** | GPS + consentimiento + RLS + vista agregada | ✅ **Implementado** |
-| **Cambio 2b** | Código DANE de centro poblado | ⛔ bloqueado (falta archivo DANE CDCP) |
-| **Cambio 1a** | Vocabulario controlado de principio activo | ⏸️ diferido (se empareja con AWaRe) |
-| **Cambio 1b** | `aware_lookup` + `aware_categoria` derivable | ⛔ bloqueado (falta archivo OMS AWaRe 2023) |
+| **Cambio 1b** | `aware_lookup` (tabla de referencia AWaRe) | ✅ **cargada** (AWaRe **2025**) · derivación pendiente de decisión |
+| **Cambio 2b** | `centro_poblado_dane` (catálogo DANE) | ✅ **cargado** (8.161) · captura pendiente de decisión |
+| **Cambio 1a** | Vocabulario controlado / bridge DCI→ATC5 | ⏸️ decisión abierta (regla de parada: mapeo fiable) |
 
 ### Nota sobre los comentarios del bioestadístico (A–D)
 
@@ -86,5 +86,35 @@ la vista agregada tiene **0** columnas de coordenada. RLS owner-only (patrón id
 validado en prod para `medicamento_item`); se verificará con test dueño/ajeno al aplicar a
 prod. **401 tests en verde**, tsc + build + lint OK.
 
-**Pendiente:** `028` por aplicar a producción (con tu visto bueno). El código DANE de
-centro poblado (Cambio 2b) queda a la espera del archivo oficial DANE.
+**Pendiente:** `028` por aplicar a producción (con tu visto bueno).
+
+---
+
+## Catálogos de referencia oficiales cargados (Cambios 1b y 2b)
+
+El stakeholder aportó las fuentes oficiales; se integran **verbatim** (sin inventar):
+
+- **`aware_lookup`** (migración `029`): clasificación **AWaRe OMS 2025** (WHO B09489) —
+  268 antibióticos (93 Access · 145 Watch · 30 Reserve) con su ATC5, + 116
+  combinaciones «no recomendadas» (`aware_not_recommended`). RLS de solo lectura.
+  **Nota de versión:** el prompt citaba AWaRe 2023; el stakeholder aportó la **2025**
+  (más reciente) — se usa esa y se declara en la migración.
+- **`centro_poblado_dane`** (migración `030`): catálogo DANE de centros poblados —
+  **8.161** códigos (8 díg.) con municipio/departamento/tipo. RLS de solo lectura.
+
+Validados en Postgres 16 local: idempotentes; conteos correctos; `amoxicilina`
+(J01CA04) → **Access** por join; centros poblados con acentos correctos. **Migraciones
+`029`/`030` por aplicar a producción** (seeds grandes; se aplican con tu visto bueno).
+
+### Decisiones abiertas (regla de parada)
+
+1. **Derivación de `aware_categoria` (bridge DCI→ATC5).** La captura del principio
+   activo es texto libre en español y ruidoso (p. ej. «AMOXICILINA TRIHIDRATO (1048.97)
+   EQUIVALENTE A AMOXICILINA»); la AWaRe está en INN inglés + ATC5. Mapear requiere un
+   bridge (criterio). Control cruzado del piloto contra AWaRe 2021: ~11 antibióticos
+   mapeados (≈9 Access, 2 Watch) — consistente con el 12/2/1 esperado, con normalizador
+   aproximado. **Opciones:** (a) vocabulario controlado en captura (el encuestador elige
+   de una lista pre-mapeada a ATC5) — mejor a futuro; (b) bridge curado DCI-es→ATC5 para
+   los antibióticos conocidos, validado contra el 12/2/1. Requiere tu decisión.
+2. **Captura de centro poblado.** ¿Combobox de centro poblado acotado al municipio
+   (como el de municipio), o derivar el centro poblado de la coordenada GPS post-hoc?
