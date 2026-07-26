@@ -25,6 +25,40 @@ ATC5 verificable — el índice ATC/DDD de la OMS no es redistribuible). Detalle
 
 ---
 
+## Comentario B — Catálogo CIE-10 oficial como tabla de referencia (`032`)
+
+**Objetivo.** Habilitar la codificación CIE-10 del problema de salud autorreportado
+(`prbSalud`, ya capturado como texto libre) contra una fuente **oficial y verificable**,
+sin inventar códigos.
+
+**Fuente (verbatim, NO de memoria).** MinSalud (Colombia), Dir. de Epidemiología y
+Demografía — «Catálogo de patologías – Tabla CIE-10. Instrumentos RIPS», ed. 2018
+(traducción CEMECE/WHOFIC), act. 2021-02-08 (`tabla-cie-10.zip` → hoja «Final»). Integrada
+por el **script reproducible** `scripts/gen_cie10_lookup.py` (patrón de `gen_atc_lookup.py`).
+
+**Decisión de granularidad (mínima fricción/error).** Prod recibe el catálogo a nivel de
+**RÚBRICA de 3 caracteres (2.053)** — apropiado para un diagnóstico AUTORREPORTADO en hogar,
+sin falsa precisión (que degradaría la κ del comentario C). El catálogo **completo de 4
+caracteres (12.568 subcategorías)** queda versionado en `scripts/data/cie10_4char_full.sql`
+para un eventual uso RIPS, sin aplicarlo como migración pendiente.
+
+**Sin auto-codificación (decisión anti-error).** A diferencia de AWaRe (donde DCI→nombre es
+determinista), codificar texto libre → CIE-10 NO es determinista. `cie10_sispro` sirve para
+**codificación asistida con humano en el bucle** y para **validar** que un código asignado
+exista — no para adivinar el código.
+
+**Integridad.** Checksum de origen (md5 sobre `codigo|descripcion|capitulo|capitulo_nombre`
+ordenado): `f277370a45ff3fda8f52c6b581f1e217` (2.053 rúbricas). Verificable contra prod tras
+sembrar.
+
+**Estado en producción.** **DDL aplicado** (tabla `cie10_sispro` + RLS de solo lectura +
+índice; 0 filas). El **seed de 2.053 filas NO se pudo aplicar por MCP** (el canal trunca
+payloads grandes; transcribir 2.053 filas arriesgaría corromper el dato oficial). Se
+materializa por el **canal de migraciones** (`supabase db push` / psql con `SUPABASE_DB_URL`
+— el mismo secret pendiente del backup): una sola configuración desbloquea seed + respaldo.
+
+---
+
 ## Cambio 3 — Margen de caducidad con signo (Sección 11.2)
 
 **Objetivo.** Garantizar que el análisis del margen reciba el valor CRUDO CON SIGNO, sin
