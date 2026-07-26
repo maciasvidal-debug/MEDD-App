@@ -8,11 +8,11 @@
 
 | Cambio | Descripción | Estado |
 |---|---|---|
-| **Cambio 3** | Invariante del margen de caducidad con signo | ✅ **Implementado** |
-| **Cambio 2a** | GPS + consentimiento + RLS + vista agregada | ✅ **Implementado** |
-| **Cambio 1b** | `aware_lookup` (tabla de referencia AWaRe) | ✅ **cargada** (AWaRe **2025**) · derivación pendiente de decisión |
-| **Cambio 2b** | `centro_poblado_dane` (catálogo DANE) | ✅ **cargado** (8.161) · captura pendiente de decisión |
-| **Cambio 1a** | Vocabulario controlado / bridge DCI→ATC5 | ⏸️ decisión abierta (regla de parada: mapeo fiable) |
+| **Cambio 3** | Invariante del margen de caducidad con signo | ✅ **Implementado** (prod) |
+| **Cambio 2a** | GPS + consentimiento + RLS + vista agregada | ✅ **Implementado** (prod; RLS dueño/ajeno verificada) |
+| **Cambio 1b** | `aware_lookup` (tabla de referencia AWaRe) | ✅ **cargada** en prod (AWaRe **2025**, 268 + 116) |
+| **Cambio 1a** | Derivación AWaRe (bridge DCI-es→AWaRe, server-side) | ✅ **Implementado** (prod; `031`) |
+| **Cambio 2b** | `centro_poblado_dane` (catálogo DANE) | 🟡 **estructura en prod, seed diferido** (0 filas) · captura **diferida** (sin fricción) |
 
 ### Nota sobre los comentarios del bioestadístico (A–D)
 
@@ -97,24 +97,68 @@ El stakeholder aportó las fuentes oficiales; se integran **verbatim** (sin inve
 - **`aware_lookup`** (migración `029`): clasificación **AWaRe OMS 2025** (WHO B09489) —
   268 antibióticos (93 Access · 145 Watch · 30 Reserve) con su ATC5, + 116
   combinaciones «no recomendadas» (`aware_not_recommended`). RLS de solo lectura.
-  **Nota de versión:** el prompt citaba AWaRe 2023; el stakeholder aportó la **2025**
-  (más reciente) — se usa esa y se declara en la migración.
-- **`centro_poblado_dane`** (migración `030`): catálogo DANE de centros poblados —
-  **8.161** códigos (8 díg.) con municipio/departamento/tipo. RLS de solo lectura.
+  **Aplicada a producción** (268 + 116 filas verificadas). **Nota de versión:** el prompt
+  citaba AWaRe 2023; el stakeholder aportó la **2025** — se usa esa y se declara en la
+  migración.
+- **`centro_poblado_dane`** (migración `030`): catálogo DANE de centros poblados
+  (**8.161** códigos, 8 díg., con municipio/departamento/tipo). **Estado en producción:
+  estructura (DDL) aplicada, SEED DIFERIDO (0 filas en la base viva).** El seed de 8.161
+  filas está versionado en la migración `030`; no se materializó en prod porque **no hay
+  consumidor** (ver decisión de centro poblado abajo) y la asignación post-hoc de centro
+  poblado requiere GEOMETRÍAS DANE (no este catálogo de atributos, que no trae
+  coordenadas). Se materializa cuando exista consumidor. RLS de solo lectura.
 
 Validados en Postgres 16 local: idempotentes; conteos correctos; `amoxicilina`
-(J01CA04) → **Access** por join; centros poblados con acentos correctos. **Migraciones
-`029`/`030` por aplicar a producción** (seeds grandes; se aplican con tu visto bueno).
+(J01CA04) → **Access** por join; centros poblados con acentos correctos.
 
-### Decisiones abiertas (regla de parada)
+### Decisiones cerradas (delegadas al criterio de ingeniería)
 
-1. **Derivación de `aware_categoria` (bridge DCI→ATC5).** La captura del principio
-   activo es texto libre en español y ruidoso (p. ej. «AMOXICILINA TRIHIDRATO (1048.97)
-   EQUIVALENTE A AMOXICILINA»); la AWaRe está en INN inglés + ATC5. Mapear requiere un
-   bridge (criterio). Control cruzado del piloto contra AWaRe 2021: ~11 antibióticos
-   mapeados (≈9 Access, 2 Watch) — consistente con el 12/2/1 esperado, con normalizador
-   aproximado. **Opciones:** (a) vocabulario controlado en captura (el encuestador elige
-   de una lista pre-mapeada a ATC5) — mejor a futuro; (b) bridge curado DCI-es→ATC5 para
-   los antibióticos conocidos, validado contra el 12/2/1. Requiere tu decisión.
-2. **Captura de centro poblado.** ¿Combobox de centro poblado acotado al municipio
-   (como el de municipio), o derivar el centro poblado de la coordenada GPS post-hoc?
+Ambas decisiones abiertas se resolvieron bajo el mandato de **mínima fricción y error**:
+
+1. **Derivación AWaRe → server-side, sin captura nueva (opción b).** Ver «Cambio 1a»
+   abajo. Se descartó el vocabulario controlado en captura (opción a) por la fricción que
+   impone al encuestador y el riesgo de mala selección; el encuestador sigue digitando el
+   DCI libre y la categoría se deriva por join. Cero cambio de UI.
+2. **Centro poblado → captura DIFERIDA (sin campo nuevo).** El municipio (ya capturado) y
+   el GPS (ya capturado, con consentimiento) cubren la geografía del análisis espacial. El
+   centro poblado se asignaría post-hoc por join espacial contra **geometrías** DANE
+   oficiales (que el catálogo de atributos NO trae; derivarlo del GPS exigiría fabricar
+   coordenadas — vetado por la regla anti-alucinación). Añadir un combobox de centro
+   poblado impondría fricción por un dato sin consumidor inmediato. Se difiere; el catálogo
+   queda como estructura lista.
+
+---
+
+## Cambio 1a — Derivación AWaRe (Sección 11 · R9)
+
+**Objetivo.** Pasar del principio activo CAPTURADO (texto libre en español, ruidoso:
+«AMOXICILINA TRIHIDRATO (1048.97) EQUIVALENTE A AMOXICILINA») a la categoría AWaRe
+(Access/Watch/Reserve), que la OMS publica en INN inglés + ATC5, para el análisis de la
+Sección 11 — **sin fricción de captura y sin clasificaciones inventadas**.
+
+**Implementado (migración `031`, server-side, sin captura nueva):**
+- **`medd_dci_token(text)`**: función pura/IMMUTABLE (search_path fijo, línea de `026`)
+  que extrae el token canónico del DCI (primer token alfabético, minúsculas, sin
+  diacríticos). Los DCI de antibióticos encabezan con el principio activo.
+- **`aware_bridge`**: puente curado **token-es → antibiótico AWaRe (INN inglés)**, con
+  **FK duro a `aware_lookup(antibiotic)`** — anti-alucinación: un nombre inventado o con
+  typo FALLA el insert, no entra silencioso. El puente **solo mapea nombre→nombre**; el
+  ATC5 y la categoría se **leen por join** de `aware_lookup` (OMS 2025), nunca se digitan.
+  Cubre los antibióticos del piloto (verificados contra el dato real) + ambulatorios
+  comunes en Colombia con mapeo es→en inequívoco. Cotrimoxazol: `trimetoprim`,
+  `sulfametoxazol` y `cotrimoxazol` → el MISMO combo (un producto no deriva dos ATC5).
+- **`v_medicamento_aware`** (security_invoker): deriva por join, **NULL cuando el DCI no
+  está cubierto o no es antibiótico** (cobertura honesta, nunca una clase arriesgada).
+- **`v_qtl_aware`** (security_invoker): cobertura y distribución Access/Watch/Reserve (QTL).
+
+**Validación (producción, dato real).** 94 ítems → **13 clasificados (11 Access, 2 Watch,
+0 Reserve)**, 81 NULL (no antibióticos). Coincide con el perfil esperado del piloto
+(mayoría Access; los 2 Watch = las dos grafías de ciprofloxacina/o). Sin mis-clasificación
+verificada ítem a ítem: amoxicilina/ampicilina/cefalexina/clindamicina/doxiciclina/
+cotrimoxazol → Access; ciprofloxacina/o → Watch. La analítica AWaRe vive fuera de la app y
+consume estas vistas.
+
+**Limitaciones documentadas.** El match usa el primer token (los combos se clasifican por
+su agente base; la CATEGORÍA es correcta, el ATC5 refleja el base). `medicamento_item.
+atc_codigo` no está poblado, así que el denominador de antibióticos (J01) se afina en el
+análisis. Metronidazol no está en la lista antibacteriana AWaRe 2025 → NULL (correcto).
