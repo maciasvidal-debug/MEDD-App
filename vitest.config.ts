@@ -14,7 +14,7 @@ export default defineConfig({
       // Gate the business logic (lib/), not presentational UI. supabase.ts is a
       // thin client and constants.ts is data — neither has unit-testable logic.
       include: ['src/lib/**'],
-      exclude: ['src/lib/**/*.test.ts', 'src/lib/supabase.ts', 'src/lib/constants.ts'],
+      exclude: ['src/lib/**/*.test.ts', 'src/lib/constants.ts'],
       reporter: ['text-summary'],
       // Ratchet floor: set just below current measured coverage so a drop fails
       // CI, without forcing new tests today. Raise these as coverage grows.
