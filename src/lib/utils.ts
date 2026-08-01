@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 // Generic, cross-cutting helpers with no domain of their own. Date logic lives
 // in ./date, statistics in ./stats, and CSV export in ./csv.
 
@@ -11,16 +12,13 @@
 // fail fast instead. Any runtime that can run this PWA (it requires IndexedDB)
 // provides Web Crypto, making the throw unreachable in supported environments.
 export function uuid(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      const array = new Uint8Array(1)
-      crypto.getRandomValues(array)
-      const r = array[0] % 16 // 256 % 16 === 0 → uniform, no modulo bias
-      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
-    })
+  if (typeof crypto === 'undefined') {
+    throw new Error('uuid(): the Web Crypto API is required to generate secure identifiers')
   }
-  throw new Error('uuid(): the Web Crypto API is required to generate secure identifiers')
+  if (crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return uuidv4()
 }
 
 // ─── Numbers ──────────────────────────────────────────────────────────────
