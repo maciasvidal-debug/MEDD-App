@@ -18,7 +18,7 @@
 #   3) Guardar el subgrupo ATC nivel 2 (3 caracteres).
 #
 # Determinista: misma entrada → mismo archivo. No asigna códigos "de memoria";
-# todo proviene del CUM. Las correcciones puntuales viven en atc.ts, anotadas.
+# la información proviene del CUM. Las correcciones puntuales viven en atc.ts, anotadas.
 # ==========================================================================
 import sys, re, json, unicodedata
 from collections import defaultdict
