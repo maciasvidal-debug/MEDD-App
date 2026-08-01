@@ -34,7 +34,7 @@ describe('historical CSV regression', () => {
   })
 
   it('normalizes the mixed/blank instrument versions to non-null (Rec. 1)', () => {
-    // The pilot mixed v1 (blank version) and v2. After the fix a blank version
+    // The pilot mixed v1 (blank version) and v2. After the update a blank version
     // reads back as 1 — never null — so the export guard never trips.
     expect(surveys.every(s => s.instrumentVersion != null)).toBe(true)
     expect(surveys.filter(s => s.instrumentVersion === 1).length).toBe(3) // 3 v1
