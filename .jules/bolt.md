@@ -8,8 +8,3 @@
 **Learning:** When pushing data arrays to an API (like Supabase `upsert`), transforming an N+1 sequence of individual requests into a single network operation reduces latency, limits round trips, and mitigates the browser's concurrency limits on outgoing parallel connections.
 
 **Action:** Whenever looping over data to issue a network request, investigate whether the receiving API supports bulk operations (e.g., Supabase passing an array of rows to `upsert`). If supported, refactor to bulk actions to enhance speed and reliability.
-## 2025-02-18 - Optimized Breslow-Day Loop Allocation
-
-**Learning:** When using `Array.prototype.filter()` followed by a `for..of` loop in a hot path, this can cause significant memory overhead due to array allocations and garbage collection. Additionally, `for..of` can trigger object destructuring overhead which impacts performance when iterating large datasets.
-
-**Action:** Replace `Array.prototype.filter()` and `for..of` loops with a unified, hand-written `for(let i = 0; i < len; i++)` loop where filtering logic is inlined as a condition. Use manual property access (e.g., `const a = strata[i].a`) instead of destructuring (`const { a } = strata[i]`). This reduces allocations and overall iteration overhead (in this case, improving execution time by ~70%).
