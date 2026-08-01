@@ -33,3 +33,10 @@
 **Vulnerability:** The `src/lib/supabase.ts` file assumed that `import.meta.env.VITE_SUPABASE_URL` and `import.meta.env.VITE_SUPABASE_ANON_KEY` were present and coerced them to strings using `as string`. This could lead to silent failures, unexpected states, or broken configurations at runtime if the environment variables were missing during the build step.
 **Learning:** Even though anonymous keys are meant to be public and rely on Row-Level Security (RLS) for data protection, failing to validate their presence during initialization is poor security hygiene. Missing variables coerced to strings bypass type checks and lead to hard-to-debug failures in production.
 **Prevention:** Always validate critical environment variables at initialization time. If they are missing, throw a clear and immediate error to prevent the application from starting in an insecure or invalid state.
+## 2024-08-01 - Unrestricted LocalStorage Clear
+
+**Vulnerability:** Clearing `localStorage` entirely using `localStorage.clear()` removes all keys, including those from other apps on the same domain and important auth tokens (like Supabase session data), leading to state disruption and unintended logouts.
+
+**Learning:** Unrestricted clearing of global states like `localStorage` can break application state (e.g., authentication) and violate the principle of least privilege by affecting unrelated data.
+
+**Prevention:** Always scope data deletion to the specific keys or prefixes owned by the feature or application (e.g., iterating and deleting only keys starting with `medd_`).
