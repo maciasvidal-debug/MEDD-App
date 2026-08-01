@@ -37,7 +37,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
       } else {
         window.indexedDB?.deleteDatabase('medd_db')
       }
-      localStorage.clear()
+      // Only remove medd_ prefixed keys to preserve auth tokens and unrelated data
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith('medd_')) {
+          localStorage.removeItem(key)
+        }
+      }
     } catch (e) {
       console.error('Failed to clear local data:', e)
     } finally {
