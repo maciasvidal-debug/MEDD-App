@@ -170,7 +170,7 @@ export function Step6({ draft, onNext, onBack }: StepProps) {
       pushToast('Corrige los errores antes de guardar.', 'error')
       // The save button sits at the bottom of a long summary; bring the quality
       // report (which lists the blocking errors) into view so the toast isn't the
-      // only signal and the surveyor sees exactly what to fix.
+      // only signal and the surveyor sees exactly what to correct.
       try {
         document.getElementById('wizard-quality')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       } catch { /* jsdom */ }
