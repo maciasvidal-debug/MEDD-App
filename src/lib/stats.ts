@@ -184,40 +184,57 @@ export function iccBinary(groups: { n: number; cases: number }[]): ICCResult | n
  * with fewer than 2 fully-informative strata.
  */
 export function breslowDay(strata: Stratum2x2[]): { chi2: number; df: number; p: number } | null {
-  const usable = strata.filter(s =>
-    (s.a + s.b) > 0 && (s.c + s.d) > 0 && (s.a + s.c) > 0 && (s.b + s.d) > 0)
-  if (usable.length < 2) return null
-
+  const len = strata.length
+  let usableCount = 0
   let orNum = 0, orDen = 0
-  for (const { a, b, c, d } of usable) {
-    const n = a + b + c + d
-    orNum += (a * d) / n
-    orDen += (b * c) / n
+
+  // Pass 1: find usable strata and compute Mantel-Haenszel common OR
+  // Avoids intermediate array allocations from .filter() and object destructuring overhead
+  for (let i = 0; i < len; i++) {
+    const s = strata[i]
+    const a = s.a, b = s.b, c = s.c, d = s.d
+    if ((a + b) > 0 && (c + d) > 0 && (a + c) > 0 && (b + d) > 0) {
+      usableCount++
+      const n = a + b + c + d
+      orNum += (a * d) / n
+      orDen += (b * c) / n
+    }
   }
-  if (orDen === 0) return null
+
+  if (usableCount < 2 || orDen === 0) return null
+
+  // Note: we cannot completely fuse the two loops because 'psi' (the pooled OR estimate)
+  // must be fully computed across ALL strata before we can calculate expected counts in pass 2.
   const psi = orNum / orDen
   if (!Number.isFinite(psi) || psi <= 0) return null
 
   let bd = 0
-  for (const { a, b, c, d } of usable) {
-    const n1 = a + b, m1 = a + c, N = a + b + c + d
-    // Expected exposed-case count A under the common OR ψ (root of a quadratic).
-    let A: number
-    const alpha = psi - 1
-    if (Math.abs(alpha) < 1e-9) {
-      A = (m1 * n1) / N
-    } else {
-      const bcoef = -(psi * (m1 + n1) + (N - n1 - m1))
-      const disc = Math.sqrt(Math.max(0, bcoef * bcoef - 4 * alpha * psi * m1 * n1))
-      const lo = Math.max(0, n1 + m1 - N), hi = Math.min(n1, m1)
-      const r1 = (-bcoef - disc) / (2 * alpha)
-      const r2 = (-bcoef + disc) / (2 * alpha)
-      A = (r1 >= lo - 1e-6 && r1 <= hi + 1e-6) ? r1 : r2
+
+  // Pass 2: compute Breslow-Day statistic
+  for (let i = 0; i < len; i++) {
+    const s = strata[i]
+    const a = s.a, b = s.b, c = s.c, d = s.d
+    if ((a + b) > 0 && (c + d) > 0 && (a + c) > 0 && (b + d) > 0) {
+      const n1 = a + b, m1 = a + c, N = a + b + c + d
+      // Expected exposed-case count A under the common OR ψ (root of a quadratic).
+      let A: number
+      const alpha = psi - 1
+      if (Math.abs(alpha) < 1e-9) {
+        A = (m1 * n1) / N
+      } else {
+        const bcoef = -(psi * (m1 + n1) + (N - n1 - m1))
+        const disc = Math.sqrt(Math.max(0, bcoef * bcoef - 4 * alpha * psi * m1 * n1))
+        const lo = Math.max(0, n1 + m1 - N), hi = Math.min(n1, m1)
+        const r1 = (-bcoef - disc) / (2 * alpha)
+        const r2 = (-bcoef + disc) / (2 * alpha)
+        A = (r1 >= lo - 1e-6 && r1 <= hi + 1e-6) ? r1 : r2
+      }
+      const va = 1 / (1 / A + 1 / (n1 - A) + 1 / (m1 - A) + 1 / (N - n1 - m1 + A))
+      if (Number.isFinite(va) && va > 0) bd += (a - A) ** 2 / va
     }
-    const va = 1 / (1 / A + 1 / (n1 - A) + 1 / (m1 - A) + 1 / (N - n1 - m1 + A))
-    if (Number.isFinite(va) && va > 0) bd += (a - A) ** 2 / va
   }
-  const df = usable.length - 1
+
+  const df = usableCount - 1
   return { chi2: bd, df, p: chiSquareP(bd, df) }
 }
 
