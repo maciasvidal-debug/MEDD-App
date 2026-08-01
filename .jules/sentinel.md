@@ -29,8 +29,10 @@
 **Vulnerability:** The `quoteIdent` function in `backend/src/utils/sql.js` verified the structural shape of SQL identifiers using a regex but did not ensure that the provided identifiers belong to an explicitly allowed list of columns. This structural-only validation left the system open to attacks where an attacker could provide structurally valid but unauthorized column names, potentially exposing or modifying unallowed data (SQL identifier injection or data leakage).
 **Learning:** When dealing with dynamic SQL identifiers (such as column or table names), it's not enough to ensure the identifiers are syntactically safe (i.e. preventing traditional SQL injection payload like `'; DROP TABLE...`). You must also implement an allowlist (or explicit mappings) to guarantee that the requested identifier is authorized for the given context.
 **Prevention:** Always require an explicit allowlist of authorized identifiers alongside syntactic validation when building dynamic SQL queries. The `quoteIdent` function was updated to require a second argument containing an array of permitted identifiers, immediately throwing an error if the passed identifier isn't in this `allowlist`.
+## 2024-08-01 - Unrestricted LocalStorage Clear
 
-## 2025-02-14 - Replace custom cryptographic UUID fallback with established library
-**Vulnerability:** The application used a custom pseudo-random implementation for UUID v4 generation as a fallback when `crypto.randomUUID` was unavailable.
-**Learning:** Custom cryptographic/randomness implementations, especially those using module arithmetic like `%`, can easily introduce biases or edge-cases leading to weak identifiers and collision risks.
-**Prevention:** Rely on widely tested and trusted cryptographic libraries like `uuid` instead of rolling custom logic for secure identifier generation.
+**Vulnerability:** Clearing `localStorage` entirely using `localStorage.clear()` removes all keys, including those from other apps on the same domain and important auth tokens (like Supabase session data), leading to state disruption and unintended logouts.
+
+**Learning:** Unrestricted clearing of global states like `localStorage` can break application state (e.g., authentication) and violate the principle of least privilege by affecting unrelated data.
+
+**Prevention:** Always scope data deletion to the specific keys or prefixes owned by the feature or application (e.g., iterating and deleting only keys starting with `medd_`).

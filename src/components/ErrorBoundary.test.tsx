@@ -70,6 +70,7 @@ describe('ErrorBoundary', () => {
 
   it('reloads the page when "Recargar" is pressed', async () => {
     const user = userEvent.setup()
+      localStorage.setItem('medd_test', '123')
     render(
       <ErrorBoundary>
         <Bomb />
@@ -92,7 +93,9 @@ describe('ErrorBoundary', () => {
         configurable: true,
         value: { databases, deleteDatabase },
       })
-      const clearStorage = vi.spyOn(Storage.prototype, 'clear')
+      localStorage.setItem('medd_test', '123')
+      localStorage.setItem('other_app', '456')
+      const removeItem = vi.spyOn(Storage.prototype, 'removeItem')
 
       render(
         <ErrorBoundary>
@@ -107,7 +110,9 @@ describe('ErrorBoundary', () => {
       expect(deleteDatabase).toHaveBeenCalledWith('other_db')
       // The nameless entry is guarded by `db.name && ...`, so only two deletes.
       expect(deleteDatabase).toHaveBeenCalledTimes(2)
-      expect(clearStorage).toHaveBeenCalledTimes(1)
+      expect(removeItem).toHaveBeenCalledWith('medd_test')
+      expect(removeItem).not.toHaveBeenCalledWith('other_app')
+      expect(localStorage.getItem('other_app')).toBe('456')
     })
 
     it('falls back to deleting the known db when databases() is unavailable', async () => {
@@ -118,7 +123,9 @@ describe('ErrorBoundary', () => {
         configurable: true,
         value: { deleteDatabase },
       })
-      const clearStorage = vi.spyOn(Storage.prototype, 'clear')
+      localStorage.setItem('medd_test', '123')
+      localStorage.setItem('other_app', '456')
+      const removeItem = vi.spyOn(Storage.prototype, 'removeItem')
 
       render(
         <ErrorBoundary>
@@ -130,7 +137,9 @@ describe('ErrorBoundary', () => {
       await waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
       expect(deleteDatabase).toHaveBeenCalledWith('medd_db')
       expect(deleteDatabase).toHaveBeenCalledTimes(1)
-      expect(clearStorage).toHaveBeenCalledTimes(1)
+      expect(removeItem).toHaveBeenCalledWith('medd_test')
+      expect(removeItem).not.toHaveBeenCalledWith('other_app')
+      expect(localStorage.getItem('other_app')).toBe('456')
     })
 
     it('still reloads (and logs) when databases() rejects — the catch/finally path', async () => {
@@ -158,13 +167,14 @@ describe('ErrorBoundary', () => {
       )
     })
 
-    it('still reloads (and logs) when localStorage.clear throws — the catch/finally path', async () => {
+    it('still reloads (and logs) when localStorage.removeItem throws — the catch/finally path', async () => {
       const user = userEvent.setup()
+      localStorage.setItem('medd_test', '123')
       Object.defineProperty(window, 'indexedDB', {
         configurable: true,
         value: { deleteDatabase: vi.fn() },
       })
-      vi.spyOn(Storage.prototype, 'clear').mockImplementation(() => {
+      vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
         // e.g. Safari private mode / storage disabled.
         throw new Error('storage denied')
       })
