@@ -3,13 +3,15 @@
 
 // ─── UUID ─────────────────────────────────────────────────────────────────
 
-// Cryptographically-secure UUID v4. Uses crypto.randomUUID where available
-// (secure contexts), falling back to a crypto.getRandomValues-filled template
-// for insecure-context (http) deployments where randomUUID may be unavailable.
-// Never falls back to Math.random(): a non-CSPRNG would yield weak, potentially
-// predictable record ids and worse collision resistance for a primary key, so we
-// fail fast instead. Any runtime that can run this PWA (it requires IndexedDB)
-// provides Web Crypto, making the throw unreachable in supported environments.
+/**
+ * Cryptographically-secure UUID v4. Uses crypto.randomUUID where available
+ * (secure contexts), falling back to a crypto.getRandomValues-filled template
+ * for insecure-context (http) deployments where randomUUID may be unavailable.
+ * Never falls back to Math.random(): a non-CSPRNG would yield weak, potentially
+ * predictable record ids and worse collision resistance for a primary key, so we
+ * fail fast instead. Any runtime that can run this PWA (it requires IndexedDB)
+ * provides Web Crypto, making the throw unreachable in supported environments.
+ */
 export function uuid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
