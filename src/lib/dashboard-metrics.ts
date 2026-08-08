@@ -444,10 +444,25 @@ export function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
   const nNotAsked = surveys.filter(s => (s.instrumentVersion ?? 1) < 2).length
   if (asked.length === 0) return null
 
-  const count = (rows: Survey[], pick: (s: Survey) => string[], opts: readonly string[]) =>
-    opts.map(o => ({ name: o, n: rows.filter(s => (pick(s) ?? []).includes(o)).length }))
-      .filter(d => d.n > 0)
-      .sort((a, b) => b.n - a.n)
+  const count = (rows: Survey[], pick: (s: Survey) => string[], opts: readonly string[]) => {
+    const freqs = new Map<string, number>()
+    for (const row of rows) {
+      const picked = pick(row)
+      if (!picked) continue
+      for (let i = 0; i < picked.length; i++) {
+        const val = picked[i]
+        if (picked.indexOf(val) === i && opts.includes(val)) {
+          freqs.set(val, (freqs.get(val) ?? 0) + 1)
+        }
+      }
+    }
+    const result = []
+    for (const opt of opts) {
+      const n = freqs.get(opt)
+      if (n !== undefined && n > 0) result.push({ name: opt, n })
+    }
+    return result.sort((a, b) => b.n - a.n)
+  }
 
   const expiredAsked = asked.filter(s => s.vtoMedNc === 'Sí' || (s.cantMedVto ?? 0) > 0)
 
