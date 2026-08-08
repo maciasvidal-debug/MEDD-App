@@ -272,9 +272,13 @@ export function buildSurveyorQC(surveys: Survey[]): SurveyorQC | null {
   const poolVencPct = surveys.length
     ? surveys.filter(s => s.vtoMedNc === 'Sí').length / surveys.length
     : 0
-  const digit = terminalDigitTest(
-    surveys.map(s => s.pesoMedNc).filter((v): v is number => v != null),
-  )
+
+  const validWeights: number[] = []
+  for (const s of surveys) {
+    if (s.pesoMedNc != null) validWeights.push(s.pesoMedNc)
+  }
+
+  const digit = terminalDigitTest(validWeights)
   return { rows, poolVencPct, digit }
 }
 
