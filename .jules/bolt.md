@@ -1,4 +1,4 @@
-## 2024-06-12 - Optimize chiSquareTest function
+## 2026-08-08 - Array allocation optimization
 
 **Learning:** Reducing passes over nested arrays by manually unrolling `map` and `reduce` combinations and avoiding creating intermediate array allocations with functional constructs, instead using typed arrays (`Float64Array`) and single-pass iteration (`for` loops), provides substantial and consistent performance improvements across large nested datasets (up to ~3.5x improvement).
 
@@ -15,3 +15,5 @@
 
 **Learning:** When looping over static array definitions (like an array of valid department names) and calculating dynamic properties inside the loop based on the static data (such as getting the word length via `.split(' ').length`), performance takes a considerable hit. Especially on high iteration counts.
 **Action:** Precalculate properties based on static structures instead of calling dynamic operators inside loops that use those structures.
+**Learning:** Chained array methods like `.map().filter()` create intermediate arrays which causes redundant iterations and garbage collection pressure.
+**Action:** When extracting data for analysis (e.g. valid weights), use a single manual `for...of` loop or `.reduce()` to iterate the array exactly once and minimize allocations.
