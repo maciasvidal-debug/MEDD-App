@@ -64,7 +64,7 @@ export function ExportarPage() {
           </div>
           <Button
             fullWidth disabled={disabled}
-            style={{ background: disabled ? C.bg : '#3B6D11', color: disabled ? C.hint : '#fff', border: 'none' }}
+            style={{ background: disabled ? C.bg : C.green, color: disabled ? C.hint : C.surface, border: 'none' }}
             icon="ti-download"
             onClick={exportCSV}
           >
@@ -98,7 +98,7 @@ export function ExportarPage() {
           </div>
           <Button
             fullWidth disabled={disabled}
-            style={{ background: disabled ? C.bg : '#1D4ED8', color: disabled ? C.hint : '#fff', border: 'none' }}
+            style={{ background: disabled ? C.bg : C.navy, color: disabled ? C.hint : C.surface, border: 'none' }}
             icon="ti-download"
             onClick={exportJSON}
           >
