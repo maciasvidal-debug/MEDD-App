@@ -55,7 +55,7 @@ export const step1Schema = z.object({
   nui:    z.number(),
   // Diseño muestral (Rec. 5): identificador de hogar obligatorio (autogenerado
   // por el asistente, editable) para dejar el agrupamiento por hogar
-  // identificable desde la captura. El MÉTODO de selección muestral NO se captura
+  // identificable desde la captura. El método de selección muestral NO se captura
   // aquí: es una decisión del investigador previa al estudio (constante de
   // estudio/ola), no una elección del encuestador por encuesta — se fija a nivel
   // de estudio, no en el asistente.
