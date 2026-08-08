@@ -76,40 +76,13 @@ const isEstratoHigh = (e: number) => e >= 3
 export function buildEstratoAssociation(surveys: Survey[]): Association | null {
   const acc = ESTRATO_BANDS.map(d => ({ ...d, total: 0, cases: 0 }))
 
-  // Pre-calculate array lookup since estrato values are typically bounded integers (1-6)
-  // Fallback to iterating for any out-of-bounds or non-integer values.
-  const lookupMax = Math.max(...acc.map(d => d.max))
-  const lookup = new Array(lookupMax + 1)
-  for (let i = 0; i <= lookupMax; i++) {
-    let match = undefined
-    for (let j = 0; j < acc.length; j++) {
-      if (i >= acc[j].min && i <= acc[j].max) {
-        match = acc[j]
-        break
-      }
-    }
-    lookup[i] = match
-  }
-
   for (const s of surveys) {
     const e = s.estrato
     if (e == null) continue
 
-    // O(1) lookup for common values
-    let g = undefined
-    if (e >= 0 && e <= lookupMax && Number.isInteger(e)) {
-      g = lookup[e]
-    } else {
-      // Fallback optimized linear scan
-      for (let i = 0; i < acc.length; i++) {
-        if (e >= acc[i].min && e <= acc[i].max) {
-          g = acc[i]
-          break
-        }
-      }
-    }
-
+    const g = acc.find(band => e >= band.min && e <= band.max)
     if (!g) continue
+
     g.total++
     if (s.vtoMedNc === 'Sí') g.cases++
   }
