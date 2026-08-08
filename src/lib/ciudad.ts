@@ -31,6 +31,11 @@ const DEPARTAMENTOS = [
 
 const DEPT_SET = new Set(DEPARTAMENTOS)
 
+const DEPARTAMENTOS_PARSED = DEPARTAMENTOS.map(name => ({
+  name,
+  wordCount: name.split(' ').length
+}))
+
 // Spanish title-case keeping connectors lowercase (de, del, la, los…).
 const MINOR = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e'])
 const titleCase = (s: string) =>
@@ -80,13 +85,12 @@ export function normalizeCiudad(raw: string | null | undefined): Ciudad {
   // 3) Trailing department word(s): "Sabanalarga Atlantico", "barranquilla atlantico".
   if (!dept) {
     const words = muni.split(' ')
-    for (const d of DEPARTAMENTOS) {
-      const dWords = d.split(' ')
-      if (words.length > dWords.length) { // keep ≥1 word as the municipality
-        const tail = fold(words.slice(-dWords.length).join(' '))
+    for (const { name: d, wordCount: dLen } of DEPARTAMENTOS_PARSED) {
+      if (words.length > dLen) { // keep ≥1 word as the municipality
+        const tail = fold(words.slice(-dLen).join(' '))
         if (tail === d) {
-          dept = words.slice(-dWords.length).join(' ')
-          muni = words.slice(0, words.length - dWords.length).join(' ')
+          dept = words.slice(-dLen).join(' ')
+          muni = words.slice(0, words.length - dLen).join(' ')
           break
         }
       }

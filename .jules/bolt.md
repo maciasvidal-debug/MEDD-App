@@ -11,3 +11,7 @@
 ## 2025-02-05 - Array.find() optimization inside hot loops
 **Learning:** `Array.prototype.find()` inside hot loops mapping arrays over elements is a significant performance drain in JavaScript/TypeScript engines compared to direct array indexed lookups and/or plain `for` loops.
 **Action:** When searching small, static domains inside large loops (e.g. associating categories or mapping items to ranges), prefer `O(1)` precalculated array lookups (e.g., mapping `lookup[index]`) or a simple linear scan using a standard `for` loop over array elements over the `.find()` method. Doing so decreases CPU overhead, cutting execution time by nearly 25-30% on critical paths for millions of rows.
+## 2024-05-18 - Optimized `normalizeCiudad` department string parsing
+
+**Learning:** When looping over static array definitions (like an array of valid department names) and calculating dynamic properties inside the loop based on the static data (such as getting the word length via `.split(' ').length`), performance takes a considerable hit. Especially on high iteration counts.
+**Action:** Precalculate properties based on static structures instead of calling dynamic operators inside loops that use those structures.
