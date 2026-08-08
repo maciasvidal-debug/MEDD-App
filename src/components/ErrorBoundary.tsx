@@ -1,4 +1,5 @@
 import React from 'react'
+import { C } from './ui'
 
 interface Props { children: React.ReactNode }
 interface State { error: Error | null }
@@ -60,14 +61,14 @@ export class ErrorBoundary extends React.Component<Props, State> {
         style={{
           minHeight: '100dvh', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', textAlign: 'center',
-          background: '#F0FDF9', padding: '24px 20px', gap: 14,
+          background: C.bg, padding: '24px 20px', gap: 14,
         }}
       >
-        <i className="ti ti-alert-triangle" style={{ fontSize: 40, color: '#B45309' }} aria-hidden />
-        <h1 style={{ fontSize: 18, fontWeight: 600, color: '#0F172A', margin: 0 }}>
+        <i className="ti ti-alert-triangle" style={{ fontSize: 40, color: C.amber }} aria-hidden />
+        <h1 style={{ fontSize: 18, fontWeight: 600, color: C.text, margin: 0 }}>
           Algo salió mal
         </h1>
-        <p style={{ fontSize: 13, color: '#64748B', maxWidth: 340, lineHeight: 1.5, margin: 0 }}>
+        <p style={{ fontSize: 13, color: C.muted, maxWidth: 340, lineHeight: 1.5, margin: 0 }}>
           La aplicación encontró un error inesperado. Puedes recargar para
           intentarlo de nuevo. Si el problema continúa, limpia los datos locales
           (esto borra las encuestas no sincronizadas guardadas en este dispositivo).
@@ -77,7 +78,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             onClick={this.handleReload}
             style={{
               minHeight: 44, padding: '11px 20px', borderRadius: 8, border: 'none',
-              background: '#0F766E', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              background: C.primary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
             }}
           >
             Recargar
@@ -86,7 +87,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             onClick={this.handleClearData}
             style={{
               minHeight: 44, padding: '11px 20px', borderRadius: 8,
-              border: '1px solid #FCA5A5', background: '#FEE2E2', color: '#B91C1C',
+              border: `1px solid color-mix(in srgb, ${C.red} 30%, transparent)`, background: C.redLight, color: C.red,
               fontSize: 14, fontWeight: 600, cursor: 'pointer',
             }}
           >
