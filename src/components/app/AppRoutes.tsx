@@ -1,6 +1,7 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { Suspense } from 'react'
 import { Spinner } from '../../components/ui'
-import { ViewState } from '../../lib/store'
+import type { AppView } from '../../types'
 
 // ⚡ Bolt: every route is code-split, not just the Dashboard. The app opens on
 // one view at a time, so eagerly bundling all pages into the initial JS made the
@@ -31,16 +32,6 @@ const BuscarPage    = React.lazy(loadRoute.buscar)
 const ExportarPage  = React.lazy(loadRoute.exportar)
 const AjustesPage   = React.lazy(loadRoute.ajustes)
 
-// Warm every route chunk in the background after first paint, so the service
-// worker caches them while online and the offline-first flows stay available
-// with no signal. Deferred to idle so it never competes with the initial load;
-// dynamic imports are deduped, so a later navigation reuses the warmed module.
-function prefetchRoutes() {
-  const warm = () => { for (const load of Object.values(loadRoute)) load().catch(() => {}) }
-  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(warm)
-  else setTimeout(warm, 2000)
-}
-
 function PageLoader() {
   return (
     <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -49,7 +40,7 @@ function PageLoader() {
   )
 }
 
-export function AppRoutes({ view }: { view: ViewState }) {
+export function AppRoutes({ view }: { view: AppView }) {
   return (
     <Suspense fallback={<PageLoader />}>
       {view === 'dashboard'  && <DashboardPage />}
@@ -62,5 +53,12 @@ export function AppRoutes({ view }: { view: ViewState }) {
   )
 }
 
-// Ensure fast refresh works correctly by not mixing exported components and functions
-export { prefetchRoutes }
+// Warm every route chunk in the background after first paint, so the service
+// worker caches them while online and the offline-first flows stay available
+// with no signal. Deferred to idle so it never competes with the initial load;
+// dynamic imports are deduped, so a later navigation reuses the warmed module.
+export function prefetchRoutes() {
+  const warm = () => { for (const load of Object.values(loadRoute)) load().catch(() => {}) }
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(warm)
+  else setTimeout(warm, 2000)
+}

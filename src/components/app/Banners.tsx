@@ -1,4 +1,3 @@
-import React from 'react'
 import { useStore } from '../../lib/store'
 import { useNetworkStatus } from '../../hooks/useNetworkStatus'
 import { C } from '../../components/ui'

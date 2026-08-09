@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { useStore } from './lib/store'
 import { useShallow } from 'zustand/react/shallow'
 import { BottomNav, SideNav, ToastContainer } from './components/layout'

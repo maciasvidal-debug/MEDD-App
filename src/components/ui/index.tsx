@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { useId, useRef, useState, type ButtonHTMLAttributes } from 'react'
 import { useFocusTrap } from './useFocusTrap'
 
