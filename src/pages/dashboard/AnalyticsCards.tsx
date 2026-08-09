@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react'
 import { Card, C } from '../../components/ui'
 import { STAT_GLOSSARY } from './constants'

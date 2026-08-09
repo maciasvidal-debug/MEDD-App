@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import type React from 'react'
 import { Button, C } from '../ui'
 import type { SurveyDraft } from '../../types'
