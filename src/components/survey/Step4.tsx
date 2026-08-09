@@ -35,39 +35,21 @@ function OtroField({ control, name, label, error, inputRef }: {
 // Body of Step 4, shown only when the home keeps unused medicines. Owns its own
 // just-in-time reveal refs (only relevant while this block is mounted) so Step4
 // stays a thin orchestrator. Form state is threaded down from Step4's useForm.
-function MedSobSection({ control, register, watch, errors }: {
+
+interface SectionProps {
   control: Control<Step4Data>
   register: UseFormRegister<Step4Data>
   watch: UseFormWatch<Step4Data>
   errors: FieldErrors<Step4Data>
-}) {
-  const dispMedVc = watch('dispMedVc')
-  const cantMed   = watch('cantMed')
-  const vtoMedNc  = watch('vtoMedNc')
-  const cantMedVto = watch('cantMedVto')
-  const motNoConsumo = watch('motNoConsumo')
-  const motVencimiento = watch('motVencimiento')
-  const dispFinal = watch('dispFinal')
-  const conocePuntos = watch('conocePuntos')
-  // Reasons for expiry only make sense once expired meds are declared.
-  const hasExpired = vtoMedNc === 'Sí' || (cantMedVto ?? 0) > 0
+}
 
-  // Just-in-time focus/scroll when an answer reveals a follow-up block: big
-  // blocks scroll into view; the small "Otro" boxes also grab focus so the
-  // surveyor lands right on the field to fill.
-  const dispVcRef   = useFocusOnReveal<HTMLDivElement>(dispMedVc === 'Sí', true)
-  const expiredRef  = useFocusOnReveal<HTMLDivElement>(hasExpired)
-  const otroNoConRef  = useFocusOnReveal<HTMLDivElement>(!!motNoConsumo?.includes('Otro'), true)
-  const otroVencRef   = useFocusOnReveal<HTMLDivElement>(!!motVencimiento?.includes('Otro'), true)
-  const otroDispRef   = useFocusOnReveal<HTMLDivElement>(!!dispFinal?.includes('Otro'), true)
-  const conocePuntosRef = useFocusOnReveal<HTMLDivElement>(conocePuntos === 'Sí', true)
+
+function KnowledgeSection({ control, errors, watch }: SectionProps) {
+  const dispMedVc = watch('dispMedVc')
+  const dispVcRef = useFocusOnReveal<HTMLDivElement>(dispMedVc === 'Sí', true)
 
   return (
     <>
-      <RevealNote>
-        Como el hogar <strong>guarda medicamentos sin consumir</strong>, complete las cantidades y,
-        si observa vencidos, regístrelos uno a uno en el paso de <strong>Medicamentos</strong>.
-      </RevealNote>
       <Divider label="Conocimiento del entrevistado" />
 
       <YesNoField control={control} name="dispMedVc" required help={FIELD_HELP.dispMedVc}
@@ -84,7 +66,16 @@ function MedSobSection({ control, register, watch, errors }: {
           </Field>
         </div>
       )}
+    </>
+  )
+}
 
+
+function ObservationSection({ control, register, errors, watch }: SectionProps) {
+  const cantMed = watch('cantMed')
+
+  return (
+    <>
       <Divider label="Observación directa — encuestador" />
 
       <YesNoField control={control} name="vtoMedNc" required help={FIELD_HELP.vtoMedNc}
@@ -116,8 +107,29 @@ function MedSobSection({ control, register, watch, errors }: {
           {...register('pesoMedNc', { valueAsNumber: true })}
         />
       </Field>
+    </>
+  )
+}
 
-      {/* ─── Motivos y disposición (instrumento v2) ─── */}
+
+function MotivesAndDisposalSection({ control, errors, watch }: SectionProps) {
+  const vtoMedNc = watch('vtoMedNc')
+  const cantMedVto = watch('cantMedVto')
+  const motNoConsumo = watch('motNoConsumo')
+  const motVencimiento = watch('motVencimiento')
+  const dispFinal = watch('dispFinal')
+  const conocePuntos = watch('conocePuntos')
+
+  const hasExpired = vtoMedNc === 'Sí' || (cantMedVto ?? 0) > 0
+
+  const expiredRef = useFocusOnReveal<HTMLDivElement>(hasExpired)
+  const otroNoConRef = useFocusOnReveal<HTMLDivElement>(!!motNoConsumo?.includes('Otro'), true)
+  const otroVencRef = useFocusOnReveal<HTMLDivElement>(!!motVencimiento?.includes('Otro'), true)
+  const otroDispRef = useFocusOnReveal<HTMLDivElement>(!!dispFinal?.includes('Otro'), true)
+  const conocePuntosRef = useFocusOnReveal<HTMLDivElement>(conocePuntos === 'Sí', true)
+
+  return (
+    <>
       <Divider label="Motivos y disposición" />
 
       <MultiChipField control={control} name="motNoConsumo"
@@ -167,6 +179,22 @@ function MedSobSection({ control, register, watch, errors }: {
   )
 }
 
+
+function MedSobSection({ control, register, watch, errors }: SectionProps) {
+  return (
+    <>
+      <RevealNote>
+        Como el hogar <strong>guarda medicamentos sin consumir</strong>, complete las cantidades y,
+        si observa vencidos, regístrelos uno a uno en el paso de <strong>Medicamentos</strong>.
+      </RevealNote>
+
+      <KnowledgeSection control={control} register={register} watch={watch} errors={errors} />
+      <ObservationSection control={control} register={register} watch={watch} errors={errors} />
+      <MotivesAndDisposalSection control={control} register={register} watch={watch} errors={errors} />
+    </>
+  )
+}
+
 export function Step4({ draft, onNext, onBack }: StepProps) {
   const { control, register, handleSubmit, watch, formState: { errors } } = useForm<Step4Data>({
     resolver: zodResolver(step4Schema),
@@ -191,6 +219,7 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
 
   // The whole questionnaire body is gated on "keeps unused meds at home"; it
   // scrolls into view when revealed. Its many sub-reveals live in MedSobSection.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const medSob    = watch('medSob')
   const medSobRef = useFocusOnReveal<HTMLDivElement>(medSob === 'Sí')
 
