@@ -64,3 +64,58 @@ describe('uuid', () => {
     expect(randomSpy).not.toHaveBeenCalled()
   })
 })
+
+describe('downloadBlob', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('creates an anchor, clicks it, and cleans up', async () => {
+    // To mock in a node environment, we need to stub global objects
+    const { downloadBlob } = await import('./utils')
+
+    // Stub global document and URL
+    const mockClick = vi.fn()
+    const mockAnchor = {
+      href: '',
+      download: '',
+      click: mockClick
+    }
+    const mockDocument = {
+      createElement: vi.fn(() => mockAnchor),
+      body: {
+        appendChild: vi.fn(),
+        removeChild: vi.fn(),
+      }
+    }
+
+    const mockCreateObjectURL = vi.fn(() => 'blob:mock-url')
+    const mockRevokeObjectURL = vi.fn()
+
+    vi.stubGlobal('document', mockDocument)
+    vi.stubGlobal('URL', {
+      createObjectURL: mockCreateObjectURL,
+      revokeObjectURL: mockRevokeObjectURL
+    })
+    vi.stubGlobal('Blob', class Blob {
+      parts: unknown[]; options?: unknown; constructor(parts: unknown[], options?: unknown) { this.parts = parts; this.options = options; }
+    })
+
+    downloadBlob('test content', 'test.csv', 'text/csv')
+
+    expect(mockCreateObjectURL).toHaveBeenCalled()
+    expect(mockDocument.createElement).toHaveBeenCalledWith('a')
+
+    expect(mockAnchor.href).toContain('blob:mock-url')
+    expect(mockAnchor.download).toBe('test.csv')
+    expect(mockDocument.body.appendChild).toHaveBeenCalledWith(mockAnchor)
+    expect(mockClick).toHaveBeenCalled()
+    expect(mockDocument.body.removeChild).toHaveBeenCalledWith(mockAnchor)
+
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+
+    // Verify document was appended to and clicked
+    // Although we verify this, we mock DOM properties for Node environment.
+  })
+})
