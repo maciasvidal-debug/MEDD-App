@@ -30,7 +30,13 @@ const MOTIVE_COLUMNS: (keyof Survey)[] = [
 ]
 
 function escapeCSV(value: unknown): string {
-  const str = Array.isArray(value) ? value.join('; ') : String(value ?? '')
+  let str = Array.isArray(value) ? value.join('; ') : String(value ?? '')
+
+  // Mitigate CSV Injection (CWE-1236): Prefix cells starting with formula characters
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = "'" + str
+  }
+
   // Quote (and double internal quotes) when the cell contains the delimiter, a
   // quote, or any line break — CR included, so a stray '\r' can't split a row.
   return /[",\n\r]/.test(str)
