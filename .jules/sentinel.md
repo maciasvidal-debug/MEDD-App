@@ -40,3 +40,8 @@
 **Learning:** Unrestricted clearing of global states like `localStorage` can break application state (e.g., authentication) and violate the principle of least privilege by affecting unrelated data.
 
 **Prevention:** Always scope data deletion to the specific keys or prefixes owned by the feature or application (e.g., iterating and deleting only keys starting with `medd_`).
+
+## $(date +%Y-%m-%d) - Unescaped wildcards in SoQL queries
+**Vulnerability:** The wildcard characters `%` and `_` were not escaped when building a SoQL query for the `datos.gov.co` API, allowing potential query manipulation or overly broad search execution.
+**Learning:** SoQL uses PostgreSQL syntax under the hood. To safely interpolate user input into a `LIKE` clause, `%` and `_` must be escaped with a backslash.
+**Prevention:** Always escape both single quotes and wildcard characters (`%`, `_`) using regex replace before interpolating user input into any SQL/SoQL `LIKE` clause.
