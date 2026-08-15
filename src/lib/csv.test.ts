@@ -274,3 +274,35 @@ describe('toCodebookCSV', () => {
     expect(lines.length).toBeGreaterThan(1)
   })
 })
+
+
+
+describe('CSV injection mitigation (CWE-1236)', () => {
+  it('prefixes formula characters with a single quote', () => {
+    const surveys = [
+      {
+        id: 'a', nui: 1, instrumentVersion: 2, medications: [],
+        obs: '=1+1',
+        dir: '+cmd',
+        ciudad: '-5',
+        departamento: '@foo',
+        estrato: '1'
+      }
+    ] as unknown as Survey[]
+    const out = toCSV(surveys)
+
+    expect(out).toContain("'=1+1")
+    expect(out).toContain("'+cmd")
+    expect(out).toContain("'-5")
+    expect(out).toContain("'@foo")
+  })
+
+  it('does not prefix safe strings', () => {
+    const surveys = [
+      { id: 'a', nui: 1, instrumentVersion: 2, medications: [], obs: 'Hello = World' }
+    ] as unknown as Survey[]
+    const out = toCSV(surveys)
+    expect(out).toContain('Hello = World')
+    expect(out).not.toContain("'Hello = World")
+  })
+})

@@ -1,3 +1,7 @@
+## 2025-02-14 - Fix Potential CSV Formula Injection
+**Vulnerability:** The system allowed data exports (CSV) to retain initial characters (`=`, `+`, `-`, `@`, `\t`, `\r`) commonly used for CSV Injection (CWE-1236). This could lead to Formula Injection when the file is opened with spreadsheet programs.
+**Learning:** Spreadsheets evaluating cell contents that start with specific symbols as formulas could inadvertently execute malicious payloads leading to data leakage or remote code execution.
+**Prevention:** Sanitization at the export boundary ensures such characters are properly escaped. We chose to prefix these specific cells with a single quote (`'`), the standard recommendation, effectively instructing Excel and other parsers to interpret the content as literal text instead of a command or formula.
 ## 2026-06-12 - Fix CORS fallback to false exposing preflight requests
 
 **Vulnerability:** The CORS configuration in Express used `origin: false` as a fallback when no allowed origins were provided. This caused the `cors` middleware to completely ignore OPTIONS requests, causing them to fall through to the application routing, which could expose route existence or trigger wildcards unintentionally.
