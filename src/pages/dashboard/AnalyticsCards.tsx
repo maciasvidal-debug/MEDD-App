@@ -403,7 +403,6 @@ export function kappaBand(k: number): { label: string; color: string } {
 }
 
 export function BackcheckAgreementCard({ a }: { a?: BackcheckAgreement }) {
-console.log(a);
   if (!a || typeof a.kappaBin?.kappa !== 'number' || Number.isNaN(a.kappaBin?.kappa)) return null;
   const { nPairs, kappaBin, catAgreement, pesoMAD } = a
   const band = kappaBin ? kappaBand(kappaBin.kappa) : null
