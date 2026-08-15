@@ -45,6 +45,14 @@ describe('useCUM', () => {
     expect(url).toContain("%L''OR%")
   })
 
+  it('escapes SoQL wildcard characters (% and _) in the $where clause', async () => {
+    const fetchSpy = mockFetch([])
+    const { result } = renderHook(() => useCUM())
+    await act(async () => { await result.current.search("10%_vit") })
+    const url = decodeURIComponent(String(fetchSpy.mock.calls[0][0]))
+    expect(url).toContain("%10\\%\\_VIT%")
+  })
+
   it('sets a friendly error on an HTTP failure', async () => {
     mockFetch(null, false, 500)
     const { result } = renderHook(() => useCUM())

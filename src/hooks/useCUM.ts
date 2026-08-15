@@ -47,7 +47,7 @@ export function useCUM(): UseCUMResult {
       // Escape single quotes (SoQL string-literal escaping) before interpolating
       // the user term into the $where clause — mirrors useMunicipios and prevents
       // query breakage / SoQL injection from terms containing apostrophes.
-      const safe = trimmed.toUpperCase().replace(/'/g, "''")
+      const safe = trimmed.toUpperCase().replace(/'/g, "''").replace(/[%_]/g, '\\$&')
       const where = encodeURIComponent(
         `(upper(producto) like '%${safe}%' OR ` +
         `upper(principioactivo) like '%${safe}%') AND ` +
