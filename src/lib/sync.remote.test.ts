@@ -41,12 +41,16 @@ vi.mock('./supabase', () => ({
           state.deleteThrow
             ? Promise.reject(new Error('network'))
             : Promise.resolve({ error: state.deleteError }),
+        in: () =>
+          state.deleteThrow
+            ? Promise.reject(new Error('network'))
+            : Promise.resolve({ error: state.deleteError }),
       }),
     }),
   },
 }))
 
-import { fetchProfile, upsertProfile, pushSurvey, deleteSurveyRemote, pullSurveys } from './sync'
+import { fetchProfile, upsertProfile, pushSurvey, deleteSurveyRemote, deleteSurveysRemote, pullSurveys } from './sync'
 import { toRow } from './sync-mapping'
 import { DEFAULT_SETTINGS } from './constants'
 import type { Settings, Survey } from '../types'
@@ -177,5 +181,22 @@ describe('pushSurveys', () => {
   it('returns true immediately if surveys array is empty', async () => {
     const { pushSurveys } = await import('./sync')
     expect(await pushSurveys([], 'owner')).toBe(true)
+  })
+})
+
+describe('deleteSurveysRemote', () => {
+  it('returns true on success and false on error/throw', async () => {
+    expect(await deleteSurveysRemote(['A', 'B'])).toBe(true)
+    state.deleteError = { message: 'net' }
+    expect(await deleteSurveysRemote(['A', 'B'])).toBe(false)
+    state.deleteError = null
+    state.deleteThrow = true
+    expect(await deleteSurveysRemote(['A', 'B'])).toBe(false)
+  })
+
+  it('returns true immediately when passed an empty array without calling Supabase', async () => {
+    // If it called Supabase while deleteThrow was true, it would return false instead of true
+    state.deleteThrow = true
+    expect(await deleteSurveysRemote([])).toBe(true)
   })
 })
