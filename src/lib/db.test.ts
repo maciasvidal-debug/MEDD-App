@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
-  saveSurvey, getAllSurveys, getSurvey, deleteSurvey, saveManySurveys,
+  saveSurvey, getAllSurveys, getSurvey, deleteSurvey, saveManySurveys, clearAllSurveys,
   addDeletion, getDeletionIds, removeDeletion, removeDeletions, clearLocalUserData,
   getSettings, saveSettings, getDraft, saveDraft, clearDraft,
 } from './db'
@@ -41,6 +41,20 @@ describe('db — survey CRUD', () => {
     await saveManySurveys([])
     expect(await getAllSurveys()).toHaveLength(0)
   })
+
+  it('saveManySurveys propagates transaction errors', async () => {
+    // Passing an object without the keyPath 'id' causes a DataError in idb
+    const badSurvey = { nui: 1 } as unknown as Survey
+    await expect(saveManySurveys([badSurvey])).rejects.toThrow(/Data provided to an operation does not meet requirements/)
+  })
+
+  it('clearAllSurveys removes all surveys from the store', async () => {
+    await saveManySurveys([mkSurvey('a'), mkSurvey('b')])
+    expect(await getAllSurveys()).toHaveLength(2)
+    await clearAllSurveys()
+    expect(await getAllSurveys()).toHaveLength(0)
+  })
+
 })
 
 describe('db — deletion tombstones (v4 store)', () => {
