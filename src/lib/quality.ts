@@ -103,13 +103,41 @@ function collectWarnings(d: SurveyDraft): string[] {
   return warnings
 }
 
+// Cache for grouping surveys by their composite fingerprint. Using a WeakMap
+// keyed by the existing array ensures that the index is automatically garbage
+// collected when the array reference changes and prevents memory leaks.
+const duplicateIndexCache = new WeakMap<Survey[], Map<string, Survey[]>>()
+
+function getSurveyFingerprint(s: Pick<Survey, 'fNac' | 'ciudad' | 'fEta'>): string {
+  return `${s.fNac}|${s.ciudad}|${s.fEta}`
+}
+
 // Likely prior record (same respondent fingerprint), excluding the edited row.
 function findDuplicate(d: SurveyDraft, existing: Survey[], editingId?: string): Survey | null {
   if (!(d.fNac && d.ciudad && d.fEta)) return null
-  return existing.find(s =>
-    s.id !== editingId &&
-    s.fNac === d.fNac && s.ciudad === d.ciudad && s.fEta === d.fEta,
-  ) ?? null
+
+  let index = duplicateIndexCache.get(existing)
+  if (!index) {
+    index = new Map<string, Survey[]>()
+    for (const s of existing) {
+      if (!(s.fNac && s.ciudad && s.fEta)) continue
+      const key = getSurveyFingerprint(s)
+      const group = index.get(key)
+      if (group) {
+        group.push(s)
+      } else {
+        index.set(key, [s])
+      }
+    }
+    duplicateIndexCache.set(existing, index)
+  }
+
+  const key = getSurveyFingerprint(d as Pick<SurveyDraft, 'fNac' | 'ciudad' | 'fEta'>)
+  const matches = index.get(key)
+  if (!matches) return null
+
+  // Find the first match that isn't the currently edited survey
+  return matches.find(s => s.id !== editingId) ?? null
 }
 
 export function validateDraft(
