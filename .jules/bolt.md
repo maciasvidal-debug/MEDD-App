@@ -21,3 +21,8 @@
 
 **Learning:** O(M * N) filtering checks across large arrays are extremely slow in Javascript, especially when mapping and filtering inside `map()`. Building a temporary lookup/frequency map in O(N) drastically improves performance.
 **Action:** When calculating statistics or histograms for array items across many records, use a single-pass `for` loop to increment counters in a `Map` or plain object, handling inner-array deduplication directly. This reduced the dashboard aggregation time for the `count` helper from ~60ms down to ~19ms for 100k items.
+## 2026-08-22 - Optimization for array search
+
+**Learning:** When searching an array for multiple distinct elements, multiple `.find()` calls iterate the array multiple times. A single-pass loop (using a `for` loop) is significantly faster, reducing overhead especially for larger arrays. If only a specific subset of matches are expected, extracting these variables directly in a single pass with early breakouts (`break`) when all targets are matched gives a noticeable performance boost over multiple O(N) traversals. Using an object dictionary `{}` inside a hot loop can be surprisingly slow in v8 due to allocation overhead compared to primitive variables for small fixed numbers of search targets.
+
+**Action:** When finding 2-3 specific distinct elements in an array, use a single `for` loop with multiple variables and early breakouts instead of chaining `.find()`, but balance readability and scope. Ensure the overhead is justified by the hot path context.
