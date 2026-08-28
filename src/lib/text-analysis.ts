@@ -327,8 +327,21 @@ function buildHermeneuticInsights(
     })
   }
 
+  // Find specific themes in a single pass (O(N)) instead of multiple .find() traversals
+  let qcTheme: ThemeCount | undefined
+  let alarmTheme: ThemeCount | undefined
+  for (let i = 0, len = themes.length; i < len; i++) {
+    const t = themes[i]
+    if (t.theme === 'Calidad del dato') {
+      qcTheme = t
+      if (alarmTheme) break
+    } else if (t.theme === 'Señal de alarma') {
+      alarmTheme = t
+      if (qcTheme) break
+    }
+  }
+
   // Data quality threshold
-  const qcTheme = themes.find(t => t.theme === 'Calidad del dato')
   if (qcTheme && qcTheme.pct > 0.15) {
     out.push({
       id: 'herm-qc', tone: 'warn',
@@ -337,7 +350,6 @@ function buildHermeneuticInsights(
   }
 
   // Alarm signals
-  const alarmTheme = themes.find(t => t.theme === 'Señal de alarma')
   if (alarmTheme && alarmTheme.surveys > 0) {
     out.push({
       id: 'herm-alarm', tone: 'warn',
