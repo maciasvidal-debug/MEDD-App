@@ -413,41 +413,78 @@ export interface MotiveStats {
 // percentages aren't diluted by older "not asked" records (those are reported
 // separately as nNotAsked). A record is v1 when instrumentVersion is absent/<2.
 export function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
-  const asked = surveys.filter(s => (s.instrumentVersion ?? 1) >= 2 && s.medSob === 'Sí')
-  const nNotAsked = surveys.filter(s => (s.instrumentVersion ?? 1) < 2).length
-  if (asked.length === 0) return null
+  let nAsked = 0;
+  let nNotAsked = 0;
+  let nExpiredAsked = 0;
+  let conoceSi = 0;
+  let conoceBase = 0;
+  const noConsumoCounts = new Map<string, number>();
+  const vencimientoCounts = new Map<string, number>();
 
-  const count = (rows: Survey[], pick: (s: Survey) => string[], opts: readonly string[]) => {
-    const freqs = new Map<string, number>()
-    for (const row of rows) {
-      const picked = pick(row)
-      if (!picked) continue
-      for (let i = 0; i < picked.length; i++) {
-        const val = picked[i]
-        if (picked.indexOf(val) === i && opts.includes(val)) {
-          freqs.set(val, (freqs.get(val) ?? 0) + 1)
+  for (const s of surveys) {
+    if ((s.instrumentVersion ?? 1) < 2) {
+      nNotAsked++;
+      continue;
+    }
+    if (s.medSob !== 'Sí') {
+      continue;
+    }
+
+    nAsked++;
+
+    if (s.conocePuntos === 'Sí') {
+      conoceSi++;
+      conoceBase++;
+    } else if (s.conocePuntos === 'No') {
+      conoceBase++;
+    }
+
+    const isExpired = s.vtoMedNc === 'Sí' || (s.cantMedVto ?? 0) > 0;
+    if (isExpired) {
+      nExpiredAsked++;
+    }
+
+    if (s.motNoConsumo) {
+      const seen = new Set<string>();
+      for (const val of s.motNoConsumo) {
+        if (!seen.has(val) && (OPT.motNoConsumo as readonly string[]).includes(val)) {
+          seen.add(val);
+          noConsumoCounts.set(val, (noConsumoCounts.get(val) ?? 0) + 1);
         }
       }
     }
-    const result = []
-    for (const opt of opts) {
-      const n = freqs.get(opt)
-      if (n !== undefined && n > 0) result.push({ name: opt, n })
+
+    if (isExpired && s.motVencimiento) {
+      const seen = new Set<string>();
+      for (const val of s.motVencimiento) {
+        if (!seen.has(val) && (OPT.motVencimiento as readonly string[]).includes(val)) {
+          seen.add(val);
+          vencimientoCounts.set(val, (vencimientoCounts.get(val) ?? 0) + 1);
+        }
+      }
     }
-    return result.sort((a, b) => b.n - a.n)
   }
 
-  const expiredAsked = asked.filter(s => s.vtoMedNc === 'Sí' || (s.cantMedVto ?? 0) > 0)
+  if (nAsked === 0) return null;
+
+  const countResult = (counts: Map<string, number>, opts: readonly string[]) => {
+    const result = [];
+    for (const opt of opts) {
+      const n = counts.get(opt);
+      if (n !== undefined && n > 0) result.push({ name: opt, n });
+    }
+    return result.sort((a, b) => b.n - a.n);
+  };
 
   return {
-    nAsked: asked.length,
+    nAsked,
     nNotAsked,
-    nExpiredAsked: expiredAsked.length,
-    noConsumo:   count(asked, s => s.motNoConsumo, OPT.motNoConsumo),
-    vencimiento: count(expiredAsked, s => s.motVencimiento, OPT.motVencimiento),
-    conoceSi:    asked.filter(s => s.conocePuntos === 'Sí').length,
-    conoceBase:  asked.filter(s => s.conocePuntos === 'Sí' || s.conocePuntos === 'No').length,
-  }
+    nExpiredAsked,
+    noConsumo: countResult(noConsumoCounts, OPT.motNoConsumo),
+    vencimiento: countResult(vencimientoCounts, OPT.motVencimiento),
+    conoceSi,
+    conoceBase,
+  };
 }
 
 // ─── Disposal behaviour, unified across instrument versions ─────────────────
