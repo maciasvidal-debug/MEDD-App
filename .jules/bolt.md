@@ -21,3 +21,8 @@
 
 **Learning:** O(M * N) filtering checks across large arrays are extremely slow in Javascript, especially when mapping and filtering inside `map()`. Building a temporary lookup/frequency map in O(N) drastically improves performance.
 **Action:** When calculating statistics or histograms for array items across many records, use a single-pass `for` loop to increment counters in a `Map` or plain object, handling inner-array deduplication directly. This reduced the dashboard aggregation time for the `count` helper from ~60ms down to ~19ms for 100k items.
+## 2025-02-18 - Single-Pass Data Aggregation
+
+**Learning:** Redundant iterations (`O(N)`) over data collections for aggregating multiple metrics can cause significant CPU overhead, especially as datasets grow.
+
+**Action:** Consolidate multiple `filter` and mapping passes into a single iteration where multiple state variables or counters are updated simultaneously to maximize cache locality and reduce raw loop overhead.
