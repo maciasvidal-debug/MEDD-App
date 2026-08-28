@@ -431,15 +431,38 @@ export function buildTextAnalysis(surveys: Survey[]): TextAnalysisResult | null 
   // Co-occurrence matrix (symmetric, zero diagonal)
   const themeLabels = themes.map(t => t.theme)
   const themeIndex = new Map(themeLabels.map((t, i) => [t, i]))
-  const matrix: number[][] = themeLabels.map(() => new Array(themeLabels.length).fill(0))
-  // Single pass over surveys: increment each theme pair present in a survey
+  const tLen = themeLabels.length
+  const matrix: number[][] = themeLabels.map(() => new Array(tLen).fill(0))
+
+  // Reusable buffer to avoid allocations in the hot loop
+  const idxBuffer = new Int32Array(tLen)
+
+  // Single pass over surveys: compute the half-matrix
   for (const st of surveyThemes) {
-    const idx = st.map(t => themeIndex.get(t)!)
-    for (let a = 0; a < idx.length; a++)
-      for (let b = a + 1; b < idx.length; b++) {
-        matrix[idx[a]][idx[b]]++
-        matrix[idx[b]][idx[a]]++
+    const len = st.length
+    if (len < 2) continue
+
+    for (let j = 0; j < len; j++) {
+      idxBuffer[j] = themeIndex.get(st[j])!
+    }
+
+    // Only compute the upper triangle to halve the inner loop work
+    for (let a = 0; a < len - 1; a++) {
+      const idA = idxBuffer[a]
+      const rowA = matrix[idA]
+      for (let b = a + 1; b < len; b++) {
+        rowA[idxBuffer[b]]++
       }
+    }
+  }
+
+  // Mirror the upper triangle to the lower triangle (matrix is symmetric)
+  for (let i = 0; i < tLen; i++) {
+    for (let j = i + 1; j < tLen; j++) {
+      const val = matrix[i][j] + matrix[j][i]
+      matrix[i][j] = val
+      matrix[j][i] = val
+    }
   }
 
   return {
