@@ -391,12 +391,17 @@ export const useStore = create<AppStore>((set, get) => ({
     }
     await saveSurvey(updated)
     clearDraft()
-    set(s => ({
-      surveys: s.surveys.map(sv => (sv.id === id ? updated : sv)),
-      view: 'encuestas',
-      wizard: null,
-      pendingDraft: null,
-    }))
+    set(s => {
+      const index = s.surveys.findIndex(sv => sv.id === id)
+      const nextSurveys = index !== -1 ? [...s.surveys] : s.surveys
+      if (index !== -1) nextSurveys[index] = updated
+      return {
+        surveys: nextSurveys,
+        view: 'encuestas',
+        wizard: null,
+        pendingDraft: null,
+      }
+    })
     get().pushToast('Encuesta actualizada')
 
     const { user } = get()
