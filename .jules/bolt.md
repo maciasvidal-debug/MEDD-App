@@ -26,12 +26,3 @@
 **Learning:** Redundant iterations (`O(N)`) over data collections for aggregating multiple metrics can cause significant CPU overhead, especially as datasets grow.
 
 **Action:** Consolidate multiple `filter` and mapping passes into a single iteration where multiple state variables or counters are updated simultaneously to maximize cache locality and reduce raw loop overhead.
-## 2026-08-22 - Optimization for array search
-
-**Learning:** When searching an array for multiple distinct elements, multiple `.find()` calls iterate the array multiple times. A single-pass loop (using a `for` loop) is significantly faster, reducing overhead especially for larger arrays. If only a specific subset of matches are expected, extracting these variables directly in a single pass with early breakouts (`break`) when all targets are matched gives a noticeable performance boost over multiple O(N) traversals. Using an object dictionary `{}` inside a hot loop can be surprisingly slow in v8 due to allocation overhead compared to primitive variables for small fixed numbers of search targets.
-
-**Action:** When finding 2-3 specific distinct elements in an array, use a single `for` loop with multiple variables and early breakouts instead of chaining `.find()`, but balance readability and scope. Ensure the overhead is justified by the hot path context.
-## 2025-02-18 - Optimize repeated O(N) array searching by caching indexes with WeakMap
-
-**Learning:** Re-running an O(N) search (`.find()`) across a large array repeatedly (e.g. searching for duplicates inside a validation function called multiple times) scales poorly. Using a `WeakMap` keyed by the array reference allows building a grouped lookup map (index) exactly once per array instance in O(N) and then querying it in O(1) for subsequent checks. The `WeakMap` ensures the index is automatically garbage collected when the array reference goes out of scope, preventing memory leaks.
-**Action:** When a function repeatedly searches an external array parameter, check if you can memoize an index (like a `Map`) using a `WeakMap<ArrayType, IndexType>`. This transforms repeated O(N) linear scans into O(1) lookups, providing drastic performance improvements (e.g., 39x faster on an array of 50k elements).

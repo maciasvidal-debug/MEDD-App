@@ -447,7 +447,7 @@ export function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
     if (s.motNoConsumo) {
       const seen = new Set<string>();
       for (const val of s.motNoConsumo) {
-        if (!seen.has(val) && OPT.motNoConsumo.includes(val)) {
+        if (!seen.has(val) && (OPT.motNoConsumo as readonly string[]).includes(val)) {
           seen.add(val);
           noConsumoCounts.set(val, (noConsumoCounts.get(val) ?? 0) + 1);
         }
@@ -457,7 +457,7 @@ export function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
     if (isExpired && s.motVencimiento) {
       const seen = new Set<string>();
       for (const val of s.motVencimiento) {
-        if (!seen.has(val) && OPT.motVencimiento.includes(val)) {
+        if (!seen.has(val) && (OPT.motVencimiento as readonly string[]).includes(val)) {
           seen.add(val);
           vencimientoCounts.set(val, (vencimientoCounts.get(val) ?? 0) + 1);
         }

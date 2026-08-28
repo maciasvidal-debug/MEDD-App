@@ -1,0 +1,5 @@
+🧪 [Add tests for deleteSurveysRemote]
+
+🎯 **What:** Added tests for the `deleteSurveysRemote` function which was completely untested.
+📊 **Coverage:** Covered the happy path (successfully deleting multiple IDs), error state (Supabase error), thrown exception (network failure), and the early return fast path (empty ID array).
+✨ **Result:** Test coverage for `src/lib/sync.ts` is now improved with 100% functionality coverage for both single and multiple remote deletions.
