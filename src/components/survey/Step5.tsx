@@ -274,7 +274,11 @@ export function Step5({ draft, onNext, onBack }: StepProps) {
   }
 
   function removeMed(idx: number) {
-    setMeds(prev => prev.filter((_, i) => i !== idx))
+    setMeds(prev => {
+      const next = [...prev]
+      next.splice(idx, 1)
+      return next
+    })
   }
 
   function handleNext(e: React.FormEvent) {
