@@ -6,3 +6,8 @@
 **Learning:** When building frequency maps in tight loops inside V8 (like processing tokens), using a raw object created with `Object.create(null)` is roughly 6-10% faster than repeatedly calling `Map.prototype.get` and `Map.prototype.set` due to optimized object property access. Converting the `Record` to a `Map` via `Object.entries()` afterwards maintains the necessary type contract without sacrificing the inner-loop speed gains.
 
 **Action:** Prefer `Object.create(null)` for temporary counting dictionaries in critical hot paths over `Map`, especially when the number of insertions significantly outweighs the overhead of an eventual conversion to a `Map` (if required by the API boundary).
+## 2024-05-16 - Optimizing array state removal in React
+
+**Learning:** When removing a single element from an array held in React state, replacing `filter` with `splice` on a shallow copy (e.g. `const next = [...prev]; next.splice(idx, 1)`) can significantly improve performance for large arrays by avoiding the allocation of new elements on every iteration and reducing garbage collection pressure.
+
+**Action:** Use `splice` on a shallow copy instead of `filter` when removing single elements from large arrays in state to improve performance.
