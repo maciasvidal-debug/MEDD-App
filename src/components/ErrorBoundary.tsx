@@ -23,7 +23,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   handleReload = () => {
     this.setState({ error: null })
-    window.location.reload()
+    window.location.href = window.location.origin + '/'
   }
 
   handleClearData = async () => {
@@ -48,7 +48,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     } catch (e) {
       console.error('Failed to clear local data:', e)
     } finally {
-      window.location.reload()
+      window.location.href = window.location.origin + '/'
     }
   }
 
