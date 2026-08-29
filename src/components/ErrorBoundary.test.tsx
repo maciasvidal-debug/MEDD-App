@@ -11,7 +11,7 @@ function Bomb({ message = "kaboom" }: { message?: string }): never {
 }
 
 describe("ErrorBoundary", () => {
-  let reload: ReturnType<typeof vi.fn>;
+
   let consoleError: ReturnType<typeof vi.spyOn>;
   const originalLocation = window.location;
 
@@ -19,26 +19,21 @@ describe("ErrorBoundary", () => {
     // React itself logs caught render errors to console.error; silence the noise
     // and let each test assert on the boundary's own log call explicitly.
     consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    reload = vi.fn();
+
     // jsdom's window.location.reload is non-configurable, so swap the whole
     // location object for a stub (preserving the fields other code may read).
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: {
-        ...originalLocation,
-        href: originalLocation.href,
-        origin: originalLocation.origin,
-        reload,
-      },
-    });
+    // Mock window.location for href assignment tracking
+    delete (window as unknown as Record<string, unknown>).location;
+    (window as unknown as Record<string, unknown>).location = {
+      ...originalLocation,
+      origin: "http://localhost:3000",
+      href: "http://localhost:3000/some/path?attack=1#hash",
+    };
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: originalLocation,
-    });
+    (window as unknown as Record<string, unknown>).location = originalLocation;
   });
 
   it("renders its children when nothing throws", () => {
@@ -89,7 +84,7 @@ describe("ErrorBoundary", () => {
       </ErrorBoundary>,
     );
     await user.click(screen.getByRole("button", { name: "Recargar" }));
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(window.location.href).toBe("http://localhost:3000/");
   });
 
   describe('"Limpiar datos y recargar" — clearing local persistence', () => {
@@ -128,7 +123,7 @@ describe("ErrorBoundary", () => {
 
       await renderAndClickClear();
 
-      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(window.location.href).toBe("http://localhost:3000/"));
       expect(databases).toHaveBeenCalledTimes(1);
       expect(deleteDatabase).toHaveBeenCalledWith("medd_db");
       expect(deleteDatabase).toHaveBeenCalledWith("other_db");
@@ -149,7 +144,7 @@ describe("ErrorBoundary", () => {
 
       await renderAndClickClear();
 
-      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(window.location.href).toBe("http://localhost:3000/"));
       expect(deleteDatabase).toHaveBeenCalledWith("medd_db");
       expect(deleteDatabase).toHaveBeenCalledTimes(1);
       expect(removeItemSpy).toHaveBeenCalledWith("medd_test");
@@ -169,7 +164,7 @@ describe("ErrorBoundary", () => {
 
       // The finally block must reload even though clearing failed — otherwise the
       // user is stranded on the error screen with no way out.
-      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(window.location.href).toBe("http://localhost:3000/"));
       expect(consoleError).toHaveBeenCalledWith(
         "Failed to clear local data:",
         expect.objectContaining({ message: "IDB unavailable" }),
@@ -188,7 +183,7 @@ describe("ErrorBoundary", () => {
 
       await renderAndClickClear();
 
-      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(window.location.href).toBe("http://localhost:3000/"));
       expect(consoleError).toHaveBeenCalledWith(
         "Failed to clear local data:",
         expect.objectContaining({ message: "storage denied" }),
