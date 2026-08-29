@@ -31,7 +31,7 @@ if (typeof import.meta.env === 'undefined') {
   Object.defineProperty(import.meta, 'env', {
     value: {
       VITE_SUPABASE_URL: 'https://test.supabase.co',
-      VITE_SUPABASE_ANON_KEY: 'test-anon-key'
+      VITE_SUPABASE_ANON_KEY: 'mock-public-anon-key-for-testing-purposes-only'
     },
     writable: true,
   });
@@ -40,6 +40,6 @@ if (typeof import.meta.env === 'undefined') {
      import.meta.env.VITE_SUPABASE_URL = 'https://test.supabase.co';
   }
   if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
-     import.meta.env.VITE_SUPABASE_ANON_KEY = 'test-anon-key';
+     import.meta.env.VITE_SUPABASE_ANON_KEY = 'mock-public-anon-key-for-testing-purposes-only';
   }
 }
