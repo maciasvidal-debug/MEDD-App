@@ -138,11 +138,13 @@ function tokenise(text: string): string[] {
 // Operates on already-tokenised texts so the (comparatively costly) tokenisation
 // is done once and shared with computeBigrams, rather than repeated per consumer.
 function computeTF(tokensByText: string[][]): Map<string, number> {
-  const freq = new Map<string, number>()
-  for (const tokens of tokensByText)
-    for (const token of tokens)
-      freq.set(token, (freq.get(token) ?? 0) + 1)
-  return freq
+  const freqObj: Record<string, number> = Object.create(null)
+  for (const tokens of tokensByText) {
+    for (const token of tokens) {
+      freqObj[token] = (freqObj[token] ?? 0) + 1
+    }
+  }
+  return new Map(Object.entries(freqObj))
 }
 
 // ─── Bigrams ──────────────────────────────────────────────────────────────────
