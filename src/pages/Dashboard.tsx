@@ -366,8 +366,7 @@ export default function DashboardPage() {
         {/* Control de calidad operativo por encuestador (para-data / antifraude) */}
         {isInvestigador && surveyorQC && <SurveyorQCCard qc={surveyorQC} />}
 
-        {/* Diseño muestral: agrupamiento por hogar (Rec. 5). El método de
-            selección es constante de estudio (investigador), no se grafica. */}
+        {/* Diseño muestral: agrupamiento por hogar */}
         {isInvestigador && household && (
           <HouseholdClusteringCard h={household} />
         )}
