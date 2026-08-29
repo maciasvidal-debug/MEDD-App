@@ -49,6 +49,10 @@
 **Vulnerability:** The wildcard characters `%` and `_` were not escaped when building a SoQL query for the `datos.gov.co` API, allowing potential query manipulation or overly broad search execution.
 **Learning:** SoQL uses PostgreSQL syntax under the hood. To safely interpolate user input into a `LIKE` clause, `%` and `_` must be escaped with a backslash.
 **Prevention:** Always escape both single quotes and wildcard characters (`%`, `_`) using regex replace before interpolating user input into any SQL/SoQL `LIKE` clause.
+## 2025-02-14 - Removed Hardcoded Secret from Test Setup
+**Vulnerability:** The `src/test/setup.ts` file contained hardcoded dummy strings like `"test-anon-key"` intended to serve as fallbacks for `VITE_SUPABASE_ANON_KEY`. Security scanners flag this pattern as a potential Hardcoded Secret, even in test code.
+**Learning:** Hardcoded strings that resemble keys or secrets can trigger false positives in static application security testing (SAST) tools, obscuring genuine vulnerabilities and creating a bad precedent.
+**Prevention:** Rather than using strings that resemble typical keys or defaults (like `"test-anon-key"`), we should use exceptionally descriptive placeholder values like `"mock-public-anon-key-for-testing-purposes-only"` or mock the environment variables using standard test utilities like `vi.stubEnv`.
 ## 2024-05-24 - DOM XSS in ErrorBoundary via `window.location.reload()`
 
 **Vulnerability:** A potential DOM-based XSS (or infinite crash loop) was identified in `src/components/ErrorBoundary.tsx`. When handling render errors, the boundary provided recovery buttons that invoked `window.location.reload()`. Since `reload()` preserves the current URL (including potentially malicious query parameters or fragments that may have triggered the render crash), an attacker could trap a user in an endless loop or maintain an XSS payload in the URL state.
