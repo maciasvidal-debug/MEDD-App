@@ -85,10 +85,11 @@ export default function DashboardPage() {
 
   const {
     nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
-    barAsSalud, barNvEstu, barNvPosg, barEtnia, barEstrato, ciudadVenc
+    barAsSalud, barNvEstu, barNvPosg, barEtnia, barEstrato, ciudadVenc, integrityIssues
   } = useMemo(() => {
     let nSob = 0, nVenc = 0, nDisp = 0
     let pesoTotal = 0, unidTotal = 0, vencTotal = 0, totalMeds = 0
+    const integrityIssues: typeof data = []
 
     const asSaludCounts: Record<string, number> = {}
     const nvEstuCounts: Record<string, number> = {}
@@ -107,6 +108,12 @@ export default function DashboardPage() {
       unidTotal += s.cantMed ?? 0
       vencTotal += s.cantMedVto ?? 0
       totalMeds += s.medications?.length ?? 0
+
+      // Records that declare expired meds in the home but carry no expired-product
+      // detail — the integrity gap surfaced for follow-up / back-check.
+      if (declaresExpiredWithoutDetail(s)) {
+        integrityIssues.push(s)
+      }
 
       if (s.asSalud) asSaludCounts[s.asSalud] = (asSaludCounts[s.asSalud] || 0) + 1
       if (s.nvEstu) nvEstuCounts[s.nvEstu] = (nvEstuCounts[s.nvEstu] || 0) + 1
@@ -138,7 +145,7 @@ export default function DashboardPage() {
 
     return {
       nSob, nVenc, nDisp, pesoTotal, unidTotal, vencTotal, totalMeds,
-      barAsSalud, barNvEstu, barNvPosg, barEtnia, barEstrato, ciudadVenc
+      barAsSalud, barNvEstu, barNvPosg, barEtnia, barEstrato, ciudadVenc, integrityIssues
     }
   }, [data])
 
@@ -159,9 +166,6 @@ export default function DashboardPage() {
   const classMotive = useMemo(() => buildClassMotiveCross(data), [data])
   // Disposal behaviour unified across v1 (free-text ctoDispVc) and v2 (dispFinal).
   const disposal = useMemo(() => buildDisposalStats(data), [data])
-  // Records that declare expired meds in the home but carry no expired-product
-  // detail — the integrity gap surfaced for follow-up / back-check.
-  const integrityIssues = useMemo(() => data.filter(declaresExpiredWithoutDetail), [data])
   const backcheck = useMemo(() => buildBackcheckAgreement(data), [data])
   const adjusted = useMemo(() => buildEstratoAdjusted(data), [data])
 
