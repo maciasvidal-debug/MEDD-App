@@ -1,7 +1,8 @@
 import { type Proportion } from '../../lib/stats'
 import { Card, C } from '../../components/ui'
 import { pct } from '../../lib/utils'
-import { INSIGHT_TONE, STAT_GLOSSARY } from './constants'
+import { INSIGHT_TONE } from './constants'
+import { STAT_GLOSSARY } from '../../data/statGlossary'
 import { SectionLabel } from './Navigation'
 import { type Insight } from '../../lib/insights'
 
