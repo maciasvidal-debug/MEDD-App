@@ -11,3 +11,7 @@
 **Learning:** When removing a single element from an array held in React state, replacing `filter` with `splice` on a shallow copy (e.g. `const next = [...prev]; next.splice(idx, 1)`) can significantly improve performance for large arrays by avoiding the allocation of new elements on every iteration and reducing garbage collection pressure.
 
 **Action:** Use `splice` on a shallow copy instead of `filter` when removing single elements from large arrays in state to improve performance.
+
+## 2026-09-01 - Merging isolated array filters into single-pass loops
+**Learning:** Performing isolated `.filter()` iterations on large datasets creates unnecessary allocations and traverses the array again (O(N) overhead).
+**Action:** When a loop already exists to process the array inside a \`useMemo\`, push the conditionally passing items into a new array during that single pass to avoid extra iterations.
