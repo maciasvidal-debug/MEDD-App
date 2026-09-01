@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
 import { Card, C } from '../../components/ui'
-import { STAT_GLOSSARY } from './constants'
+import { STAT_GLOSSARY } from '../../data/statGlossary'
 import { SectionLabel } from './Navigation'
 import {
   type AssocGroup, type Association, type SurveyorEffect, type SurveyorQC,
