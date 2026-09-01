@@ -407,7 +407,7 @@ export function buildTextAnalysis(surveys: Survey[]): TextAnalysisResult | null 
     .map(([term, count]) => ({ term, count, pct: totalOcc > 0 ? count / totalOcc : 0 }))
 
   // Theme detection per survey (count each theme at most once per survey)
-  const surveyThemes = withObs.map(s => [...new Set(detectThemes(s.obs))])
+  const surveyThemes = withObs.map(s => detectThemes(s.obs))
 
   const themeMap: Record<string, number> = {}
   for (const st of surveyThemes)
