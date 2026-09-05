@@ -19,6 +19,12 @@ import type { Survey } from '../types'
 
 // ─── Retention time of expired medications (days-overdue distribution) ──────
 
+
+// ⚡ Bolt: Pre-compute Sets from static arrays to upgrade O(N) array.includes()
+// lookups inside the loop to O(1) Set.has() lookups for performance optimization.
+const OPT_MOT_NO_CONSUMO_SET = new Set<string>(OPT.motNoConsumo);
+const OPT_MOT_VENCIMIENTO_SET = new Set<string>(OPT.motVencimiento);
+
 export interface DaysSummary { n: number; median: number; q1: number; q3: number; p90: number; max: number }
 
 // Distribution of how many days each expired product has been past its expiry
@@ -418,8 +424,8 @@ export function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
   let nExpiredAsked = 0;
   let conoceSi = 0;
   let conoceBase = 0;
-  const noConsumoCounts = new Map<string, number>();
-  const vencimientoCounts = new Map<string, number>();
+  const noConsumoCounts: Record<string, number> = Object.create(null);
+  const vencimientoCounts: Record<string, number> = Object.create(null);
 
   for (const s of surveys) {
     if ((s.instrumentVersion ?? 1) < 2) {
@@ -447,9 +453,9 @@ export function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
     if (s.motNoConsumo) {
       const seen = new Set<string>();
       for (const val of s.motNoConsumo) {
-        if (!seen.has(val) && (OPT.motNoConsumo as readonly string[]).includes(val)) {
+        if (!seen.has(val) && OPT_MOT_NO_CONSUMO_SET.has(val)) {
           seen.add(val);
-          noConsumoCounts.set(val, (noConsumoCounts.get(val) ?? 0) + 1);
+          noConsumoCounts[val] = (noConsumoCounts[val] ?? 0) + 1;
         }
       }
     }
@@ -457,9 +463,9 @@ export function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
     if (isExpired && s.motVencimiento) {
       const seen = new Set<string>();
       for (const val of s.motVencimiento) {
-        if (!seen.has(val) && (OPT.motVencimiento as readonly string[]).includes(val)) {
+        if (!seen.has(val) && OPT_MOT_VENCIMIENTO_SET.has(val)) {
           seen.add(val);
-          vencimientoCounts.set(val, (vencimientoCounts.get(val) ?? 0) + 1);
+          vencimientoCounts[val] = (vencimientoCounts[val] ?? 0) + 1;
         }
       }
     }
@@ -467,10 +473,10 @@ export function buildMotiveStats(surveys: Survey[]): MotiveStats | null {
 
   if (nAsked === 0) return null;
 
-  const countResult = (counts: Map<string, number>, opts: readonly string[]) => {
+  const countResult = (counts: Record<string, number>, opts: readonly string[]) => {
     const result = [];
     for (const opt of opts) {
-      const n = counts.get(opt);
+      const n = counts[opt];
       if (n !== undefined && n > 0) result.push({ name: opt, n });
     }
     return result.sort((a, b) => b.n - a.n);
