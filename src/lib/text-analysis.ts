@@ -117,13 +117,23 @@ export interface TextAnalysisResult {
 
 // ─── Text normalisation ───────────────────────────────────────────────────────
 // Strips diacritics, lowercases and collapses whitespace. Keep digits.
+// Uses a null-prototype dictionary cache to memoize regex executions in this hot loop,
+// providing an O(1) fast path for repeated vocabulary tokens.
+const NORM_CACHE: Record<string, string> = Object.create(null);
+
 function norm(text: string): string {
-  return text
+  const cached = NORM_CACHE[text];
+  if (cached !== undefined) return cached;
+
+  const res = text
     .toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
+    .trim();
+
+  NORM_CACHE[text] = res;
+  return res;
 }
 
 // ─── Tokeniser ────────────────────────────────────────────────────────────────
