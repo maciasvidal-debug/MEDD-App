@@ -191,6 +191,11 @@ describe('pullSurveys', () => {
     state.pullThrow = true
     expect(await pullSurveys()).toEqual([])
   })
+
+  it('returns [] if data mapping throws an error', async () => {
+    state.pullData = [new Proxy({}, { get() { throw new Error('mapping error') } }) as never]
+    expect(await pullSurveys()).toEqual([])
+  })
 })
 
 describe('pushSurveys', () => {
