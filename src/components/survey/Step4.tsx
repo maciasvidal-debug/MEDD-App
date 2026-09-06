@@ -1,5 +1,5 @@
 import React from 'react'
-import { useForm, Controller, type Control, type FieldErrors, type UseFormRegister, type UseFormWatch } from 'react-hook-form'
+import { useForm, useWatch, Controller, type Control, type FieldErrors, type UseFormRegister, type UseFormWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Field, SectionHead, Divider, RevealNote } from '../ui'
 import { useFocusOnReveal } from '../ui/useFocusOnReveal'
@@ -219,8 +219,7 @@ export function Step4({ draft, onNext, onBack }: StepProps) {
 
   // The whole questionnaire body is gated on "keeps unused meds at home"; it
   // scrolls into view when revealed. Its many sub-reveals live in MedSobSection.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const medSob    = watch('medSob')
+  const medSob    = useWatch({ control, name: 'medSob' })
   const medSobRef = useFocusOnReveal<HTMLDivElement>(medSob === 'Sí')
 
   function handleNext(data: Step4Data) {
