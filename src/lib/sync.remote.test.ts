@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const state = vi.hoisted(() => ({
   profileData:  null as Record<string, unknown> | null,
   profileError: null as { message: string } | null,
+  profileThrow: false,
   upsertError:  null as { message: string } | null,
   upsertThrow:  false,
   deleteError:  null as { message: string } | null,
@@ -21,7 +22,7 @@ vi.mock('./supabase', () => ({
   supabase: {
     from: () => ({
       select: () => ({
-        maybeSingle: () => Promise.resolve({ data: state.profileData, error: state.profileError }),
+        maybeSingle: () => state.profileThrow ? Promise.reject(new Error("network")) : Promise.resolve({ data: state.profileData, error: state.profileError }),
         order: () =>
           state.pullThrow
             ? Promise.reject(new Error('network'))
@@ -62,7 +63,7 @@ const mkSurvey = (id: string, over: Partial<Survey> = {}): Survey => ({
 
 beforeEach(() => {
   Object.assign(state, {
-    profileData: null, profileError: null,
+    profileData: null, profileError: null, profileThrow: false,
     upsertError: null, upsertThrow: false,
     deleteError: null, deleteThrow: false,
     pullData: [], pullError: null, pullThrow: false,
@@ -97,6 +98,11 @@ describe('fetchProfile', () => {
     state.profileError = { message: 'boom' }
     expect(await fetchProfile()).toBeNull()
   })
+
+  it('returns null when the fetch throws an exception', async () => {
+    state.profileThrow = true
+    expect(await fetchProfile()).toBeNull()
+  })
 })
 
 describe('upsertProfile', () => {
@@ -108,6 +114,26 @@ describe('upsertProfile', () => {
   it('parses semestre to an int and stamps the user_id', async () => {
     expect(await upsertProfile('owner', settings)).toBe(true)
     expect(state.lastUpsert).toMatchObject({ user_id: 'owner', etr_semestre: 8, nui_encuestador: '77' })
+  })
+
+  it('handles partial settings safely by falling back to null', async () => {
+    // Only pass partial settings to trigger the || null branch
+    const partialSettings = {
+      nuiEncuestador: '',
+      etrPrograma: undefined,
+      etrTipoInst: null,
+      etrSemestre: 'invalid',
+      etrInstitucion: ''
+    } as unknown as Settings;
+
+    await upsertProfile('owner', partialSettings)
+    expect(state.lastUpsert).toMatchObject({
+      nui_encuestador: null,
+      etr_programa: null,
+      etr_tipo_inst: null,
+      etr_semestre: null,
+      etr_institucion: null
+    })
   })
 
   it('maps empty optional fields and a blank semestre to null', async () => {
@@ -181,6 +207,38 @@ describe('pushSurveys', () => {
   it('returns true immediately if surveys array is empty', async () => {
     const { pushSurveys } = await import('./sync')
     expect(await pushSurveys([], 'owner')).toBe(true)
+  })
+})
+
+
+describe('pushSurveyGeo', () => {
+  it('returns true on success and false on error/throw', async () => {
+    const { pushSurveyGeo } = await import('./sync')
+
+    // Success path
+    const survey = mkSurvey('G', { geoConsent: true, geoLat: 4.5, geoLng: -74.0 })
+    expect(await pushSurveyGeo([survey], 'owner')).toBe(true)
+    expect(state.lastUpsert).toMatchObject({ survey_id: 'G', geo_lat: 4.5, geo_lng: -74.0 })
+
+    // Error returned
+    state.upsertError = { message: 'net' }
+    expect(await pushSurveyGeo([survey], 'owner')).toBe(false)
+
+    // Exception thrown
+    state.upsertError = null
+    state.upsertThrow = true
+    expect(await pushSurveyGeo([survey], 'owner')).toBe(false)
+  })
+
+  it('returns true immediately if surveys array is empty or lacks valid geo data', async () => {
+    const { pushSurveyGeo } = await import('./sync')
+    expect(await pushSurveyGeo([], 'owner')).toBe(true)
+
+    const surveyNoConsent = mkSurvey('H', { geoConsent: false, geoLat: 4.5, geoLng: -74.0 })
+    expect(await pushSurveyGeo([surveyNoConsent], 'owner')).toBe(true)
+
+    const surveyNoCoords = mkSurvey('I', { geoConsent: true })
+    expect(await pushSurveyGeo([surveyNoCoords], 'owner')).toBe(true)
   })
 })
 
