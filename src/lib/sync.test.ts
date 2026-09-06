@@ -126,4 +126,14 @@ describe('fullSync — push (encuestador)', () => {
     expect(state.pushed.some(r => r.id === 'F')).toBe(true)
     expect((await getSurvey('F'))!.syncStatus).toBe('synced')
   })
+
+  it('does not mark local surveys as synced if the push fails', async () => {
+    await saveSurvey(mkSurvey('G', { syncStatus: 'local' }))
+    state.pushError = { message: 'network error' }
+
+    const res = await fullSync('owner', 'encuestador')
+
+    expect(res.pushed).toBe(0)
+    expect((await getSurvey('G'))!.syncStatus).toBe('local')
+  })
 })
