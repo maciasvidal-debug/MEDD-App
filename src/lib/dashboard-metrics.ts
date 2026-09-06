@@ -328,10 +328,10 @@ export interface MedStats {
 // accumulate the most expired units. `isExpired` reuses the same product metric
 // as the rest of the app (F_VTO < F_ETA).
 export function buildMedicationStats(surveys: Survey[]): MedStats | null {
-  const dciMap   = new Map<string, { n: number; expired: number }>()
-  const prodMap  = new Map<string, number>()
-  const groupMap = new Map<string, { n: number; expired: number }>()
-  const subgroupMap = new Map<string, { n: number; expired: number }>()
+  const dciMap: Record<string, { n: number; expired: number }> = Object.create(null)
+  const prodMap: Record<string, number> = Object.create(null)
+  const groupMap: Record<string, { n: number; expired: number }> = Object.create(null)
+  const subgroupMap: Record<string, { n: number; expired: number }> = Object.create(null)
   let totalProducts = 0, expiredProducts = 0, withVto = 0, classified = 0
 
   for (const s of surveys) {
@@ -343,61 +343,61 @@ export function buildMedicationStats(surveys: Survey[]): MedStats | null {
 
       const dci = (m.dci || '').trim()
       if (dci) {
-        const g = dciMap.get(dci) ?? { n: 0, expired: 0 }
+        const g = dciMap[dci] ?? { n: 0, expired: 0 }
         g.n++; if (expired) g.expired++
-        dciMap.set(dci, g)
+        dciMap[dci] = g
       }
       const nm = (m.nmMed || '').trim()
-      if (nm) prodMap.set(nm, (prodMap.get(nm) ?? 0) + 1)
+      if (nm) prodMap[nm] = (prodMap[nm] ?? 0) + 1
 
       // Therapeutic class (ATC) derived from the active ingredient.
       const group = therapeuticGroup(m.dci || '')
       if (group !== SIN_CLASIFICAR) classified++
-      const gg = groupMap.get(group) ?? { n: 0, expired: 0 }
+      const gg = groupMap[group] ?? { n: 0, expired: 0 }
       gg.n++; if (expired) gg.expired++
-      groupMap.set(group, gg)
+      groupMap[group] = gg
 
       const sub = therapeuticSubgroup(m.dci || '')
-      const sg = subgroupMap.get(sub) ?? { n: 0, expired: 0 }
+      const sg = subgroupMap[sub] ?? { n: 0, expired: 0 }
       sg.n++; if (expired) sg.expired++
-      subgroupMap.set(sub, sg)
+      subgroupMap[sub] = sg
     }
   }
   if (totalProducts === 0) return null
 
-  const topDci = Array.from(dciMap.entries())
+  const topDci = Object.entries(dciMap)
     .map(([name, g]) => ({ name, n: g.n }))
     .sort((a, b) => b.n - a.n).slice(0, 8)
-  const topExpiredDci = Array.from(dciMap.entries())
+  const topExpiredDci = Object.entries(dciMap)
     .filter(([, g]) => g.expired > 0)
     .map(([name, g]) => ({ name, value: g.expired }))
     .sort((a, b) => b.value - a.value).slice(0, 8)
-  const topProducts = Array.from(prodMap.entries())
+  const topProducts = Object.entries(prodMap)
     .map(([name, n]) => ({ name, n }))
     .sort((a, b) => b.n - a.n).slice(0, 8)
 
   // Therapeutic-group distributions exclude the "Sin clasificar" bucket from the
   // bars (it's summarised separately as the classified-coverage %).
-  const byGroup = Array.from(groupMap.entries())
+  const byGroup = Object.entries(groupMap)
     .filter(([name, g]) => name !== SIN_CLASIFICAR && g.n > 0)
     .map(([name, g]) => ({ name, n: g.n }))
     .sort((a, b) => b.n - a.n)
-  const byGroupExpired = Array.from(groupMap.entries())
+  const byGroupExpired = Object.entries(groupMap)
     .filter(([name, g]) => name !== SIN_CLASIFICAR && g.expired > 0)
     .map(([name, g]) => ({ name, value: g.expired }))
     .sort((a, b) => b.value - a.value)
-  const bySubgroup = Array.from(subgroupMap.entries())
+  const bySubgroup = Object.entries(subgroupMap)
     .filter(([name, g]) => name !== SIN_CLASIFICAR && g.n > 0)
     .map(([name, g]) => ({ name, n: g.n }))
     .sort((a, b) => b.n - a.n).slice(0, 12)
-  const bySubgroupExpired = Array.from(subgroupMap.entries())
+  const bySubgroupExpired = Object.entries(subgroupMap)
     .filter(([name, g]) => name !== SIN_CLASIFICAR && g.expired > 0)
     .map(([name, g]) => ({ name, value: g.expired }))
     .sort((a, b) => b.value - a.value).slice(0, 12)
   const classifiedPct = pct(classified, totalProducts)
 
   return {
-    totalProducts, expiredProducts, distinctDci: dciMap.size, withVto, classifiedPct,
+    totalProducts, expiredProducts, distinctDci: Object.keys(dciMap).length, withVto, classifiedPct,
     topDci, topExpiredDci, topProducts, byGroup, byGroupExpired, bySubgroup, bySubgroupExpired,
   }
 }
@@ -509,7 +509,7 @@ export interface DisposalStats {
 // read time. Base = homes that store meds and carry any disposal info; coverage
 // is reported so the unclassified legacy tail is visible.
 export function buildDisposalStats(surveys: Survey[]): DisposalStats | null {
-  const catCount = new Map<string, number>()
+  const catCount: Record<string, number> = Object.create(null)
   let base = 0, fromStructured = 0, fromText = 0, unclassifiedText = 0
 
   for (const s of surveys) {
@@ -526,12 +526,12 @@ export function buildDisposalStats(surveys: Survey[]): DisposalStats | null {
       continue // no disposal information at all
     }
     base++
-    for (const c of cats) catCount.set(c, (catCount.get(c) ?? 0) + 1)
+    for (const c of cats) catCount[c] = (catCount[c] ?? 0) + 1
   }
 
   if (base === 0) return null
   const byCategory = OPT.dispFinal
-    .map(c => ({ name: c, n: catCount.get(c) ?? 0 }))
+    .map(c => ({ name: c, n: catCount[c] ?? 0 }))
     .filter(d => d.n > 0)
     .sort((a, b) => b.n - a.n)
 
@@ -556,8 +556,8 @@ export function buildClassMotiveCross(surveys: Survey[]): ClassMotiveCross | nul
   const asked = surveys.filter(s => (s.instrumentVersion ?? 1) >= 2 && s.medSob === 'Sí')
   if (asked.length === 0) return null
 
-  const motiveTotals = new Map<string, number>()
-  const groupAgg = new Map<string, { base: number; counts: Map<string, number> }>()
+  const motiveTotals: Record<string, number> = Object.create(null)
+  const groupAgg: Record<string, { base: number; counts: Record<string, number> }> = Object.create(null)
   let nBase = 0
 
   for (const s of asked) {
@@ -569,21 +569,21 @@ export function buildClassMotiveCross(surveys: Survey[]): ClassMotiveCross | nul
     if (groups.size === 0) continue
     const motives = (s.motNoConsumo ?? []).filter(Boolean)
     nBase++
-    for (const mo of motives) motiveTotals.set(mo, (motiveTotals.get(mo) ?? 0) + 1)
+    for (const mo of motives) motiveTotals[mo] = (motiveTotals[mo] ?? 0) + 1
     for (const g of groups) {
-      const agg = groupAgg.get(g) ?? { base: 0, counts: new Map<string, number>() }
+      const agg = groupAgg[g] ?? { base: 0, counts: Object.create(null) }
       agg.base++
-      for (const mo of motives) agg.counts.set(mo, (agg.counts.get(mo) ?? 0) + 1)
-      groupAgg.set(g, agg)
+      for (const mo of motives) agg.counts[mo] = (agg.counts[mo] ?? 0) + 1
+      groupAgg[g] = agg
     }
   }
 
   // Keep motive columns in codebook order, only those actually used.
-  const motives = OPT.motNoConsumo.filter(mo => (motiveTotals.get(mo) ?? 0) > 0)
+  const motives = OPT.motNoConsumo.filter(mo => (motiveTotals[mo] ?? 0) > 0)
   if (nBase === 0 || motives.length === 0) return null
 
-  const rows = Array.from(groupAgg.entries())
-    .map(([group, agg]) => ({ group, base: agg.base, counts: motives.map(mo => agg.counts.get(mo) ?? 0) }))
+  const rows = Object.entries(groupAgg)
+    .map(([group, agg]) => ({ group, base: agg.base, counts: motives.map(mo => agg.counts[mo] ?? 0) }))
     .sort((a, b) => b.base - a.base)
     .slice(0, 8)
 
