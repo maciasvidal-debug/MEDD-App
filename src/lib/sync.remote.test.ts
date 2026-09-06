@@ -199,16 +199,24 @@ describe('pullSurveys', () => {
 })
 
 describe('pushSurveys', () => {
-  it('returns true on success and false on error/throw', async () => {
+  it('returns true on success', async () => {
     const { pushSurveys } = await import('./sync')
     expect(await pushSurveys([mkSurvey('A'), mkSurvey('B')], 'owner')).toBe(true)
     expect(state.lastUpsert).toMatchObject({ id: 'B', user_id: 'owner' })
+  })
+
+  it('returns false when Supabase returns an error', async () => {
+    const { pushSurveys } = await import('./sync')
     state.upsertError = { message: 'net' }
     expect(await pushSurveys([mkSurvey('A')], 'owner')).toBe(false)
-    state.upsertError = null
+  })
+
+  it('returns false when the request throws an exception', async () => {
+    const { pushSurveys } = await import('./sync')
     state.upsertThrow = true
     expect(await pushSurveys([mkSurvey('A')], 'owner')).toBe(false)
   })
+
   it('returns true immediately if surveys array is empty', async () => {
     const { pushSurveys } = await import('./sync')
     expect(await pushSurveys([], 'owner')).toBe(true)
