@@ -15,6 +15,9 @@ import { WizardNavBar, scrollToFirstError, type StepProps } from './_shared'
 
 // ─── Municipio combobox ───────────────────────────────────────────────────────
 
+const SUGGESTION_BLUR_DELAY_MS = 160;
+
+
 function toTitleCase(s: string): string {
   const lower = ['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e']
   return s
@@ -79,7 +82,7 @@ function MunicipioCombobox({ value, onChange, departamento }: MunicipioComboboxP
   // is still stored cleanly. The department is fixed by the cascade, so we leave
   // it alone here.
   function handleBlur() {
-    setTimeout(() => setOpen(false), 160)
+    setTimeout(() => setOpen(false), SUGGESTION_BLUR_DELAY_MS)
     const muni = normalizeCiudad(text).municipio
     if (muni && muni !== text) {
       skipSearch.current = true
