@@ -5,6 +5,8 @@ import { useCUM } from '../hooks/useCUM'
 
 // ─── BUSCAR PAGE ──────────────────────────────────────────────────────────
 
+const COPY_FEEDBACK_DURATION_MS = 1500
+
 export function BuscarPage() {
   const [query, setQuery] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
@@ -13,7 +15,7 @@ export function BuscarPage() {
   function copy(text: string, key: string) {
     navigator.clipboard.writeText(text || '').catch(() => {})
     setCopied(key)
-    setTimeout(() => setCopied(null), 1500)
+    setTimeout(() => setCopied(null), COPY_FEEDBACK_DURATION_MS)
   }
 
   return (
@@ -108,4 +110,3 @@ export function BuscarPage() {
     </div>
   )
 }
-
