@@ -1,8 +1,12 @@
-## 2026-09-26 - Optimized `iccBinary` for Array Passes Overhead
-**Learning:** Found multiple array passes utilizing `.filter()` followed by `.reduce()` passes that increased Garbage Collection pressure via transient array creations. V8 does better with simpler, single or double pass `for` loops than multiple sequential functional combinators on hot paths.
-**Action:** Transformed `iccBinary` to eliminate `groups.filter()` and its successive `.reduce()` statements into two explicit, pre-optimized `for` loops, bypassing allocations and providing a ~4-80x speedup when benchmarking large structures. Will keep applying this methodology for high-frequency or data-heavy array aggregations in TypeScript/JavaScript contexts where speed is crucial.
-## 2024-05-24 - Single Pass for Multiple Summations
+## 2025-02-18 - Hoisting regexes out of hot loops
 
-**Learning:** When calculating multiple summations over an array (e.g. sums of terms or powers of terms used in statistical formulas like Cochran-Armitage or variance), `Array.prototype.reduce()` requires one pass per reduction. If these reductions are separate statements, it causes N passes over the entire array. Using a single `for` loop to compute all summations in parallel significantly reduces the iteration overhead.
+**Learning:** Repeatedly creating regex objects from literals in hot loops (even with global flags) has a non-negligible cost. Furthermore, iterating over long string arrays can cause many unnecessary `.toLowerCase()` and `.split(/\s+/)` string allocations if not guarded by early-exit conditions.
+**Action:** When acting as a performance optimization agent (Bolt), always check for string allocations inside loops, look for opportunities to short-circuit iteration (`break` or `return`), and hoist reusable `RegExp` objects out of functions entirely (to module scope).
+## 2026-09-06 - Testing gap on error paths
 
-**Action:** For performance optimization in tight or hot code paths, combine multiple reductions (`.reduce()` or similar array methods) into a single standard `for` loop to compute all running totals in O(N) instead of O(N * number_of_reductions).
+**Learning:** When code catches exceptions, a single test that asserts the same fallback value for both "caught an exception" and "got an error response from an API" conflates two distinct scenarios.
+**Action:** Write granular test cases that independently verify different failure conditions (e.g., throwing vs. returning an error), to ensure that refactoring doesn't break one of those specific paths silently.
+
+## 2024-05-18 - Optimized mapping arrays by pre-computing multipliers
+**Learning:** Checking `totalOcc > 0` and dividing values by it inside `.map()` arrays leads to redundant branches and repetitive floating-point division in hot loops.
+**Action:** When computing percentages for an array iteratively, pre-compute the percentage multiplier using a ternary operator (e.g., `const factor = total > 0 ? 1 / total : 0`) before the `.map()` loop, and then perform a simple multiplication (`value * factor`) instead of repeating the branch condition and division. This eliminates redundant checks inside iteration and speeds up execution.
