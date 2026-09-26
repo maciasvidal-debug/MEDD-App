@@ -152,19 +152,32 @@ export interface ICCResult {
  * [0,1]. Each group is summarised by its size and case count.
  */
 export function iccBinary(groups: { n: number; cases: number }[]): ICCResult | null {
-  const g = groups.filter(x => x.n > 0)
-  const k = g.length
-  const N = g.reduce((s, x) => s + x.n, 0)
+  let k = 0, N = 0, totalCases = 0
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i]
+    if (g.n > 0) {
+      k++
+      N += g.n
+      totalCases += g.cases
+    }
+  }
+
   if (k < 2 || N <= k) return null
 
-  const pbar = g.reduce((s, x) => s + x.cases, 0) / N
+  const pbar = totalCases / N
   let ssb = 0, ssw = 0, sumSq = 0
-  for (const { n, cases } of g) {
-    const p = cases / n
-    ssb += n * (p - pbar) ** 2          // between-cluster
-    ssw += n * p * (1 - p)              // within-cluster (binary identity)
-    sumSq += n * n
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i]
+    const n = g.n
+    if (n > 0) {
+      const cases = g.cases
+      const p = cases / n
+      ssb += n * (p - pbar) ** 2          // between-cluster
+      ssw += n * p * (1 - p)              // within-cluster (binary identity)
+      sumSq += n * n
+    }
   }
+
   const msb = ssb / (k - 1)
   const msw = ssw / (N - k)
   const n0 = (N - sumSq / N) / (k - 1)

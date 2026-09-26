@@ -23,33 +23,52 @@
 create or replace view public.v_product_metrics
   with (security_invoker = true)
 as
+with parsed_meds as (
+  select
+    s.id          as survey_id,
+    s.user_id,
+    s.f_eta,
+    s.ciudad,
+    s.estrato,
+    s.as_salud,
+    s.cant_med,
+    s.cant_med_vto,
+    s.peso_med_nc,
+    s.f_disp,
+    m.value ->> 'nmMed'                                  as nm_med,
+    m.value ->> 'dci'                                    as dci,
+    nullif(m.value ->> 'concMed', '')::numeric           as conc_med,
+    m.value ->> 'undConc'                                as und_conc,
+    nullif(m.value ->> 'fVto', '')::date                 as f_vto
+  from public.surveys s,
+       jsonb_array_elements(s.medications) as m
+)
 select
-  s.id          as survey_id,
-  s.user_id,
-  s.f_eta,
-  s.ciudad,
-  s.estrato,
-  s.as_salud,
-  s.cant_med,
-  s.cant_med_vto,
-  s.peso_med_nc,
-  s.f_disp,
-  m.value ->> 'nmMed'                                   as nm_med,
-  m.value ->> 'dci'                                     as dci,
-  nullif(m.value ->> 'concMed', '')::numeric           as conc_med,
-  m.value ->> 'undConc'                                 as und_conc,
-  nullif(m.value ->> 'fVto', '')::date                  as f_vto,
-  case when nullif(m.value ->> 'fVto', '') is not null
-       then (nullif(m.value ->> 'fVto', '')::date < s.f_eta)
+  survey_id,
+  user_id,
+  f_eta,
+  ciudad,
+  estrato,
+  as_salud,
+  cant_med,
+  cant_med_vto,
+  peso_med_nc,
+  f_disp,
+  nm_med,
+  dci,
+  conc_med,
+  und_conc,
+  f_vto,
+  case when f_vto is not null
+       then (f_vto < f_eta)
   end                                                   as is_expired,
-  case when nullif(m.value ->> 'fVto', '') is not null
-       then (s.f_eta - nullif(m.value ->> 'fVto', '')::date)
+  case when f_vto is not null
+       then (f_eta - f_vto)
   end                                                   as t_vto,    -- días vencido en hogar
-  case when s.f_disp is not null
-       then (s.f_eta - s.f_disp)
+  case when f_disp is not null
+       then (f_eta - f_disp)
   end                                                   as t_disp,   -- ciclo total desde dispensación
-  case when nullif(m.value ->> 'fVto', '') is not null and s.f_disp is not null
-       then (nullif(m.value ->> 'fVto', '')::date - s.f_disp)
+  case when f_vto is not null and f_disp is not null
+       then (f_vto - f_disp)
   end                                                   as v_util    -- vida útil remanente al dispensar
-from public.surveys s,
-     jsonb_array_elements(s.medications) as m;
+from parsed_meds;
