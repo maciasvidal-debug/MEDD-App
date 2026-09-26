@@ -1,4 +1,3 @@
-import { logger } from './lib/logger'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 // Self-hosted Inter (variable) — bundled into the build so it works offline
