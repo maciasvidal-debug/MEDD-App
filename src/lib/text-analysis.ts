@@ -407,9 +407,11 @@ export function buildTextAnalysis(surveys: Survey[]): TextAnalysisResult | null 
   const tfMap = computeTF(tokensByText)
   const sortedTerms = Array.from(tfMap.entries()).sort((a, b) => b[1] - a[1])
   const totalOcc = sortedTerms.reduce((a, [, c]) => a + c, 0)
+  // Optimization: pre-compute percentage multiplier to avoid redundant > 0 checks and divisions in loops
+  const pctFactor = totalOcc > 0 ? 1 / totalOcc : 0
   const topTerms: TermFreq[] = sortedTerms
     .slice(0, 25)
-    .map(([term, count]) => ({ term, count, pct: totalOcc > 0 ? count / totalOcc : 0 }))
+    .map(([term, count]) => ({ term, count, pct: count * pctFactor }))
 
   // Bigrams (min frequency 2)
   const bgMap = computeBigrams(tokensByText)
@@ -417,7 +419,7 @@ export function buildTextAnalysis(surveys: Survey[]): TextAnalysisResult | null 
     .filter(([, c]) => c >= 2)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 12)
-    .map(([term, count]) => ({ term, count, pct: totalOcc > 0 ? count / totalOcc : 0 }))
+    .map(([term, count]) => ({ term, count, pct: count * pctFactor }))
 
   // Theme detection per survey (count each theme at most once per survey)
   const surveyThemes = withObs.map(s => detectThemes(s.obs))
