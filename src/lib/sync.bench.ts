@@ -25,7 +25,7 @@ const testData = generateSurveys(10000)
 
 describe('pushSurveyGeo data preparation', () => {
   bench('current: filter + map', () => {
-    return testData
+    void testData
       .filter(s => s.geoConsent && s.geoLat != null && s.geoLng != null)
       .map(s => ({
         survey_id: s.id,
@@ -56,6 +56,6 @@ describe('pushSurveyGeo data preparation', () => {
     }
     // Trim the array
     rows.length = count
-    return rows
+    void rows
   })
 })
