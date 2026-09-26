@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger'
 import { useState, useCallback, useRef } from 'react'
 import type { CUMRecord } from '../types'
 import { CUM_API, CUM_FIELDS } from '../lib/constants'
@@ -79,7 +80,7 @@ export function useCUM(): UseCUMResult {
       setResults(dedupe(data))
     } catch (err) {
       if ((err as Error).name === 'AbortError') return
-      console.error('[CUM API]', err)
+      logger.error('[CUM API]', err)
       setError('Sin conexión a datos.gov.co. Verifique su acceso a internet.')
       setResults([])
     } finally {
