@@ -18,7 +18,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Surface the real cause in the console for debugging.
-    console.error('Unhandled error caught by ErrorBoundary:', error, info)
+    if (import.meta.env.DEV) {
+      console.error('Unhandled error caught by ErrorBoundary:', error, info)
+    }
   }
 
   handleReload = () => {
@@ -46,7 +48,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
         }
       }
     } catch (e) {
-      console.error('Failed to clear local data:', e)
+      if (import.meta.env.DEV) {
+        console.error('Failed to clear local data:', e)
+      }
     } finally {
       window.location.href = window.location.origin + '/'
     }
