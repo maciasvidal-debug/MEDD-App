@@ -59,16 +59,22 @@ export default function DashboardPage() {
   const filtersActive = isInvestigador && (!!fCiudad || !!fSalud || fEstrato !== null || !!fProg || !!fTipo)
   const clearFilters = () => { setFCiudad(''); setFSalud(''); setFEstrato(null); setFProg(''); setFTipo('') }
 
-  // Cities present in the data, for the filter dropdown.
-  const ciudadOptions = useMemo(
-    () => Array.from(new Set(surveys.map(s => s.ciudad).filter(Boolean))).sort() as string[],
-    [surveys],
-  )
-  // Surveyor academic programs present in the data.
-  const progOptions = useMemo(
-    () => Array.from(new Set(surveys.map(s => s.etrPrograma).filter(Boolean))).sort() as string[],
-    [surveys],
-  )
+  // Extracted options for filter dropdowns (combined single pass for performance)
+  const { ciudadOptions, progOptions } = useMemo(() => {
+    const ciudadSet = new Set<string>()
+    const progSet = new Set<string>()
+
+    for (let i = 0; i < surveys.length; i++) {
+      const s = surveys[i]
+      if (s.ciudad) ciudadSet.add(s.ciudad)
+      if (s.etrPrograma) progSet.add(s.etrPrograma)
+    }
+
+    return {
+      ciudadOptions: Array.from(ciudadSet).sort(),
+      progOptions: Array.from(progSet).sort(),
+    }
+  }, [surveys])
 
   const data = useMemo(() => {
     if (!isInvestigador) return surveys
