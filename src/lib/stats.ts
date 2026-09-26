@@ -300,15 +300,26 @@ export interface TrendTest {
  * p-value via z² ~ χ²₁. Returns null when there is no informative table.
  */
 export function cochranArmitage(groups: { score: number; n: number; cases: number }[]): TrendTest | null {
-  const N = groups.reduce((s, g) => s + g.n, 0)
-  const R = groups.reduce((s, g) => s + g.cases, 0)
-  if (groups.length < 2 || N === 0 || R === 0 || R === N) return null
+  let N = 0;
+  let R = 0;
+  let sumScoreCases = 0;
+  let sumNS = 0;
+  let sumNS2 = 0;
 
-  const pBar  = R / N
-  const u     = groups.reduce((s, g) => s + g.score * (g.cases - g.n * pBar), 0)
-  const sumNS  = groups.reduce((s, g) => s + g.n * g.score, 0)
-  const sumNS2 = groups.reduce((s, g) => s + g.n * g.score * g.score, 0)
-  const v = pBar * (1 - pBar) * (sumNS2 - (sumNS * sumNS) / N)
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i];
+    N += g.n;
+    R += g.cases;
+    sumScoreCases += g.score * g.cases;
+    sumNS += g.n * g.score;
+    sumNS2 += g.n * g.score * g.score;
+  }
+
+  if (groups.length < 2 || N === 0 || R === 0 || R === N) return null;
+
+  const pBar = R / N;
+  const u = sumScoreCases - pBar * sumNS;
+  const v = pBar * (1 - pBar) * (sumNS2 - (sumNS * sumNS) / N);
   if (v <= 0) return null
 
   const z = u / Math.sqrt(v)
