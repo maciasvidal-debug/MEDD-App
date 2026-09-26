@@ -58,3 +58,8 @@
 **Vulnerability:** A potential DOM-based XSS (or infinite crash loop) was identified in `src/components/ErrorBoundary.tsx`. When handling render errors, the boundary provided recovery buttons that invoked `window.location.reload()`. Since `reload()` preserves the current URL (including potentially malicious query parameters or fragments that may have triggered the render crash), an attacker could trap a user in an endless loop or maintain an XSS payload in the URL state.
 **Learning:** Using `window.location.reload()` in error boundaries or recovery flows is risky if the crash could have been triggered by malformed URL state, as the problematic state is preserved upon reload.
 **Prevention:** For application resets or error recovery, it is safer to perform a hard navigation to a known safe route (e.g., `window.location.href = window.location.origin + '/'`) to strip any tainted URL parameters and restore a clean environment.
+
+## 2025-02-14 - Unhandled Promise Rejection Logging (Information Disclosure)
+**Vulnerability:** Global `unhandledrejection` listener logging error reasons directly to the console without environment checks. This can leak sensitive data (e.g., authentication tokens, PII) in production environments via browser devtools or remote log aggregators.
+**Learning:** Error observability must be balanced with privacy. Production environments should avoid dumping raw error reasons or stack traces unless specifically sanitized.
+**Prevention:** Wrap development-specific error logging (like raw console dumps of event reasons) in `import.meta.env.DEV` conditions to prevent information disclosure in production builds.
