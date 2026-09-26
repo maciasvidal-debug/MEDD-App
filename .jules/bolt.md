@@ -17,3 +17,7 @@
 ## 2024-05-18 - Optimized mapping arrays by pre-computing multipliers
 **Learning:** Checking `totalOcc > 0` and dividing values by it inside `.map()` arrays leads to redundant branches and repetitive floating-point division in hot loops.
 **Action:** When computing percentages for an array iteratively, pre-compute the percentage multiplier using a ternary operator (e.g., `const factor = total > 0 ? 1 / total : 0`) before the `.map()` loop, and then perform a simple multiplication (`value * factor`) instead of repeating the branch condition and division. This eliminates redundant checks inside iteration and speeds up execution.
+
+## 2025-02-12 - Sync array transformation and UPSERT chunking
+**Learning:** Chained `.filter().map()` operations on large arrays (like surveys) result in O(N*M) complexity overheads and increase memory allocations/GC pressure. Furthermore, attempting to bulk-upsert unbounded arrays of data to a database (like Supabase) can trigger network payload limits, timeouts, and affect I/O stability.
+**Action:** Replace multi-pass array methods with a single-pass `for` loop pre-allocating the resulting array (`new Array(len)`), falling back to `rows.length = count` to trim. Add `.slice()` chunking (e.g. 500 records) to network UPSERT calls, wrapped in `Promise.all()` to keep requests parallelized without exceeding limits.
