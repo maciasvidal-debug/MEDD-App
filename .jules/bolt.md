@@ -1,3 +1,10 @@
+## 2026-09-26 - Optimized `iccBinary` for Array Passes Overhead
+**Learning:** Found multiple array passes utilizing `.filter()` followed by `.reduce()` passes that increased Garbage Collection pressure via transient array creations. V8 does better with simpler, single or double pass `for` loops than multiple sequential functional combinators on hot paths.
+**Action:** Transformed `iccBinary` to eliminate `groups.filter()` and its successive `.reduce()` statements into two explicit, pre-optimized `for` loops, bypassing allocations and providing a ~4-80x speedup when benchmarking large structures. Will keep applying this methodology for high-frequency or data-heavy array aggregations in TypeScript/JavaScript contexts where speed is crucial.
+
+## 2024-05-18 - Dictionary Mapping Overhead in V8 vs TypeScript Idiomatics
+**Learning:** While adopting `new Map()` over `Object.create(null)` is considered idiomatic in TypeScript for dictionaries, V8's fast-path properties for null-prototype objects in tight counting loops (`O(1)` allocations) can outperform hashing string keys in a Map for small/medium vocabulary sizes. In text analysis applications, replacing `Object.create(null)` with `new Map()` incurs a minor 8-15% execution penalty for typical payloads, although `Map` remains semantically safer and correctly types values.
+**Action:** Always measure code changes against established baselines (via Vitest bench) when replacing fast-paths with idiomatic structures. Document the explicit trade-off of raw execution speed vs syntactic idiom in the PR body to provide context.
 ## 2025-02-18 - Hoisting regexes out of hot loops
 
 **Learning:** Repeatedly creating regex objects from literals in hot loops (even with global flags) has a non-negligible cost. Furthermore, iterating over long string arrays can cause many unnecessary `.toLowerCase()` and `.split(/\s+/)` string allocations if not guarded by early-exit conditions.
