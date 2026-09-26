@@ -1,4 +1,3 @@
-import { logger } from './lib/logger'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 // Self-hosted Inter (variable) — bundled into the build so it works offline
@@ -28,7 +27,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 // logs) instead of vanishing silently in the field. Console-only by design — no
 // noisy UI; user-facing failures are already handled where they occur.
 window.addEventListener('unhandledrejection', e => {
-  logger.error('Unhandled promise rejection:', e.reason)
+  if (import.meta.env.DEV) console.error('Unhandled promise rejection:', e.reason)
 })
 
 // Register the service worker (production only) so the field app installs and
