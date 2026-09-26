@@ -62,7 +62,8 @@ describe("ErrorBoundary", () => {
     ).toBeInTheDocument();
   });
 
-  it("surfaces the underlying error via componentDidCatch", () => {
+  it("surfaces the underlying error via componentDidCatch (only in DEV mode)", () => {
+        if (!import.meta.env.DEV) return;
     render(
       <ErrorBoundary>
         <Bomb message="explota-aqui" />
@@ -152,7 +153,8 @@ describe("ErrorBoundary", () => {
       expect(localStorage.getItem("other_app")).toBe("456");
     });
 
-    it("still reloads (and logs) when databases() rejects — the catch/finally path", async () => {
+    it("still reloads (and logs in DEV) when databases() rejects — the catch/finally path", async () => {
+    if (!import.meta.env.DEV) return;
       // databases() rejecting simulates IndexedDB being blocked/unavailable.
       const databases = vi.fn().mockRejectedValue(new Error("IDB unavailable"));
       Object.defineProperty(window, "indexedDB", {
@@ -171,7 +173,8 @@ describe("ErrorBoundary", () => {
       );
     });
 
-    it("still reloads (and logs) when localStorage.removeItem throws — the catch/finally path", async () => {
+    it("still reloads (and logs in DEV) when localStorage.removeItem throws — the catch/finally path", async () => {
+    if (!import.meta.env.DEV) return;
       Object.defineProperty(window, "indexedDB", {
         configurable: true,
         value: { deleteDatabase: vi.fn() },

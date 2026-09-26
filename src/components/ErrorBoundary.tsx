@@ -1,4 +1,3 @@
-import { logger } from '../lib/logger'
 import React from 'react'
 import { C } from './ui'
 
@@ -19,7 +18,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Surface the real cause in the console for debugging.
-    logger.error('Unhandled error caught by ErrorBoundary:', error, info)
+    if (import.meta.env.DEV) {
+      console.error('Unhandled error caught by ErrorBoundary:', error, info)
+    }
   }
 
   handleReload = () => {
@@ -47,7 +48,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
         }
       }
     } catch (e) {
-      logger.error('Failed to clear local data:', e)
+      if (import.meta.env.DEV) {
+        console.error('Failed to clear local data:', e)
+      }
     } finally {
       window.location.href = window.location.origin + '/'
     }
