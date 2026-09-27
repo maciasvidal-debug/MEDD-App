@@ -17,7 +17,9 @@
 ## 2024-05-18 - Optimized mapping arrays by pre-computing multipliers
 **Learning:** Checking `totalOcc > 0` and dividing values by it inside `.map()` arrays leads to redundant branches and repetitive floating-point division in hot loops.
 **Action:** When computing percentages for an array iteratively, pre-compute the percentage multiplier using a ternary operator (e.g., `const factor = total > 0 ? 1 / total : 0`) before the `.map()` loop, and then perform a simple multiplication (`value * factor`) instead of repeating the branch condition and division. This eliminates redundant checks inside iteration and speeds up execution.
-## 2025-02-12 - Single-pass Array Transformation Over Multiple Iterations
 
-**Learning:** Combining multiple array operations (`.map()`, `.filter()`, `.reduce()`) into a single `for` loop iteration avoids intermediate array allocations and redundant O(N) traversals, providing significant performance overhead reductions.
-**Action:** When working with transformations on potentially large arrays, especially in tight loops, manually fuse multiple passes into a single iteration where possible instead of chaining array higher-order functions.
+## 2025-02-14 - IndexedDB Bulk Transaction Optimization
+
+**Learning:** When executing bulk writes or deletes in IndexedDB using the `idb` library, mapping array items to multiple promises and wrapping them in `Promise.all()` generates unnecessary memory allocations (e.g., intermediate promise objects) and microtask overhead. Firing the standard transaction operations within a synchronous loop and awaiting `tx.done` at the end is more efficient and drastically reduces the heap footprint.
+
+**Action:** Use standard synchronous `for` loops to batch `tx.store.put()` and `tx.store.delete()` inside `idb` transactions, and only await the single `tx.done` promise at the end.
