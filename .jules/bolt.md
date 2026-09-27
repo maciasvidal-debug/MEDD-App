@@ -17,3 +17,7 @@
 ## 2024-05-18 - Optimized mapping arrays by pre-computing multipliers
 **Learning:** Checking `totalOcc > 0` and dividing values by it inside `.map()` arrays leads to redundant branches and repetitive floating-point division in hot loops.
 **Action:** When computing percentages for an array iteratively, pre-compute the percentage multiplier using a ternary operator (e.g., `const factor = total > 0 ? 1 / total : 0`) before the `.map()` loop, and then perform a simple multiplication (`value * factor`) instead of repeating the branch condition and division. This eliminates redundant checks inside iteration and speeds up execution.
+
+## 2024-09-26 - Optimize detectThemes to avoid chained array methods
+**Learning:** For optimal rendering performance, avoid isolated multi-pass array iterations (e.g., standalone `.filter()` or `.map()`). Integrating these checks directly into an existing single-pass `for` loop eliminates O(N*M) complexity overheads and intermediate array allocations.
+**Action:** When filtering and transforming data in hot loops or frequently called functions, use a single `for` loop instead of chained array methods to minimize garbage collection pressure and intermediate array allocations.
