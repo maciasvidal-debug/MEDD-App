@@ -238,13 +238,39 @@ export function buildSurveyorQC(surveys: Survey[]): SurveyorQC | null {
 
   const rows: SurveyorQCRow[] = Array.from(byId.entries()).map(([nuiEtr, list]) => {
     const n = list.length
-    const completeness = list.reduce((acc, s) =>
-      acc + QC_KEY_FIELDS.filter(f => qcFilled(s[f])).length / QC_KEY_FIELDS.length, 0) / n
-    const straightPct = list.filter(isStraightlined).length / n
-    const vencPct = list.filter(s => s.vtoMedNc === 'Sí').length / n
-    const durs = list.map(durationSec).filter((d): d is number => d != null).sort((a, b) => a - b)
+
+    let totalCompleteness = 0
+    let straightCount = 0
+    let vencCount = 0
+    let fastCount = 0
+    const durs: number[] = []
+
+    for (let i = 0; i < n; i++) {
+      const s = list[i]
+
+      let filledFields = 0
+      for (let j = 0; j < QC_KEY_FIELDS.length; j++) {
+        if (qcFilled(s[QC_KEY_FIELDS[j]])) filledFields++
+      }
+      totalCompleteness += filledFields / QC_KEY_FIELDS.length
+
+      if (isStraightlined(s)) straightCount++
+      if (s.vtoMedNc === 'Sí') vencCount++
+
+      const d = durationSec(s)
+      if (d != null) {
+        durs.push(d)
+        if (d < FAST_SECONDS) fastCount++
+      }
+    }
+
+    const completeness = totalCompleteness / n
+    const straightPct = straightCount / n
+    const vencPct = vencCount / n
+
+    durs.sort((a, b) => a - b)
     const medianDurSec = durs.length ? quantile(durs, 0.5, true) : null
-    const fastCount = durs.filter(d => d < FAST_SECONDS).length
+
     return { nuiEtr, n, completeness, straightPct, vencPct, medianDurSec, fastCount }
   }).sort((a, b) => b.n - a.n)
 
