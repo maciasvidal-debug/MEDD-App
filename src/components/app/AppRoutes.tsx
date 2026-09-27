@@ -57,8 +57,10 @@ export function AppRoutes({ view }: { view: AppView }) {
 // worker caches them while online and the offline-first flows stay available
 // with no signal. Deferred to idle so it never competes with the initial load;
 // dynamic imports are deduped, so a later navigation reuses the warmed module.
+const PREFETCH_FALLBACK_DELAY_MS = 2000
+
 export function prefetchRoutes() {
   const warm = () => { for (const load of Object.values(loadRoute)) load().catch(() => {}) }
   if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(warm)
-  else setTimeout(warm, 2000)
+  else setTimeout(warm, PREFETCH_FALLBACK_DELAY_MS)
 }
