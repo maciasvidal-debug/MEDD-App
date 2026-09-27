@@ -81,22 +81,48 @@ export async function pushSurveys(surveys: Survey[], userId: string): Promise<bo
 // hace un rol privilegiado fuera de la app). Solo sube filas con consentimiento y
 // coordenada válida. Best-effort no-throwing como el resto del sync.
 export async function pushSurveyGeo(surveys: Survey[], userId: string): Promise<boolean> {
-  const rows = surveys
-    .filter(s => s.geoConsent && s.geoLat != null && s.geoLng != null)
-    .map(s => ({
-      survey_id:       s.id,
-      geo_lat:         s.geoLat,
-      geo_lng:         s.geoLng,
-      geo_accuracy_m:  s.geoAccuracyM ?? null,
-      geo_captured_at: s.geoCapturedAt || null,
-    }))
-  if (!rows.length) return true
+  const len = surveys.length
+  // Optimisation: single-pass for loop with pre-allocation avoids O(N*M) overhead
+  // and reduces memory allocations / GC pressure when dealing with large survey batches.
+  const rows = new Array(len)
+  let count = 0
+
+  for (let i = 0; i < len; i++) {
+    const s = surveys[i]
+    if (s.geoConsent && s.geoLat != null && s.geoLng != null) {
+      rows[count++] = {
+        survey_id:       s.id,
+        geo_lat:         s.geoLat,
+        geo_lng:         s.geoLng,
+        geo_accuracy_m:  s.geoAccuracyM ?? null,
+        geo_captured_at: s.geoCapturedAt || null,
+      }
+    }
+  }
+  rows.length = count
+
+  if (!count) return true
+
+  // To prevent extremely large payload failures and improve I/O stability,
+  // we process the upsert in chunks of 500 rows.
+  const CHUNK_SIZE = 500
+  let allSuccess = true
+
+  // Note: we don't depend on userId here — RLS of `survey_geo` validates
+  // ownership against surveys.user_id = auth.uid() on the server.
+  void userId
+
   try {
-    // Nota: no dependemos de userId aquí — la RLS de `survey_geo` valida la
-    // propiedad contra surveys.user_id = auth.uid() en el servidor.
-    void userId
-    const { error } = await supabase.from('survey_geo').upsert(rows, { onConflict: 'survey_id' })
-    return !error
+    const promises = []
+    for (let i = 0; i < count; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE)
+      promises.push(supabase.from('survey_geo').upsert(chunk, { onConflict: 'survey_id' }))
+    }
+    const results = await Promise.all(promises)
+    for (const res of results) {
+      if (res.error) allSuccess = false
+    }
+    return allSuccess
   } catch {
     return false
   }

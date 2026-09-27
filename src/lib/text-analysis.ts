@@ -204,13 +204,9 @@ const THEME_MATCHERS: ReadonlyArray<readonly [string, RegExp]> =
 // Returns all theme names whose keyword list has at least one match in `text`.
 function detectThemes(text: string): string[] {
   const n = norm(text)
-  const result: string[] = []
-  for (let i = 0; i < THEME_MATCHERS.length; i++) {
-    if (THEME_MATCHERS[i][1].test(n)) {
-      result.push(THEME_MATCHERS[i][0])
-    }
-  }
-  return result
+  return THEME_MATCHERS
+    .filter(([, re]) => re.test(n))
+    .map(([theme]) => theme)
 }
 
 // ─── Negation bigrams ─────────────────────────────────────────────────────────

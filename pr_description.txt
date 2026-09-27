@@ -1,4 +1,0 @@
-🎯 **What:** Extracted the explicit magic number `2000` in the `setTimeout` on line 63 of `src/components/app/AppRoutes.tsx` into a constant named `PREFETCH_FALLBACK_DELAY_MS`.
-💡 **Why:** Magic numbers decrease code maintainability. Extracting this timeout value into a descriptive constant explicitly defines its purpose (a delay for the offline-first route prefetch fallback when `requestIdleCallback` is unavailable).
-✅ **Verification:** Verified the changes by running the formatting checks, `npm run lint` and `npx vitest run` successfully, ensuring zero regressions.
-✨ **Result:** The code is more readable, self-documenting, and maintainable.

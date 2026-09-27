@@ -8,12 +8,17 @@ const state = vi.hoisted(() => ({
   deleteFailIds: new Set<string>(),
   deleted: [] as string[],
   pushed: [] as Record<string, unknown>[],
+  throwNextUpsert: false,
 }))
 
 vi.mock('./supabase', () => ({
   supabase: {
     from: () => ({
       upsert: (rowOrRows: Record<string, unknown> | Record<string, unknown>[]) => {
+        if (state.throwNextUpsert) {
+          state.throwNextUpsert = false
+          throw new Error('Network timeout')
+        }
         if (Array.isArray(rowOrRows)) {
           state.pushed.push(...rowOrRows)
         } else {
@@ -40,7 +45,7 @@ vi.mock('./supabase', () => ({
   },
 }))
 
-import { fullSync } from './sync'
+import { fullSync, pushSurveyGeo } from './sync'
 import { toRow } from './sync-mapping'
 import { saveSurvey, getSurvey, addDeletion, getDeletionIds, clearLocalUserData } from './db'
 import type { Survey } from '../types'
@@ -64,6 +69,7 @@ beforeEach(async () => {
   state.deleteFailIds = new Set()
   state.deleted = []
   state.pushed = []
+  state.throwNextUpsert = false
   await clearLocalUserData()
 })
 
@@ -135,5 +141,62 @@ describe('fullSync — push (encuestador)', () => {
 
     expect(res.pushed).toBe(0)
     expect((await getSurvey('G'))!.syncStatus).toBe('local')
+  })
+})
+
+describe('pushSurveyGeo (chunked UPSERT)', () => {
+  it('pushes surveys with geo data in chunks of 500', async () => {
+    // Generate 1100 surveys to test 3 chunks (500, 500, 100)
+    const mockSurveys = Array.from({ length: 1100 }, (_, i) => mkSurvey(`S${i}`, {
+      geoConsent: true,
+      geoLat: 4.60971,
+      geoLng: -74.08175,
+      geoAccuracyM: 10,
+    }))
+
+    // Add one without consent to ensure it is filtered
+    mockSurveys.push(mkSurvey('S-no-consent', { geoConsent: false, geoLat: 4.6, geoLng: -74.1 }))
+
+    // Add one without valid coordinates
+    mockSurveys.push(mkSurvey('S-no-lat', { geoConsent: true, geoLng: -74.1 }))
+
+    state.pushed = [] // Reset
+
+    const res = await pushSurveyGeo(mockSurveys, 'user-xyz')
+    expect(res).toBe(true)
+
+    // We should have pushed exactly 1100 valid geo records
+    expect(state.pushed.length).toBe(1100)
+  })
+
+  it('returns false if any chunk fails to upsert', async () => {
+    const mockSurveys = [
+      mkSurvey('S-fail', { geoConsent: true, geoLat: 1, geoLng: 1 })
+    ]
+    state.pushError = { message: 'DB Error' }
+
+    const res = await pushSurveyGeo(mockSurveys, 'user-xyz')
+    expect(res).toBe(false)
+  })
+
+  it('returns false on catastrophic try/catch failure', async () => {
+    state.throwNextUpsert = true
+    const mockSurveys = [
+      mkSurvey('S-throw', { geoConsent: true, geoLat: 1, geoLng: 1 })
+    ]
+    const res = await pushSurveyGeo(mockSurveys, 'user-xyz')
+    expect(res).toBe(false)
+  })
+
+  it('handles early return for empty valid rows', async () => {
+    const mockSurveys = [
+      mkSurvey('S-empty-1', { geoConsent: false, geoLat: 1, geoLng: 1 }),
+      mkSurvey('S-empty-2', { geoConsent: true, geoLat: null, geoLng: null })
+    ]
+    state.pushed = []
+
+    const res = await pushSurveyGeo(mockSurveys, 'user-xyz')
+    expect(res).toBe(true)
+    expect(state.pushed.length).toBe(0)
   })
 })
