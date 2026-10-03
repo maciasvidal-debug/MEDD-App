@@ -86,7 +86,13 @@ export function buildEstratoAssociation(surveys: Survey[]): Association | null {
     const e = s.estrato
     if (e == null) continue
 
-    const g = acc.find(band => e >= band.min && e <= band.max)
+    // ⚡ Bolt: Replaced O(N) linear search via .find() with an O(1) direct index lookup
+    // using if/else conditions to eliminate callback allocation and array iteration overhead.
+    let g;
+    if (e >= 1 && e <= 2) g = acc[0];
+    else if (e >= 3 && e <= 4) g = acc[1];
+    else if (e >= 5 && e <= 6) g = acc[2];
+
     if (!g) continue
 
     g.total++

@@ -103,13 +103,40 @@ function collectWarnings(d: SurveyDraft): string[] {
   return warnings
 }
 
+// Cache for O(1) duplicate lookups. WeakMap keys are the exactly same array instance.
+// For a given Survey[] array, we memoize a Map grouping surveys by the composite key.
+const duplicateCache = new WeakMap<Survey[], Map<string, Survey[]>>()
+
 // Likely prior record (same respondent fingerprint), excluding the edited row.
 function findDuplicate(d: SurveyDraft, existing: Survey[], editingId?: string): Survey | null {
   if (!(d.fNac && d.ciudad && d.fEta)) return null
-  return existing.find(s =>
-    s.id !== editingId &&
-    s.fNac === d.fNac && s.ciudad === d.ciudad && s.fEta === d.fEta,
-  ) ?? null
+
+  let map = duplicateCache.get(existing)
+  if (!map) {
+    map = new Map<string, Survey[]>()
+    for (let i = 0; i < existing.length; i++) {
+      const s = existing[i]
+      if (!s.fNac || !s.ciudad || !s.fEta) continue
+      const key = `${s.fNac}|${s.ciudad}|${s.fEta}`
+      const group = map.get(key)
+      if (group) group.push(s)
+      else map.set(key, [s])
+    }
+    duplicateCache.set(existing, map)
+  }
+
+  const key = `${d.fNac}|${d.ciudad}|${d.fEta}`
+  const matches = map.get(key)
+  if (!matches) return null
+
+  // Usually matches length is 1 or very small.
+  for (let i = 0; i < matches.length; i++) {
+    if (matches[i].id !== editingId) {
+      return matches[i]
+    }
+  }
+
+  return null
 }
 
 export function validateDraft(
