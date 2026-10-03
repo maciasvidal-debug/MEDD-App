@@ -21,3 +21,8 @@
 ## 2025-02-12 - Sync array transformation and UPSERT chunking
 **Learning:** Chained `.filter().map()` operations on large arrays (like surveys) result in O(N*M) complexity overheads and increase memory allocations/GC pressure. Furthermore, attempting to bulk-upsert unbounded arrays of data to a database (like Supabase) can trigger network payload limits, timeouts, and affect I/O stability.
 **Action:** Replace multi-pass array methods with a single-pass `for` loop pre-allocating the resulting array (`new Array(len)`), falling back to `rows.length = count` to trim. Add `.slice()` chunking (e.g. 500 records) to network UPSERT calls, wrapped in `Promise.all()` to keep requests parallelized without exceeding limits.
+## 2025-02-18 - Fast Date String Parsing
+
+**Learning:** Repeatedly instantiating `new Date(str)` inside frequently called functions (like date difference calculations over large datasets) introduces significant CPU overhead and garbage collection pressure due to string parsing and object allocation.
+
+**Action:** For bounded domains of date strings (e.g., standard `YYYY-MM-DD`), memoize the parsed epoch timestamps in a module-level `Map<string, number>` cache. This reduces repeated object instantiations and enables near O(1) timestamp retrieval, drastically improving operations per second in hot loops.
