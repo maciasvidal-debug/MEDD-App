@@ -244,10 +244,20 @@ export function buildSurveyorQC(surveys: Survey[]): SurveyorQC | null {
 
   const rows: SurveyorQCRow[] = Array.from(byId.entries()).map(([nuiEtr, list]) => {
     const n = list.length
-    const completeness = list.reduce((acc, s) =>
-      acc + QC_KEY_FIELDS.filter(f => qcFilled(s[f])).length / QC_KEY_FIELDS.length, 0) / n
-    const straightPct = list.filter(isStraightlined).length / n
-    const vencPct = list.filter(s => s.vtoMedNc === 'Sí').length / n
+    let compSum = 0, strCount = 0, vencCount = 0
+    for (let i = 0; i < n; i++) {
+      const s = list[i]
+      let filled = 0
+      for (let j = 0; j < QC_KEY_FIELDS.length; j++) {
+        if (qcFilled(s[QC_KEY_FIELDS[j]])) filled++
+      }
+      compSum += filled / QC_KEY_FIELDS.length
+      if (isStraightlined(s)) strCount++
+      if (s.vtoMedNc === 'Sí') vencCount++
+    }
+    const completeness = compSum / n
+    const straightPct = strCount / n
+    const vencPct = vencCount / n
     const durs = list.map(durationSec).filter((d): d is number => d != null).sort((a, b) => a - b)
     const medianDurSec = durs.length ? quantile(durs, 0.5, true) : null
     const fastCount = durs.filter(d => d < FAST_SECONDS).length
