@@ -101,7 +101,10 @@ export async function saveManySurveys(surveys: Survey[]): Promise<void> {
   if (surveys.length === 0) return
   const db = await getDB()
   const tx = db.transaction('surveys', 'readwrite')
-  await Promise.all([...surveys.map(s => tx.store.put(s)), tx.done])
+  for (const s of surveys) {
+    tx.store.put(s)
+  }
+  await tx.done
 }
 
 export async function deleteSurvey(id: string): Promise<void> {
@@ -151,7 +154,10 @@ export async function removeDeletions(ids: string[]): Promise<void> {
   if (ids.length === 0) return
   const db = await getDB()
   const tx = db.transaction('deletions', 'readwrite')
-  await Promise.all([...ids.map(id => tx.store.delete(id)), tx.done])
+  for (const id of ids) {
+    tx.store.delete(id)
+  }
+  await tx.done
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────
