@@ -25,7 +25,7 @@ describe('AuthPage error handling', () => {
     vi.mocked(supabase.auth.signInWithPassword).mockResolvedValueOnce({
       data: { user: { id: '1' }, session: { access_token: '123' } },
       error: null
-    } as unknown as ReturnType<typeof supabase.auth.signInWithPassword>)
+    } as unknown as Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>)
 
     render(<AuthPage />)
 
@@ -50,7 +50,7 @@ describe('AuthPage error handling', () => {
     vi.mocked(supabase.auth.signInWithPassword).mockResolvedValueOnce({
       data: { user: null, session: null },
       error: { message: 'Invalid login credentials', name: 'AuthError', status: 400 }
-    } as unknown as ReturnType<typeof supabase.auth.signInWithPassword>)
+    } as unknown as Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>)
 
     render(<AuthPage />)
 
