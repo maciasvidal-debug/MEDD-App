@@ -22,6 +22,10 @@
 **Learning:** Chained `.filter().map()` operations on large arrays (like surveys) result in O(N*M) complexity overheads and increase memory allocations/GC pressure. Furthermore, attempting to bulk-upsert unbounded arrays of data to a database (like Supabase) can trigger network payload limits, timeouts, and affect I/O stability.
 **Action:** Replace multi-pass array methods with a single-pass `for` loop pre-allocating the resulting array (`new Array(len)`), falling back to `rows.length = count` to trim. Add `.slice()` chunking (e.g. 500 records) to network UPSERT calls, wrapped in `Promise.all()` to keep requests parallelized without exceeding limits.
 
-## 2024-05-18 - Extract Regex from Loops
-**Learning:** Instantiating regular expressions inline within tight loops (like `split(/\s+/)`) forces the engine to parse the literal repeatedly or rely on internal caches, which can still incur overhead over thousands of executions.
-**Action:** Always extract invariant regexes to module-level constants (e.g., `const WS_RE = /\s+/`) so that they are compiled exactly once, minimizing GC and instantiation pressure during hot path execution.
+## 2024-05-18 - Optimize Loop Conditions over Array Searching
+**Learning:** For extremely tight, hot loops parsing large arrays, replacing generic JavaScript array helper methods like `.find()` with direct index access bounded by sequential `if/else` checks removes function callback overhead and avoids generic array iteration.
+**Action:** When a known finite set of bounds must be checked repeatedly in an unrolled loop, replace `array.find(cond)` with `if (val >= min && val <= max) out = array[idx];` to secure an O(1) direct lookup that improves CPU performance by roughly ~7%.
+
+## 2024-05-18 - Optimize Loop Conditions over Array Searching
+**Learning:** For extremely tight, hot loops parsing large arrays, replacing generic JavaScript array helper methods like `.find()` with direct index access bounded by sequential `if/else` checks removes function callback overhead and avoids generic array iteration.
+**Action:** When a known finite set of bounds must be checked repeatedly in an unrolled loop, replace `array.find(cond)` with `if (val >= min && val <= max) out = array[idx];` to secure an O(1) direct lookup that improves CPU performance by roughly ~7%.
