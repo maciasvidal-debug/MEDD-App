@@ -110,3 +110,33 @@ describe('initAuth', () => {
     unsub()
   })
 })
+
+describe('initAuth - error handling', () => {
+  it('prevents app crash when hydration errors out', async () => {
+    // Force an error in the hydration block by making the role lookup query throw
+    // The query returns `{ data, error }`, so we need it to actually throw an error
+    // to reach the outer catch block that we are testing.
+    // However, the test's `select().single()` mock already handles the Promise correctly,
+    // so let's mock localStorage.setItem since it's the simplest synchronous function
+    // in the `applyUserScope` try-catch.
+
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = vi.fn(() => {
+      throw new Error('Simulated error to fail hydration')
+    })
+
+    const unsub = useStore.getState().initAuth()
+
+    // Changing session to a new user triggers applyUserScope and the localStorage call
+    authState.cb!('SIGNED_IN', session('u99'))
+
+    // Vitest fails if an error is unhandled, so getting past this wait means the error was caught
+    await waitFor(() => expect(useStore.getState().authReady).toBe(true))
+
+    // We wait slightly longer to ensure the setTimeout inside initAuth finishes
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    unsub()
+    Storage.prototype.setItem = originalSetItem
+  })
+})
