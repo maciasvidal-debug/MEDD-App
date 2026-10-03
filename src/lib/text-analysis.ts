@@ -213,12 +213,13 @@ function detectThemes(text: string): string[] {
 const NEG = new Set(['no','nunca','tampoco','sin','jamas','ni'])
 
 const CLEAN_RE = /[^a-záéíóúüñ]/gi
+const WS_RE = /\s+/
 
 function negationExamples(texts: string[]): string[] {
   const found = new Set<string>()
   for (const text of texts) {
     if (found.size >= 3) break
-    const raw = text.toLowerCase().split(/\s+/)
+    const raw = text.toLowerCase().split(WS_RE)
     for (let i = 0; i < raw.length - 1 && found.size < 3; i++) {
       const w = raw[i].replace(CLEAN_RE, '')
       if (NEG.has(norm(w))) {
