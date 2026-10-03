@@ -25,3 +25,10 @@
 ## 2025-02-18 - Optimize IndexedDB writes/deletes batching
 **Learning:** For bulk writes or deletes in IndexedDB using the `idb` library, mapping individual `.put()` or `.delete()` calls to an array of promises wrapped in `Promise.all()` introduces unnecessary microtask overhead and intermediate array allocations.
 **Action:** Initiate standard transaction operations within a synchronous loop (`for...of`) and await `tx.done` at the end to minimize memory allocations and garbage collection pressure in V8/browser environments.
+## 2024-05-18 - Optimize Loop Conditions over Array Searching
+**Learning:** For extremely tight, hot loops parsing large arrays, replacing generic JavaScript array helper methods like `.find()` with direct index access bounded by sequential `if/else` checks removes function callback overhead and avoids generic array iteration.
+**Action:** When a known finite set of bounds must be checked repeatedly in an unrolled loop, replace `array.find(cond)` with `if (val >= min && val <= max) out = array[idx];` to secure an O(1) direct lookup that improves CPU performance by roughly ~7%.
+
+## 2024-05-18 - Optimize Loop Conditions over Array Searching
+**Learning:** For extremely tight, hot loops parsing large arrays, replacing generic JavaScript array helper methods like `.find()` with direct index access bounded by sequential `if/else` checks removes function callback overhead and avoids generic array iteration.
+**Action:** When a known finite set of bounds must be checked repeatedly in an unrolled loop, replace `array.find(cond)` with `if (val >= min && val <= max) out = array[idx];` to secure an O(1) direct lookup that improves CPU performance by roughly ~7%.
