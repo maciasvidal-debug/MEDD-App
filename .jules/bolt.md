@@ -22,6 +22,9 @@
 **Learning:** Chained `.filter().map()` operations on large arrays (like surveys) result in O(N*M) complexity overheads and increase memory allocations/GC pressure. Furthermore, attempting to bulk-upsert unbounded arrays of data to a database (like Supabase) can trigger network payload limits, timeouts, and affect I/O stability.
 **Action:** Replace multi-pass array methods with a single-pass `for` loop pre-allocating the resulting array (`new Array(len)`), falling back to `rows.length = count` to trim. Add `.slice()` chunking (e.g. 500 records) to network UPSERT calls, wrapped in `Promise.all()` to keep requests parallelized without exceeding limits.
 
+## 2025-02-18 - Optimize IndexedDB writes/deletes batching
+**Learning:** For bulk writes or deletes in IndexedDB using the `idb` library, mapping individual `.put()` or `.delete()` calls to an array of promises wrapped in `Promise.all()` introduces unnecessary microtask overhead and intermediate array allocations.
+**Action:** Initiate standard transaction operations within a synchronous loop (`for...of`) and await `tx.done` at the end to minimize memory allocations and garbage collection pressure in V8/browser environments.
 ## 2024-05-18 - Optimize Loop Conditions over Array Searching
 **Learning:** For extremely tight, hot loops parsing large arrays, replacing generic JavaScript array helper methods like `.find()` with direct index access bounded by sequential `if/else` checks removes function callback overhead and avoids generic array iteration.
 **Action:** When a known finite set of bounds must be checked repeatedly in an unrolled loop, replace `array.find(cond)` with `if (val >= min && val <= max) out = array[idx];` to secure an O(1) direct lookup that improves CPU performance by roughly ~7%.
