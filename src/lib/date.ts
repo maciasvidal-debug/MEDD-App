@@ -19,13 +19,26 @@ export function calcEdad(fEta: string, fNac: string): number | null {
   return age < 0 || age > 130 ? null : age
 }
 
+const dateCache = new Map<string, number>()
+
 /** Diferencia en días enteros (a − b). Espejo de la resta de fechas Excel. */
 export function dayDiff(a: string, b: string): number | null {
   if (!a || !b) return null
-  const da = new Date(a + 'T00:00:00')
-  const db = new Date(b + 'T00:00:00')
-  if (isNaN(da.getTime()) || isNaN(db.getTime())) return null
-  return Math.round((da.getTime() - db.getTime()) / 86_400_000)
+
+  let ta = dateCache.get(a)
+  if (ta === undefined) {
+    ta = new Date(a + 'T00:00:00').getTime()
+    dateCache.set(a, ta)
+  }
+
+  let tb = dateCache.get(b)
+  if (tb === undefined) {
+    tb = new Date(b + 'T00:00:00').getTime()
+    dateCache.set(b, tb)
+  }
+
+  if (isNaN(ta) || isNaN(tb)) return null
+  return Math.round((ta - tb) / 86_400_000)
 }
 
 /**
