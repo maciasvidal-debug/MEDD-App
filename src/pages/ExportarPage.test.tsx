@@ -24,7 +24,7 @@ const mockPushToast = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
   useStore.setState({
-    surveys: [{ id: 's1', version: 1 } as any],
+    surveys: [{ id: 's1', version: 1 } as unknown as import('../types').Survey],
     pushToast: mockPushToast,
   })
 })
