@@ -3,7 +3,7 @@ import { dayDiff } from './date'
 
 describe('dayDiff performance', () => {
   // Generate some dummy date strings
-  const dates = []
+  const dates: string[] = []
   for (let i = 0; i < 1000; i++) {
     const y = 2020 + Math.floor(Math.random() * 10)
     const m = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')
