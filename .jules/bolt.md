@@ -21,3 +21,8 @@
 ## 2025-02-12 - Sync array transformation and UPSERT chunking
 **Learning:** Chained `.filter().map()` operations on large arrays (like surveys) result in O(N*M) complexity overheads and increase memory allocations/GC pressure. Furthermore, attempting to bulk-upsert unbounded arrays of data to a database (like Supabase) can trigger network payload limits, timeouts, and affect I/O stability.
 **Action:** Replace multi-pass array methods with a single-pass `for` loop pre-allocating the resulting array (`new Array(len)`), falling back to `rows.length = count` to trim. Add `.slice()` chunking (e.g. 500 records) to network UPSERT calls, wrapped in `Promise.all()` to keep requests parallelized without exceeding limits.
+## 2025-02-18 - Optimize Duplicate Discovery with Memoized O(1) Lookups
+
+**Learning:** When searching for duplicates across a dataset that is frequently validated against (e.g., during form interactions or keystrokes), repeatedly executing array `.find()` loops over the existing list results in significant O(N) CPU overhead. Grouping items by their composite key in a Map turns subsequent lookups into O(1). Because the source array instance (e.g., `Survey[]`) might be stable across these repeated validation calls (as long as it wasn't modified), a `WeakMap` is perfectly suited to cache the derived lookup structure against the source array reference, enabling zero-rebuild fast paths.
+
+**Action:** Whenever implementing linear searches over relatively large local datasets for composite keys—especially in functions heavily called within the render cycle or during form validation—always consider transforming the search into an O(1) `Map` lookup and caching that map via `WeakMap` keyed on the exact dataset array instance.
