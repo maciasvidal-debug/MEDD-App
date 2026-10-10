@@ -15,14 +15,14 @@ describe('supabase initialization', () => {
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'some-key')
 
     // Simulate import.meta.env.DEV being true
-    vi.stubEnv('DEV', 'true')
-    // In vitest import.meta.env.DEV is typically true, but we'll just check the result
+    vi.stubEnv('DEV', true as any)
 
     const { supabase } = await import('./supabase')
 
     expect(consoleSpy).toHaveBeenCalledWith('Missing Supabase environment variables. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.')
     expect(supabase).toBeDefined()
-    expect(supabase.supabaseUrl).toBe('https://placeholder.supabase.co')
+    // By casting to any, we bypass the protected property check for testing purposes
+    expect((supabase as any).supabaseUrl).toBe('https://placeholder.supabase.co')
 
     consoleSpy.mockRestore()
   })
@@ -31,12 +31,13 @@ describe('supabase initialization', () => {
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.stubEnv('VITE_SUPABASE_URL', 'https://example.supabase.co')
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', '')
+    vi.stubEnv('DEV', true as any)
 
     const { supabase } = await import('./supabase')
 
     expect(consoleSpy).toHaveBeenCalledWith('Missing Supabase environment variables. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.')
     expect(supabase).toBeDefined()
-    expect(supabase.supabaseKey).toBe('placeholder-key')
+    expect((supabase as any).supabaseKey).toBe('placeholder-key')
 
     consoleSpy.mockRestore()
   })
@@ -50,8 +51,8 @@ describe('supabase initialization', () => {
 
     expect(consoleSpy).not.toHaveBeenCalled()
     expect(supabase).toBeDefined()
-    expect(supabase.supabaseUrl).toBe('https://example.supabase.co')
-    expect(supabase.supabaseKey).toBe('valid-key')
+    expect((supabase as any).supabaseUrl).toBe('https://example.supabase.co')
+    expect((supabase as any).supabaseKey).toBe('valid-key')
 
     consoleSpy.mockRestore()
   })
