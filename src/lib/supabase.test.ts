@@ -15,14 +15,16 @@ describe('supabase initialization', () => {
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'some-key')
 
     // Simulate import.meta.env.DEV being true
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.stubEnv('DEV', true as any)
 
     const { supabase } = await import('./supabase')
 
     expect(consoleSpy).toHaveBeenCalledWith('Missing Supabase environment variables. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.')
     expect(supabase).toBeDefined()
-    // By casting to any, we bypass the protected property check for testing purposes
-    expect((supabase as any).supabaseUrl).toBe('https://placeholder.supabase.co')
+
+    // @ts-expect-error Accessing protected property for testing
+    expect(supabase.supabaseUrl).toBe('https://placeholder.supabase.co')
 
     consoleSpy.mockRestore()
   })
@@ -31,13 +33,15 @@ describe('supabase initialization', () => {
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.stubEnv('VITE_SUPABASE_URL', 'https://example.supabase.co')
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', '')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.stubEnv('DEV', true as any)
 
     const { supabase } = await import('./supabase')
 
     expect(consoleSpy).toHaveBeenCalledWith('Missing Supabase environment variables. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.')
     expect(supabase).toBeDefined()
-    expect((supabase as any).supabaseKey).toBe('placeholder-key')
+    // @ts-expect-error Accessing protected property for testing
+    expect(supabase.supabaseKey).toBe('placeholder-key')
 
     consoleSpy.mockRestore()
   })
@@ -51,8 +55,10 @@ describe('supabase initialization', () => {
 
     expect(consoleSpy).not.toHaveBeenCalled()
     expect(supabase).toBeDefined()
-    expect((supabase as any).supabaseUrl).toBe('https://example.supabase.co')
-    expect((supabase as any).supabaseKey).toBe('valid-key')
+    // @ts-expect-error Accessing protected property for testing
+    expect(supabase.supabaseUrl).toBe('https://example.supabase.co')
+    // @ts-expect-error Accessing protected property for testing
+    expect(supabase.supabaseKey).toBe('valid-key')
 
     consoleSpy.mockRestore()
   })
