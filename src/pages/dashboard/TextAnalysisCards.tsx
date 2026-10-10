@@ -8,6 +8,8 @@ import { type TextAnalysisResult } from '../../lib/text-analysis'
 import { type Insight } from '../../lib/insights'
 import type { Survey } from '../../types'
 
+const ESCAPE_REGEX = /[.*+?^${}()|[\]\\]/g
+
 // ─── Shared insight band (qualitative sections) ──────────────────────────────
 // Same visual contract as QuickReadCard but embeddable inside other cards.
 
@@ -40,6 +42,8 @@ export function ObsFieldCard({ result, surveys }: { result: TextAnalysisResult; 
   const filtered = q ? withObs.filter(s => s.obs.toLowerCase().includes(q)) : withObs
   const PREVIEW = 5
   const shown = expanded ? filtered : filtered.slice(0, PREVIEW)
+
+  const searchRegex = q ? new RegExp(`(${search.replace(ESCAPE_REGEX, '\\$&')})`, 'gi') : null
 
   return (
     <Card style={{ marginBottom: 14 }}>
@@ -92,8 +96,8 @@ export function ObsFieldCard({ result, surveys }: { result: TextAnalysisResult; 
                     <span className="tnum" style={{ marginLeft: 'auto', color: C.hint }}>#{String(s.nui).padStart(3, '0')}</span>
                   </div>
                   <p style={{ margin: 0, fontSize: 13, color: C.text, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-                    {q
-                      ? s.obs.split(new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')).map((part, idx) =>
+                    {q && searchRegex
+                      ? s.obs.split(searchRegex).map((part, idx) =>
                           part.toLowerCase() === q
                             ? <mark key={idx} style={{ background: `${C.teal}30`, color: C.teal, borderRadius: 2, padding: '0 1px' }}>{part}</mark>
                             : part
