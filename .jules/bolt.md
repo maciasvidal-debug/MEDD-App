@@ -5,3 +5,7 @@
 ## 2024-10-10 - Optimizing Array Traversals in Data Aggregation Loops
 **Learning:** When aggregating frequently-accessed array properties inside hot loops (e.g., tallying values across large datasets), repeatedly allocating temporary arrays using higher-order functions like `.filter(Boolean)` adds significant CPU and garbage collection overhead. In functions like `buildClassMotiveCross`, chaining array operations (`s.motNoConsumo.filter(Boolean)`) inside nested loops over 10,000 items creates extreme performance bottlenecks.
 **Action:** Extract higher-order array filters from hot paths. Instead, implement standard `for` loops across the original array lengths and conditionally bypass unwanted elements (e.g., `if (!mo) continue`) directly within the traversal logic while applying the primary business logic. This enables single-pass traversal without generating intermediate array allocations, dramatically improving execution speed.
+## 2024-05-15 - RegExp instantiation in loop
+
+**Learning:** Initializing regular expressions dynamically inside map loops (`.map(s => new RegExp(...))`) causes unnecessary CPU and memory allocation overhead since the same regex pattern is compiled on every iteration.
+**Action:** Extract the `new RegExp(...)` compilation outside the `.map()` block whenever the regex pattern relies purely on variables invariant across the iteration. Furthermore, static regex parts like escape character matchers should be hoisted to module-level constants.
