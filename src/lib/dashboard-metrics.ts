@@ -583,14 +583,34 @@ export function buildClassMotiveCross(surveys: Survey[]): ClassMotiveCross | nul
       if (g !== SIN_CLASIFICAR) groups.add(g)
     }
     if (groups.size === 0) continue
-    const motives = (s.motNoConsumo ?? []).filter(Boolean)
+    const motNoConsumo = s.motNoConsumo ?? []
     nBase++
-    for (const mo of motives) motiveTotals[mo] = (motiveTotals[mo] ?? 0) + 1
+
+    // Process motives in a single pass without allocating a new array via .filter()
+    for (let i = 0; i < motNoConsumo.length; i++) {
+      const mo = motNoConsumo[i]
+      if (!mo) continue
+
+      motiveTotals[mo] = (motiveTotals[mo] ?? 0) + 1
+
+      for (const g of groups) {
+        let agg = groupAgg[g]
+        if (!agg) {
+          agg = { base: 0, counts: Object.create(null) }
+          groupAgg[g] = agg
+        }
+        agg.counts[mo] = (agg.counts[mo] ?? 0) + 1
+      }
+    }
+
+    // We still need to increment base count for groups even if they had no truthy motives
     for (const g of groups) {
-      const agg = groupAgg[g] ?? { base: 0, counts: Object.create(null) }
+      let agg = groupAgg[g]
+      if (!agg) {
+        agg = { base: 0, counts: Object.create(null) }
+        groupAgg[g] = agg
+      }
       agg.base++
-      for (const mo of motives) agg.counts[mo] = (agg.counts[mo] ?? 0) + 1
-      groupAgg[g] = agg
     }
   }
 
