@@ -80,9 +80,9 @@ begin
          (ord - 1)::int,
          nullif(m->>'nmMed', ''),
          nullif(m->>'dci', ''),
-         nullif(m->>'concMed', '')::numeric,
+         nullif(trim(m->>'concMed'), '')::numeric,
          nullif(m->>'undConc', ''),
-         nullif(m->>'fVto', '')::date,
+         nullif(trim(m->>'fVto'), '')::date,
          nullif(m->>'fuenteObtencion', '')
   from jsonb_array_elements(coalesce(new.medications, '[]'::jsonb)) with ordinality as t(m, ord);
   return new;
@@ -101,9 +101,9 @@ select s.id,
        (ord - 1)::int,
        nullif(m->>'nmMed', ''),
        nullif(m->>'dci', ''),
-       nullif(m->>'concMed', '')::numeric,
+       nullif(trim(m->>'concMed'), '')::numeric,
        nullif(m->>'undConc', ''),
-       nullif(m->>'fVto', '')::date,
+       nullif(trim(m->>'fVto'), '')::date,
        nullif(m->>'fuenteObtencion', '')
 from public.surveys s
 cross join lateral jsonb_array_elements(coalesce(s.medications, '[]'::jsonb)) with ordinality as t(m, ord)

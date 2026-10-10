@@ -37,9 +37,9 @@ with parsed_meds as (
     s.f_disp,
     m.value ->> 'nmMed'                                  as nm_med,
     m.value ->> 'dci'                                    as dci,
-    nullif(m.value ->> 'concMed', '')::numeric           as conc_med,
+    nullif(trim(m.value ->> 'concMed'), '')::numeric           as conc_med,
     m.value ->> 'undConc'                                as und_conc,
-    nullif(m.value ->> 'fVto', '')::date                 as f_vto
+    nullif(trim(m.value ->> 'fVto'), '')::date                 as f_vto
   from public.surveys s,
        jsonb_array_elements(s.medications) as m
 )
