@@ -119,6 +119,10 @@ export interface TextAnalysisResult {
 // Strips diacritics, lowercases and collapses whitespace. Keep digits.
 // Uses a null-prototype dictionary cache to memoize regex executions in this hot loop,
 // providing an O(1) fast path for repeated vocabulary tokens.
+const DIACRITICS_RE = /[\u0300-\u036f]/g;
+const NON_ALPHANUM_RE = /[^a-z0-9\s]/g;
+const WHITESPACE_RE = /\s+/g;
+
 const NORM_CACHE: Record<string, string> = Object.create(null);
 
 function norm(text: string): string {
@@ -127,9 +131,9 @@ function norm(text: string): string {
 
   const res = text
     .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .normalize('NFD').replace(DIACRITICS_RE, '')
+    .replace(NON_ALPHANUM_RE, ' ')
+    .replace(WHITESPACE_RE, ' ')
     .trim();
 
   NORM_CACHE[text] = res;
@@ -187,8 +191,10 @@ function computeBigrams(tokensByText: string[][]): Map<string, number> {
 
 // Escape any regex metacharacters so a keyword is matched literally (the dict is
 // exported/extensible, so don't assume keywords are always plain [a-z ]).
+const ESCAPE_REGEX_RE = /[.*+?^${}()|[\]\\]/g
+
 function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return s.replace(ESCAPE_REGEX_RE, '\\$&')
 }
 
 // Precompile one alternation RegExp per theme, once at module load. Matching a
