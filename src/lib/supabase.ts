@@ -4,9 +4,14 @@ import ws from 'ws'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.')
+const hasEnvVars = Boolean(supabaseUrl && supabaseKey)
+
+if (!hasEnvVars && import.meta.env.DEV) {
+  console.warn('Missing Supabase environment variables. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.')
 }
+
+const safeUrl = supabaseUrl || 'https://placeholder.supabase.co'
+const safeKey = supabaseKey || 'placeholder-key'
 
 // Fallback logic for Node.js environments (like Vitest in CI on older Node versions)
 // that lack native globalThis.WebSocket support required by Supabase Realtime.
@@ -21,4 +26,4 @@ if (isNode && typeof globalThis.WebSocket === 'undefined') {
   }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey, options)
+export const supabase = createClient(safeUrl, safeKey, options)
