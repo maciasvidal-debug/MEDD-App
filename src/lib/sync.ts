@@ -170,7 +170,10 @@ export async function fullSync(
   role: UserRole,
 ): Promise<{ pushed: number; pulled: number }> {
   const local    = await getAllSurveys()
-  const localMap = new Map(local.map(s => [s.id, s]))
+  const localMap = new Map<string, Survey>()
+  for (let i = 0; i < local.length; i++) {
+    localMap.set(local[i].id, local[i])
+  }
 
   // 0. Flush deletion tombstones first. Retry the remote delete for each; only
   //    drop the tombstone when the server confirms, so an offline/failed delete
