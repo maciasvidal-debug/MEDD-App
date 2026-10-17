@@ -61,7 +61,7 @@ export function assertVersioned(surveys: Survey[]): void {
   if (sinVersion.length > 0) {
     throw new Error(
       `Export bloqueado: ${sinVersion.length} registro(s) sin versión de instrumento ` +
-      `(instrumentVersion nulo). Todo registro debe declarar su versión (1 ó 2) ` +
+      `(instrumentVersion nulo). Cada registro debe declarar su versión (1 ó 2) ` +
       `antes de exportar. IDs: ${sinVersion.map(s => s.id).join(', ')}`,
     )
   }
