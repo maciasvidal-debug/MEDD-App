@@ -85,7 +85,7 @@ export function FilterBar({
         }}
       >
         <i className="ti ti-file-download" style={{ fontSize: 17 }} aria-hidden />
-        Exportar {filtersActive ? 'selección' : 'todo'} (CSV · {exportCount})
+        Exportar {filtersActive ? 'selección' : 'todos'} (CSV · {exportCount})
       </button>
     </Card>
   )
