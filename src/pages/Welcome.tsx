@@ -11,7 +11,7 @@ const ENCUESTADOR_STEPS: Step[] = [
   { icon: 'ti-clipboard-plus', title: 'Registra encuestas',
     body: 'Pulsa «Nueva encuesta» y completa los 6 pasos. Puedes pausar y retomar: tu avance se guarda solo.' },
   { icon: 'ti-cloud-check', title: 'Funciona sin conexión',
-    body: 'Captura en campo aunque no tengas señal. Todo se guarda en el dispositivo y se sincroniza automáticamente al reconectar.' },
+    body: 'Captura en campo aunque no tengas señal. Los datos se guardan en el dispositivo y se sincronizan automáticamente al reconectar.' },
   { icon: 'ti-list-check', title: 'Revisa y exporta',
     body: 'En «Registros» ves y editas tus encuestas; en «Exportar» descargas los datos en CSV.' },
   { icon: 'ti-user-shield', title: 'Tu perfil importa',
