@@ -97,6 +97,13 @@ export async function saveSurvey(survey: Survey): Promise<void> {
   await db.put('surveys', survey)
 }
 
+/**
+ * Bulk insert surveys into IDB.
+ * Performance note: A synchronous `for..of` loop calling `tx.store.put()` and
+ * awaiting `tx.done` is the most memory-efficient and performant pattern.
+ * It avoids microtask allocation overhead from `Promise.all(surveys.map(...))`
+ * and out-performs standard `for` loops when wrapping IDB native bindings.
+ */
 export async function saveManySurveys(surveys: Survey[]): Promise<void> {
   if (surveys.length === 0) return
   const db = await getDB()
@@ -148,8 +155,14 @@ export async function removeDeletion(id: string): Promise<void> {
   await db.delete('deletions', id)
 }
 
-// Drop many tombstones in one readwrite transaction instead of opening a
-// separate transaction per id (mirrors saveManySurveys' bulk-write pattern).
+/**
+ * Drop many tombstones in one readwrite transaction instead of opening a
+ * separate transaction per id (mirrors `saveManySurveys` bulk-write pattern).
+ * Performance note: A synchronous `for..of` loop calling `tx.store.delete()` and
+ * awaiting `tx.done` is the most memory-efficient and performant pattern.
+ * It avoids microtask allocation overhead from `Promise.all(ids.map(...))`
+ * and out-performs standard `for` loops when wrapping IDB native bindings.
+ */
 export async function removeDeletions(ids: string[]): Promise<void> {
   if (ids.length === 0) return
   const db = await getDB()
