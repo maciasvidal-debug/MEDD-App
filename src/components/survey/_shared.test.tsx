@@ -35,7 +35,7 @@ describe('scrollToFirstError', () => {
   })
 
   it('is a no-op when there are no errors on screen', () => {
-    document.body.innerHTML = `<p>Todo correcto</p>`
+    document.body.innerHTML = `<p>Sin errores</p>`
     scrollToFirstError()
     expect(scrollSpy).not.toHaveBeenCalled()
   })
