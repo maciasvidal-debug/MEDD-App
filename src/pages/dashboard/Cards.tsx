@@ -36,7 +36,7 @@ export function QuickReadCard({ insights }: { insights: Insight[] }) {
 }
 
 
-export function PrevalenceRow({ label, ci }: { label: string; ci: Proportion }) {
+function PrevalenceRow({ label, ci }: { label: string; ci: Proportion }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
