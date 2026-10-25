@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, C, CHART } from '../../components/ui'
 import { SectionLabel } from './Navigation'
 import { INSIGHT_TONE } from './constants'
@@ -37,13 +37,20 @@ export function ObsFieldCard({ result, surveys }: { result: TextAnalysisResult; 
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(false)
 
-  const withObs = surveys.filter(s => s.obs?.trim())
   const q = search.trim().toLowerCase()
-  const filtered = q ? withObs.filter(s => s.obs.toLowerCase().includes(q)) : withObs
+
+  const { filtered } = useMemo(() => {
+    const withObs = surveys.filter(s => s.obs?.trim())
+    const filtered = q ? withObs.filter(s => s.obs.toLowerCase().includes(q)) : withObs
+    return { filtered }
+  }, [surveys, q])
+
   const PREVIEW = 5
   const shown = expanded ? filtered : filtered.slice(0, PREVIEW)
 
-  const searchRegex = q ? new RegExp(`(${search.replace(ESCAPE_REGEX, '\\$&')})`, 'gi') : null
+  const searchRegex = useMemo(() => {
+    return q ? new RegExp(`(${search.replace(ESCAPE_REGEX, '\\$&')})`, 'gi') : null
+  }, [search, q])
 
   return (
     <Card style={{ marginBottom: 14 }}>

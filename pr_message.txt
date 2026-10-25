@@ -1,6 +1,1 @@
-🧹 [Prevent false-positive TODO flag in Spanish text]
-
-* 🎯 **What:** Rephrased the string literal `'Todo se guarda'` to `'Los datos se guardan'` and updated the grammar agreement to `'se sincronizan'`.
-* 💡 **Why:** The word 'Todo' in Spanish means 'Everything', but code health linters misidentified it as an actionable 'TODO' comment/task, artificially inflating technical debt metrics.
-* ✅ **Verification:** Ran `npm run lint` which passed with zero errors, and successfully ran the Vitest suite ensuring no behavior or component logic was broken.
-* ✨ **Result:** Improved CI/CD maintainability by preventing false-positive technical debt alerts from scanners without altering application behavior.
+⚡ Memoize regex and filtering in TextAnalysisCards
