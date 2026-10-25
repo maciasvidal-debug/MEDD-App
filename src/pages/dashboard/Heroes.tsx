@@ -70,7 +70,7 @@ export function EncuestadorHero({ n, pendingDraft, onNew, onResume, onView }: {
   )
 }
 
-export function HeroStat({ value, label }: { value: number; label: string }) {
+function HeroStat({ value, label }: { value: number; label: string }) {
   return (
     <div>
       <div className="fd tnum" style={{ fontSize: 28, fontWeight: 600, lineHeight: 1 }}>{value}</div>
