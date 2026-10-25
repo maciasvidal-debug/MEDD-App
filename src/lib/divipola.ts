@@ -14,6 +14,25 @@ const INDEX = DIVIPOLA.map(([municipio, departamento, codigo]) => ({
   municipio, departamento, codigo, key: fold(municipio),
 }))
 
+
+
+// Pre-computed Maps for O(1) lookups to avoid full array scans per keystroke/validation.
+// Ambiguous names (appearing in >1 department) are mapped to '' to preserve
+// the exact behavior of prompting the surveyor to disambiguate.
+const UNIQUE_DEPT_MAP = new Map<string, string>()
+const UNIQUE_COD_MAP = new Map<string, string>()
+const DEPT_COD_MAP = new Map<string, string>()
+
+for (const { key, departamento, codigo } of INDEX) {
+  if (UNIQUE_DEPT_MAP.has(key)) {
+    UNIQUE_DEPT_MAP.set(key, '')
+    UNIQUE_COD_MAP.set(key, '')
+  } else {
+    UNIQUE_DEPT_MAP.set(key, departamento)
+    UNIQUE_COD_MAP.set(key, codigo)
+  }
+  DEPT_COD_MAP.set(`${key}|${departamento}`, codigo)
+}
 const rec = (e: typeof INDEX[number]): MunicipioRecord =>
   ({ municipio: e.municipio, departamento: e.departamento, codigo: e.codigo })
 
@@ -57,8 +76,7 @@ export function searchMunicipios(term: string, limit = 10, departamento?: string
 export function lookupDepartamento(municipio: string): string {
   const q = fold(municipio)
   if (!q) return ''
-  const matches = INDEX.filter(e => e.key === q)
-  return matches.length === 1 ? matches[0].departamento : ''
+  return UNIQUE_DEPT_MAP.get(q) || ''
 }
 
 /**
@@ -72,6 +90,9 @@ export function lookupCodigo(municipio: string, departamento?: string): string {
   if (!municipio) return '' // guarda defensiva: municipio ausente/'' → sin código
   const q = fold(municipio)
   if (!q) return ''
-  const matches = INDEX.filter(e => e.key === q && (!departamento || e.departamento === departamento))
-  return matches.length === 1 ? matches[0].codigo : ''
+
+  if (departamento) {
+    return DEPT_COD_MAP.get(`${q}|${departamento}`) || ''
+  }
+  return UNIQUE_COD_MAP.get(q) || ''
 }
