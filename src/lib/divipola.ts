@@ -23,6 +23,17 @@ const UNIQUE_DEPT_MAP = new Map<string, string>()
 const UNIQUE_COD_MAP = new Map<string, string>()
 const DEPT_COD_MAP = new Map<string, string>()
 
+const DEPT_POOL_MAP = new Map<string, typeof INDEX>()
+for (const item of INDEX) {
+  let pool = DEPT_POOL_MAP.get(item.departamento)
+  if (!pool) {
+    pool = []
+    DEPT_POOL_MAP.set(item.departamento, pool)
+  }
+  pool.push(item)
+}
+
+
 for (const { key, departamento, codigo } of INDEX) {
   if (UNIQUE_DEPT_MAP.has(key)) {
     UNIQUE_DEPT_MAP.set(key, '')
@@ -52,7 +63,7 @@ export const DEPARTAMENTOS: readonly string[] =
  */
 export function searchMunicipios(term: string, limit = 10, departamento?: string): MunicipioRecord[] {
   const q = fold(term)
-  const pool = departamento ? INDEX.filter(e => e.departamento === departamento) : INDEX
+  const pool = departamento ? (DEPT_POOL_MAP.get(departamento) || []) : INDEX
   if (q.length < 2) {
     return departamento ? pool.map(rec).sort(byName).slice(0, limit) : []
   }
