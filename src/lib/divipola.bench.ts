@@ -1,5 +1,5 @@
 import { bench, describe } from 'vitest'
-import { lookupDepartamento, lookupCodigo } from './divipola'
+import { lookupDepartamento, lookupCodigo, searchMunicipios } from './divipola'
 
 describe('lookupDepartamento', () => {
   bench('lookup known unique', () => {
@@ -25,5 +25,17 @@ describe('lookupCodigo', () => {
   })
   bench('lookup unknown', () => {
     lookupCodigo('Ciudad Inexistente')
+  })
+})
+
+describe('searchMunicipios', () => {
+  bench('search without dept', () => {
+    searchMunicipios('San')
+  })
+  bench('search with dept', () => {
+    searchMunicipios('San', 10, 'Antioquia')
+  })
+  bench('search empty with dept', () => {
+    searchMunicipios('', 10, 'Antioquia')
   })
 })
