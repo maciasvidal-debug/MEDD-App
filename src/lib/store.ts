@@ -23,7 +23,7 @@ export type Density = 'comfortable' | 'compact'
 // Código de hogar corto y legible (H-XXXXXX). Autogenerado en cada captura y
 // editable, para que el encuestador pueda reutilizar el mismo código en las
 // demás personas del hogar. Deriva del uuid para heredar su unicidad.
-function newHogarId(): string {
+export function newHogarId(): string {
   return 'H-' + uuid().replace(/-/g, '').slice(0, 6).toUpperCase()
 }
 
