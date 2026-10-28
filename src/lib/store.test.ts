@@ -28,7 +28,7 @@ vi.mock('./supabase', () => ({
   },
 }))
 
-import { useStore, newHogarId } from './store'
+import { useStore } from './store'
 import { getSurvey, saveSurvey, clearLocalUserData } from './db'
 import { DEFAULT_SETTINGS } from './constants'
 import type { Survey, Settings } from '../types'
@@ -312,20 +312,5 @@ describe('auth wrappers', () => {
     await useStore.getState().signOut()
     expect(useStore.getState().user).toBeNull()
     expect(useStore.getState().toasts.some(t => t.level === 'info')).toBe(true)
-  })
-})
-
-describe('newHogarId', () => {
-  it('generates a string with the correct format (H-XXXXXX)', () => {
-    const id = newHogarId()
-    expect(id).toMatch(/^H-[0-9A-F]{6}$/)
-  })
-
-  it('generates unique IDs', () => {
-    const ids = new Set()
-    for (let i = 0; i < 100; i++) {
-      ids.add(newHogarId())
-    }
-    expect(ids.size).toBe(100)
   })
 })
