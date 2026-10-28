@@ -142,7 +142,7 @@ function norm(text: string): string {
 
 // ─── Tokeniser ────────────────────────────────────────────────────────────────
 // Returns content tokens (length > 2, not a stop word).
-function tokenise(text: string): string[] {
+export function tokenise(text: string): string[] {
   return norm(text)
     .split(' ')
     .filter(t => t.length > 2 && !SW.has(t))

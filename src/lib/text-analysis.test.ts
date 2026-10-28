@@ -350,3 +350,36 @@ describe('buildTextAnalysis — result structure', () => {
     expect(total).toBeCloseTo(1, 1)
   })
 })
+
+// ─── tokenise ────────────────────────────────────────────────────────────────
+
+import { tokenise } from './text-analysis'
+
+describe('tokenise', () => {
+  it('splits text by spaces and removes short tokens (length < 3)', () => {
+    expect(tokenise('a ab abc abcd')).toEqual(['abc', 'abcd'])
+  })
+
+  it('removes stopwords', () => {
+    expect(tokenise('el perro y la gata son amigos')).toEqual(['perro', 'gata', 'amigos'])
+  })
+
+  it('normalises case and removes diacritics', () => {
+    expect(tokenise('El PÉrro y lA GÁTA')).toEqual(['perro', 'gata'])
+  })
+
+  it('handles empty strings and whitespace-only strings', () => {
+    expect(tokenise('')).toEqual([])
+    expect(tokenise('   ')).toEqual([])
+    expect(tokenise('\n\t  ')).toEqual([])
+  })
+
+  it('removes non-alphanumeric characters', () => {
+    expect(tokenise('hola, ¿cómo estás?')).toEqual(['hola'])
+  })
+
+  it('keeps valid tokens only', () => {
+    // "que", "porque", "tiene" are stopwords.
+    expect(tokenise('el gato come pescado porque tiene hambre')).toEqual(['gato', 'come', 'pescado', 'hambre'])
+  })
+})
